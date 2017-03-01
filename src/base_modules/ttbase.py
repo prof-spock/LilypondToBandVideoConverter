@@ -11,7 +11,6 @@ def iif (condition, true_value, false_value):
     else:
         return false_value
 
-
 #--------------------
 
 def iif2 (condition1, true_value1, condition2, true_value2, false_value2):

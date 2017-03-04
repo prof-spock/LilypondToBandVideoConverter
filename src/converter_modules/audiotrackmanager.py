@@ -7,7 +7,7 @@
 
 #====================
 
-from miditransformation import MidiTransformer
+from miditransformer import MidiTransformer
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom

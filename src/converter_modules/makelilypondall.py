@@ -20,13 +20,14 @@
 #--------------------
 
 import argparse
-from audiotrackmanager import AudioTrackManager
 from collections import namedtuple
+
+from audiotrackmanager import AudioTrackManager
 from lilypondfilegenerator import LilypondFile
 from lilypondpngvideogenerator import LilypondPngVideoGenerator
-from miditransformation import MidiTransformer
-from mla_overallsettings import MLA_OverallSettings
-from mla_songconfigurationdata import MLA_SongConfigurationData
+from miditransformer import MidiTransformer
+from mla_overallsettingshandler import MLA_OverallSettings
+from mla_songconfigurationdatahandler import MLA_SongConfigurationData
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, convertStringToList, iif
@@ -303,9 +304,7 @@ class _LilypondProcessor:
             descriptor = songData.voiceNameToVoiceDataMap[voiceName]
             voiceNameToVolumeMap[voiceName] = descriptor.audioVolume
 
-        audioTrackManager.mixdown(songData.albumName, songData.title,
-                                  songData.voiceNameList,
-                                  voiceNameToVolumeMap)
+        audioTrackManager.mixdown(songData, voiceNameToVolumeMap)
         
         Logging.trace("<<")
 
@@ -523,10 +522,11 @@ def main ():
     configData = MLA_OverallSettings()
     configData.readFile(configurationFilePath)
 
-    Logging.initialize(Logging.Level_verbose, configData.loggingFileName)
-
-    # repeat reading of config data for having it logged
-    configData.readFile(configurationFilePath)
+    if configData.loggingFileName > "":
+        Logging.initialize(Logging.Level_verbose, configData.loggingFileName)
+        # repeat reading of config data for having it logged
+        configData.readFile(configurationFilePath)
+        
     initialize()
 
     Logging.trace(">>: processingMode = '%s'", processingMode)

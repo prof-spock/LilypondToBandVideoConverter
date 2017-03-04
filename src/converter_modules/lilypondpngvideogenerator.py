@@ -423,7 +423,8 @@ class MP4Video:
 
     @classmethod
     def make (cls, pageDurationList):
-        """Generate an MP4 video from <pageDurationList>."""
+        """Generate an MP4 video from durations in <pageDurationList>
+           and generated PNG images."""
 
         Logging.trace(">>: %s", repr(pageDurationList))
 

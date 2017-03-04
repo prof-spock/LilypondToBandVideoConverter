@@ -26,6 +26,8 @@ soundFontNameList      = None
 
 debuggingIsActive = None
 
+processedAudioFileTemplate = "%s/%s-processed.wav"
+
 #====================
 
 class AudioTrackManager:
@@ -36,63 +38,189 @@ class AudioTrackManager:
     # LOCAL FEATURES
     #--------------------
 
-    def _convertMidiToAudio (self, voiceMidiFileName, voiceName):
-        """Converts voice data in midi file with <voiceMidiFileName>
+    def _compressAudio (self, audioFilePath, songData, songTitle, albumName,
+                        targetFilePath):
+        """Compresses audio file at <audioFilePath> to AAC file at
+           <targetFilePath> using <songData>, <songTitle> and
+           <albumName> for tagging"""
+
+        Logging.trace(">>: audioFile = '%s', songData = %s,"
+                      + " title = '%s', album = '%s', targetFile = '%s'",
+                      audioFilePath, songData, songTitle, albumName,
+                      targetFilePath)
+
+        command = ( aacCommand,
+                    "-V100", "--no-optimize",
+                    "--title", songTitle,
+                    "--artist", songData.artistName,
+                    "--band", songData.artistName,
+                    "--album", albumName,
+                    "--track", str(songData.trackNumber),
+                    "--date", str(songData.year),
+                    "--artwork", songData.albumArtFilePath,
+                    "-i", audioFilePath,
+                    "-o", targetFilePath )
+
+        OperatingSystem.showMessageOnConsole("== convert to AAC: " + songTitle)
+        OperatingSystem.executeCommand(command, False)
+        Logging.trace("<<")
+
+    #--------------------
+
+    def _convertMidiToAudio (self, voiceMidiFilePath, voiceName):
+        """Converts voice data in midi file with <voiceMidiFilePath>
            to raw audio file in audio directory with <voiceName>"""
 
         Logging.trace(">>: voice = %s, midiFile = '%s'",
-                      voiceName, voiceMidiFileName)
+                      voiceName, voiceMidiFilePath)
 
         # prepare config file for fluidsynth
-        fluidsynthSettingsFileName = ("%s/%s"
+        fluidsynthSettingsFilePath = ("%s/%s"
                                       % (self._audioDirectoryPath,
                                          "fluidsynthsettings.txt"))
-        fluidsynthSettingsFile = open(fluidsynthSettingsFileName, "w")
+        fluidsynthSettingsFile = open(fluidsynthSettingsFilePath, "w")
         st = "rev_setlevel 0\nrev_setwidth 1.5\nrev_setroomsize 0.5"
         fluidsynthSettingsFile.write(st)
         fluidsynthSettingsFile.close()
         Logging.trace("--: settings file '%s' generated",
-                      fluidsynthSettingsFileName)
+                      fluidsynthSettingsFilePath)
 
         concatDirectoryProc = (lambda x: "%s/%s"
                                          % (soundFontDirectoryName, x))
         soundFonts = map(concatDirectoryProc, soundFontNameList)
-        targetFileName = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
+        targetFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
 
         # processing midi file via fluidsynth
         OperatingSystem.showMessageOnConsole("== fluidsynth "
-                                             + targetFileName)
-        command = ([fluidsynthCommand,
-                    "-n", "-i", "-g", "1",
-                    "-f", fluidsynthSettingsFileName,
-                    "-F", targetFileName]
+                                             + targetFilePath)
+
+        command = ([ fluidsynthCommand,
+                     "-n", "-i", "-g", "1",
+                     "-f", fluidsynthSettingsFilePath,
+                     "-F", targetFilePath ]
                    + soundFonts
-                   + [ voiceMidiFileName ])
+                   + [ voiceMidiFilePath ])
         OperatingSystem.executeCommand(command, False,
                                        stdout=OperatingSystem.nullDevice)
 
         # cleanup
-        OperatingSystem.removeFile(fluidsynthSettingsFileName,
+        OperatingSystem.removeFile(fluidsynthSettingsFilePath,
                                    debuggingIsActive)
+
+        Logging.trace("<<")
+
+    # --------------------
+
+    def _constructSettingsForOptionalVoices (self, optionalVoiceMap,
+                                             voiceNameList):
+        """Constructs a list of triples from mapping of optional
+           voices <optionalVoiceMap> and given <voiceNameList>, where
+           each triple represents a target audio file with its album
+           name suffix, its song title suffix and the voice name list
+           used for this audio file"""
+
+        Logging.trace(">>")
+
+        result = []
+
+        # calculate power set as list
+        optionalVoiceList = optionalVoiceMap.keys()
+        voiceNameSubsetList = self._powerset(optionalVoiceList)
+        voiceNameSubsetCount = len(voiceNameSubsetList)
+
+        for i in xrange(voiceNameSubsetCount):
+            j = -(i+1)
+            voiceNameSubset           = voiceNameSubsetList[i]
+            currentVoiceNameList = list(set(voiceNameList)
+                                        - set(voiceNameSubset))
+            albumNameSuffix = "_".join([optionalVoiceMap[name][0]
+                                        for name in voiceNameSubset])
+            songTitleSuffix = ("-" +
+                               "".join([optionalVoiceMap[name][1]
+                                        for name in voiceNameSubset]))
+            songTitleSuffix = iif(songTitleSuffix == "-",
+                                  "ALL", songTitleSuffix)
+
+            newEntry = (albumNameSuffix, songTitleSuffix, currentVoiceNameList)
+            Logging.trace("--: appending %s for subset=%s",
+                          newEntry, voiceNameSubset)
+            result.append(newEntry)
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    def _makeFilteredMidiFile (self, voiceName, midiFilePath,
+                               voiceMidiFilePath):
+        """Filters tracks in midi file named <midiFilePath> belonging
+           to voice with <voiceName> and writes them to
+           <voiceMidiFilePath>"""
+
+        Logging.trace(">>: voice = %s, midiFile = '%s', targetFile = '%s'",
+                      voiceName, midiFilePath, voiceMidiFilePath)
+
+        midiTransformer = MidiTransformer(midiFilePath, debuggingIsActive)
+        midiTransformer.filterByTrackNamePrefix(voiceName)
+        midiTransformer.save(voiceMidiFilePath)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def _makeFilteredMidiFile (self, voiceName, midiFileName,
-                               voiceMidiFileName):
-        """Filters tracks in midi file named <midiFileName> belonging
-           to voice with <voiceName> and writes them to
-           <voiceMidiFileName>"""
+    def _mixdownToWavFile (self, songTitle, voiceNameList,
+                           voiceNameToVolumeMap, attenuationLevel,
+                           targetFilePath):
+        """Constructs and executes a command for audio mixdown of song
+           with <songTitle> to target file with <targetFilePath> from
+           given <voiceNameList>, the mapping to volumes
+           <voiceNameToVolumeMap> with loudness attenuation given by
+           <attenuationLevel>"""
 
-        Logging.trace(">>: voice = %s, midiFile = '%s', targetFile = '%s'",
-                      voiceName, midiFileName, voiceMidiFileName)
+        Logging.trace(">>: voiceNames = %s, target = '%s'",
+                      voiceNameList, targetFilePath)
 
-        midiTransformer = MidiTransformer(midiFileName, debuggingIsActive)
-        midiTransformer.filterByTrackNamePrefix(voiceName)
-        midiTransformer.save(voiceMidiFileName)
-        
+        command = [ soxCommand, "--combine", "mix" ]
+
+        for voiceName in voiceNameList:
+            audioFilePath = (processedAudioFileTemplate
+                             % (self._audioDirectoryPath, voiceName))
+            volume = voiceNameToVolumeMap.get(voiceName, 1)
+            command += [ "-v", volume, audioFilePath ]
+
+        command += [ targetFilePath, "norm", str(attenuationLevel) ]
+
+        OperatingSystem.showMessageOnConsole("== make mix file: %s"
+                                             % songTitle)
+        OperatingSystem.executeCommand(command, False)
+
         Logging.trace("<<")
+
+    #--------------------
+
+    def _powerset (self, currentList):
+        """Calculates the power set of elements in <currentList>"""
+
+        Logging.trace(">>: %s", currentList)
+
+        elementCount = len(currentList)
+        powersetCardinality = 2 ** elementCount
+        result = []
+
+        for i in xrange(powersetCardinality):
+            currentSet = []
+            bitmap = i
+
+            for j in xrange(elementCount):
+                bitmap, remainder = divmod(bitmap, 2)
+
+                if remainder == 1:
+                    currentSet.append(currentList[j])
+
+            result.append(currentSet)
+
+        Logging.trace("<<: %s", result)
+        return result
 
     #--------------------
     # EXPORTED FEATURES
@@ -136,38 +264,39 @@ class AudioTrackManager:
 
     #--------------------
 
-    def copyOverrideFile (self, fileName, voiceName):
-        """Sets refined file from <fileName>"""
+    def copyOverrideFile (self, filePath, voiceName):
+        """Sets refined file from <filePath> for voice with
+           <voiceName>"""
 
         Logging.trace(">>")
 
         message = "== overriding %s from file" % voiceName
         OperatingSystem.showMessageOnConsole(message)
 
-        targetFileName = "%s/%s" % (self._audioDirectoryPath,
-                                    voiceName + "-processed.wav")
+        targetFilePath = (processedAudioFileTemplate
+                          % (self._audioDirectoryPath, voiceName))
         command = (ffmpegCommand,
-                   "-y", "-i", fileName, targetFileName)
+                   "-y", "-i", filePath, targetFilePath)
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def generateRawAudio (self, midiFileName, voiceName):
+    def generateRawAudio (self, midiFilePath, voiceName):
         """Generates audio wave file for <voiceName> from midi file
-           with <midiFileName> in target directory; if several midi
+           with <midiFilePath> in target directory; if several midi
            tracks match voice name, the resulting audio files are
            mixed; output is dry (no chorus, reverb and delay) and
            contains leading and trailing silent passages"""
 
         Logging.trace(">>: voice = %s, midiFile = '%s'",
-                      voiceName, midiFileName)
+                      voiceName, midiFilePath)
 
-        tempMidiFileName = "tempRender.mid"
-        self._makeFilteredMidiFile(voiceName, midiFileName, tempMidiFileName)
-        self._convertMidiToAudio(tempMidiFileName, voiceName)
-        OperatingSystem.removeFile(tempMidiFileName, debuggingIsActive)
+        tempMidiFilePath = "tempRender.mid"
+        self._makeFilteredMidiFile(voiceName, midiFilePath, tempMidiFilePath)
+        self._convertMidiToAudio(tempMidiFilePath, voiceName)
+        OperatingSystem.removeFile(tempMidiFilePath, debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -207,20 +336,44 @@ class AudioTrackManager:
 
     #--------------------
 
-    def mixdown (self, albumName, songTitle, voiceNameList,
-                 voiceNameToVolumeMap, optionalVoiceMap):
+    def mixdown (self, songData, voiceNameToVolumeMap):
         """Combines the processed audio files for all voices in
-           <voiceNameList> into several combination files and converts
-           them to aac format; voice volumes are given via
-           <voiceNameToVolumeMap>; the optional voices are given by
-           the keys in <optionalVoiceMap> and the final files are
-           tagged with <albumName> and <songTitle> with suffices given
-           by <optionalVoiceMap>"""
+           <songData.voiceNameList> into several combination files and
+           converts them to aac format; <songData> defines the voice
+           volumes, the relative normalization level, the optional
+           voices as well as the tags and suffices for the final files"""
 
-        Logging.trace(">>: albumName = '%s', songTitle = '%s',"
-                      + " voiceNameList = %s, voiceNameToVolumeMap = %s,",
-                      + " optionalVoiceMap = %s",
-                      albumName, songTitle, voiceNameList,
-                      voiceNameToVolumeMap, optionalVoiceMap)
+        Logging.trace(">>: songData = %s, voiceNameToVolumeMap = %s",
+                      songData, voiceNameToVolumeMap)
+
+        optionalVoiceMap = songData.optionalVoiceNameToSuffixMap
+        waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
+
+        voiceProcessingList = \
+            self._constructSettingsForOptionalVoices(optionalVoiceMap,
+                                                     songData.voiceNameList)
+        albumName = songData.albumName
+        songTitle = songData.title
+        attenuationLevel = songData.attenuationLevel
+
+        for v in voiceProcessingList:
+            albumNameSuffix, songTitleSuffix, currentVoiceNameList = v
+            currentAlbumName = iif(albumNameSuffix == "", albumName,
+                                   "%s - %s" % (albumName, albumNameSuffix))
+            currentSongTitle = "%s [%s]" % (songTitle, songTitleSuffix)
+
+            self._mixdownToWavFile(currentSongTitle, currentVoiceNameList,
+                                   voiceNameToVolumeMap, attenuationLevel,
+                                   waveIntermediateFilePath)
+
+            fileSuffix = iif(songTitleSuffix == "ALL",
+                             "", songTitleSuffix.lower())
+            targetFilePath = ("%s/%s%s%s.m4a"
+                              % (songData.audioTargetDirectoryPath,
+                                 songData.audioTargetFileNamePrefix,
+                                 songData.fileNamePrefix, fileSuffix))
+            self._compressAudio(waveIntermediateFilePath, songData,
+                                currentSongTitle, currentAlbumName,
+                                targetFilePath)
 
         Logging.trace("<<")

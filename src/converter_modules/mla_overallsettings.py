@@ -102,25 +102,24 @@ class MLA_OverallSettings:
         getValueProc = configurationFile.getValue
 
         # read all values
-        self.aacCommand = getValueProc("aacCommand", True)
-        self.ffmpegCommand = getValueProc("ffmpegCommand", True)
-        self.fluidsynthCommand = getValueProc("fluidsynthCommand", True)
+        self.aacCommand = getValueProc("aacCommand")
+        self.ffmpegCommand = getValueProc("ffmpegCommand")
+        self.fluidsynthCommand = getValueProc("fluidsynthCommand")
         self.humanizerConfigurationFileName = \
-                 getValueProc("humanizerConfigurationFileName", True)
-        self.lilypondCommand = getValueProc("lilypondCommand", True)
+                 getValueProc("humanizerConfigurationFileName")
+        self.lilypondCommand = getValueProc("lilypondCommand")
         self.lilypondMacroIncludePath = \
-                 getValueProc("lilypondMacroIncludePath", True)
-        self.loggingFileName = getValueProc("loggingFileName", True)
-        self.moveCommand = getValueProc("moveCommand", True)
-        self.soundFontDirectoryName = getValueProc("soundFontDirectoryName",
-                                                   True)
+                 getValueProc("lilypondMacroIncludePath")
+        self.loggingFileName = getValueProc("loggingFileName", "")
+        self.moveCommand = getValueProc("moveCommand")
+        self.soundFontDirectoryName = getValueProc("soundFontDirectoryName")
         self.soundFontNameList = \
-                 convertStringToList(getValueProc("soundFontNames", True))
-        self.soxCommand = getValueProc("soxCommand", True)
-        self.targetDirectoryName = getValueProc("targetDirectoryName", True)
+                 convertStringToList(getValueProc("soundFontNames"))
+        self.soxCommand = getValueProc("soxCommand")
+        self.targetDirectoryName = getValueProc("targetDirectoryName", ".")
         self.tempLilypondFileName = getValueProc("tempLilypondFileName",
-                                                 True)
+                                                 "temp.ly")
         self.tempAudioDirectoryPath = getValueProc("tempAudioDirectoryPath",
-                                                   True)
+                                                   ".")
 
         Logging.trace("<<")

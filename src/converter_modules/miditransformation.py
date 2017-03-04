@@ -1,7 +1,7 @@
 #!/bin/python
-# midiTransformation -- processes midi file and provides several
-#                       transformations on it (e.g. drum humanization,
-#                       volume adaptation, etc.)
+# midiTransformer -- processes midi file and provides several
+#                    transformations on it (e.g. drum humanization,
+#                    volume adaptation, etc.)
 #
 # author: Dr. Thomas Tensi, 2006 - 2016
 

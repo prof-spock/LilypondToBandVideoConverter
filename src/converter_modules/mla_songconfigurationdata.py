@@ -3,6 +3,7 @@
 
 #====================
 
+import datetime
 from configurationfile import ConfigurationFile
 from simplelogging import Logging
 from ttbase import convertStringToList, iif
@@ -94,9 +95,18 @@ class MLA_SongConfigurationData:
         Logging.trace(">>")
 
         # type checks
+        ValidityChecker.isString(self.artistName, "artistName")
+        ValidityChecker.isString(self.albumName, "albumName")
+        ValidityChecker.isString(self.audioTargetFileNamePrefix,
+                                 "audioTargetFileNamePrefix")
+        ValidityChecker.isDirectory(self.audioTargetDirectoryPath,
+                                    "audioTargetDirectoryPath")
+        ValidityChecker.isReadableFile(self.albumArtFilePath,
+                                       "albumArtFilePath")
         ValidityChecker.isReadableFile(self.includeFileName,
                                        "includeFileName")
         ValidityChecker.isString(self.title, "title")
+        ValidityChecker.isNatural(self.trackNumber, "trackNumber")
         ValidityChecker.isString(self.fileNamePrefix, "fileNamePrefix")
         ValidityChecker.isNatural(self.year, "year")
         ValidityChecker.isBoolean(self.debuggingIsActive, "debuggingIsActive")
@@ -164,6 +174,30 @@ class MLA_SongConfigurationData:
 
     #--------------------
 
+    def _splitOptionalVoiceInfo (self, optionalVoiceNames):
+        """Converts string <optionalVoiceNames> to mapping from voice
+           name to suffices for album name and song name"""
+
+        Logging.trace(">>: %s", optionalVoiceNames)
+
+        result = {}
+        optionalVoicePartList = optionalVoiceNames.split(",")
+
+        for part in optionalVoicePartList:
+            part = part.strip()
+
+            if part > "":
+                voiceName, suffices = part.split(":")
+                songNameSuffix, albumNameSuffix = suffices.strip().split("|")
+                value = (albumNameSuffix, songNameSuffix)
+                result[voiceName] = value
+                Logging.trace("--: %s -> %s", voiceName, str(value))
+
+        Logging.trace("<<: %s", str(result))
+        return result
+
+    #--------------------
+
     def _splitOverrideInfo (self, overrideFiles):
         """Converts string <overrideFiles> to mapping from voice name
            to override file name"""
@@ -189,9 +223,16 @@ class MLA_SongConfigurationData:
     #--------------------
 
     def __init__ (self):
+        self.artistName = "%artistName%"
+        self.albumName = "%albumName%"
+        self.optionalVoiceNameToSuffixMap = {}
         self.title = "%title%"
+        self.trackNumber = 0
+        self.audioTargetFileNamePrefix = ""
         self.fileNamePrefix = "XXXX"
         self.includeFileName = "%includeFileName%"
+        self.albumArtFilePath = "%albumArtFilePath%"
+        self.audioTargetDirectoryPath = "YYYY"
         self.year = 2017
         self.debuggingIsActive = False
         self.lyricsCountVocals = 0
@@ -211,8 +252,12 @@ class MLA_SongConfigurationData:
 
     def __str__ (self):
         st = (("_SongConfigurationData("
-               + "title = '%s', fileNamePrefix = %s,"
-               + " includeFileName = '%s', year = %d, debuggingIsActive = %s,"
+               + "artistName = '%s', albumName = '%s', title = '%s',"
+               + " audioTargetFileNamePrefix = %s, fileNamePrefix = %s,"
+               + " optionalVoiceNameToSuffixMap = %s,"
+               + " audioTargetDirectoryPath = '%s',"
+               + " includeFileName = '%s', albumArtFilePath = '%s',"
+               + " year = %d, trackNumber = %d, debuggingIsActive = %s,"
                + " lyricsCountVocals = %d, lyricsCountVocalsStandalone = %d,"
                + " lyricsCountBgVocals = %d,"
                + " lyricsCountBgVocalsStandalone = %d,"
@@ -221,14 +266,19 @@ class MLA_SongConfigurationData:
                + " voiceNameList = %s, voiceNameToVoiceDataMap = %s,"
                + " voiceNameToOverrideFileMap = %s, tempoTrackLineList = %s,"
                + " attenuationLevel = %5.3f)")
-              % (self.title, self.fileNamePrefix, self.includeFileName,
-                 self.year, self.debuggingIsActive,
+              % (self.artistName, self.albumName, self.title,
+                 self.audioTargetFileNamePrefix, self.fileNamePrefix,
+                 self.optionalVoiceNameToSuffixMap,
+                 self.audioTargetDirectoryPath, self.includeFileName,
+                 self.albumArtFilePath,
+                 self.year, self.trackNumber, self.debuggingIsActive,
                  self.lyricsCountVocals, self.lyricsCountVocalsStandalone,
                  self.lyricsCountBgVocals, self.lyricsCountBgVocalsStandalone,
                  self.useSpecialLayoutForExtracts, self.styleHumanizationKind,
                  self.humanizedVoiceNameList, self.voiceNameList,
                  self.voiceNameToVoiceDataMap, self.voiceNameToOverrideFileMap,
                  self.tempoTrackLineList, self.attenuationLevel))
+
         return st
 
     #--------------------
@@ -243,45 +293,53 @@ class MLA_SongConfigurationData:
         getValueProc = configurationFile.getValue
 
         # read all values
-        self.title = getValueProc("title", True)
-        self.fileNamePrefix = getValueProc("fileNamePrefix", True)
+        self.artistName = getValueProc("artistName", "")
+        self.albumName = getValueProc("albumName", "")
+        self.title = getValueProc("title")
+        self.trackNumber = getValueProc("trackNumber", 0)
+        self.audioTargetFileNamePrefix = \
+                 getValueProc("audioTargetFileNamePrefix", "")
+        self.fileNamePrefix = getValueProc("fileNamePrefix")
+        self.audioTargetDirectoryPath = \
+                 getValueProc("audioTargetDirectoryPath", "")
         self.includeFileName = self.fileNamePrefix + "-music.ly"
-        self.year = getValueProc("year", True)
-        self.debuggingIsActive = getValueProc("debuggingIsActive")
-        self.lyricsCountVocals = getValueProc("lyricsCountVocals", True)
+        self.albumArtFilePath = getValueProc("albumArtFilePath", "")
+        self.year = getValueProc("year", datetime.date.today().year)
+        self.debuggingIsActive = getValueProc("debuggingIsActive", False)
+        self.lyricsCountVocals = getValueProc("lyricsCountVocals")
         self.lyricsCountVocalsStandalone = \
-            getValueProc("lyricsCountVocalsStandalone")
+                 getValueProc("lyricsCountVocalsStandalone")
         self.lyricsCountBgVocals = getValueProc("lyricsCountBgVocals")
         self.lyricsCountBgVocalsStandalone = \
-            getValueProc("lyricsCountBgVocalsStandalone")
+                 getValueProc("lyricsCountBgVocalsStandalone")
         self.useSpecialLayoutForExtracts = \
-            getValueProc("useSpecialLayoutForExtracts", True)
-        self.styleHumanizationKind = \
-            getValueProc("styleHumanizationKind", True)
-        self.humanizedVoiceNameList = getValueProc("humanizedVoicesList",
-                                                   True)
-        self.tempoTrackLineList = getValueProc("tempoTrack", True)
-        self.attenuationLevel = getValueProc("attenuationLevel", True)
+                 getValueProc("useSpecialLayoutForExtracts", False)
+        self.styleHumanizationKind = getValueProc("styleHumanizationKind")
+        self.humanizedVoiceNameList = getValueProc("humanizedVoicesList", [])
+        self.tempoTrackLineList = getValueProc("tempoTrack")
+        self.attenuationLevel = getValueProc("attenuationLevel", 0)
 
-        voiceNames      = getValueProc("voices", True)
-        midiChannels    = getValueProc("midiChannel", True)
-        midiInstruments = getValueProc("midiInstrument", True)
-        midiVolumes     = getValueProc("midiVolume", True)
-        panPositions    = getValueProc("panPosition", True)
-        audioVolumes    = getValueProc("audioVolume", True)
-        reverbLevels    = getValueProc("reverbLevel", True)
-        soundVariants   = getValueProc("soundVariant", True)
+        voiceNames      = getValueProc("voices")
+        midiChannels    = getValueProc("midiChannel")
+        midiInstruments = getValueProc("midiInstrument")
+        midiVolumes     = getValueProc("midiVolume")
+        panPositions    = getValueProc("panPosition")
+        audioVolumes    = getValueProc("audioVolume")
+        reverbLevels    = getValueProc("reverbLevel")
+        soundVariants   = getValueProc("soundVariant")
 
-        overrideFiles = getValueProc("overrideFiles", False)
-        overrideFiles = iif(overrideFiles is None, "", overrideFiles)
+        overrideFiles = getValueProc("overrideFiles", "")
+        optionalVoiceNames = getValueProc("optionalVoices", "")
 
         self._checkValidity()
         self._checkStringLists(voiceNames, midiChannels, midiInstruments,
                                midiVolumes, panPositions, audioVolumes,
                                reverbLevels, soundVariants)
 
+        self.optionalVoiceNameToSuffixMap = \
+                 self._splitOptionalVoiceInfo(optionalVoiceNames)
         self.voiceNameToOverrideFileMap = \
-                self._splitOverrideInfo(overrideFiles)
+                 self._splitOverrideInfo(overrideFiles)
         self.tempoTrackLineList = \
            convertStringToList(self.tempoTrackLineList, "|")
         self.humanizedVoiceNameList = \

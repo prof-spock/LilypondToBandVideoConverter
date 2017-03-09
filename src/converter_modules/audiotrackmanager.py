@@ -1,4 +1,4 @@
-#!/bin/python
+# -*- coding: utf-8 -*-
 # audiotrackmanager -- generates audio tracks from midi file and provides
 #                      several transformations on it (e.g. instrument
 #                      postprocessing and mixdown
@@ -10,7 +10,7 @@
 from miditransformer import MidiTransformer
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
-from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
+from ttbase import adaptToRange, iif, isInRange, MyRandom
 
 #====================
 
@@ -109,46 +109,6 @@ class AudioTrackManager:
 
         Logging.trace("<<")
 
-    # --------------------
-
-    def _constructSettingsForOptionalVoices (self, optionalVoiceMap,
-                                             voiceNameList):
-        """Constructs a list of triples from mapping of optional
-           voices <optionalVoiceMap> and given <voiceNameList>, where
-           each triple represents a target audio file with its album
-           name suffix, its song title suffix and the voice name list
-           used for this audio file"""
-
-        Logging.trace(">>")
-
-        result = []
-
-        # calculate power set as list
-        optionalVoiceList = optionalVoiceMap.keys()
-        voiceNameSubsetList = self._powerset(optionalVoiceList)
-        voiceNameSubsetCount = len(voiceNameSubsetList)
-
-        for i in xrange(voiceNameSubsetCount):
-            j = -(i+1)
-            voiceNameSubset           = voiceNameSubsetList[i]
-            currentVoiceNameList = list(set(voiceNameList)
-                                        - set(voiceNameSubset))
-            albumNameSuffix = "_".join([optionalVoiceMap[name][0]
-                                        for name in voiceNameSubset])
-            songTitleSuffix = ("-" +
-                               "".join([optionalVoiceMap[name][1]
-                                        for name in voiceNameSubset]))
-            songTitleSuffix = iif(songTitleSuffix == "-",
-                                  "ALL", songTitleSuffix)
-
-            newEntry = (albumNameSuffix, songTitleSuffix, currentVoiceNameList)
-            Logging.trace("--: appending %s for subset=%s",
-                          newEntry, voiceNameSubset)
-            result.append(newEntry)
-
-        Logging.trace("<<: %s", result)
-        return result
-
     #--------------------
 
     def _makeFilteredMidiFile (self, voiceName, midiFilePath,
@@ -198,7 +158,8 @@ class AudioTrackManager:
 
     #--------------------
 
-    def _powerset (self, currentList):
+    @classmethod
+    def _powerset (cls, currentList):
         """Calculates the power set of elements in <currentList>"""
 
         Logging.trace(">>: %s", currentList)
@@ -261,6 +222,59 @@ class AudioTrackManager:
         self._audioDirectoryPath = audioDirectoryPath
 
         Logging.trace("<<")
+
+    # --------------------
+
+    @classmethod
+    def constructSettingsForOptionalVoices (cls, songData):
+        """Constructs a list of quadruples from mapping
+           <songData.optionalVoiceNameToSuffixMap> of optional voices
+           and given <songData.voiceNameList>, where each tuple
+           represents a target audio file with the voice name list
+           used, its album name, its song title and its target file
+           path"""
+
+        Logging.trace(">>")
+
+        result = []
+        optionalVoiceMap = songData.optionalVoiceNameToSuffixMap
+
+        # calculate power set as list
+        optionalVoiceList = optionalVoiceMap.keys()
+        voiceNameSubsetList = cls._powerset(optionalVoiceList)
+        voiceNameSubsetCount = len(voiceNameSubsetList)
+
+        for i in xrange(voiceNameSubsetCount):
+            j = -(i+1)
+            voiceNameSubset      = voiceNameSubsetList[i]
+            currentVoiceNameList = list(set(songData.voiceNameList)
+                                        - set(voiceNameSubset))
+            albumNameSuffix = "_".join([optionalVoiceMap[name][0]
+                                        for name in voiceNameSubset])
+            songTitleSuffix = ("-" +
+                               "".join([optionalVoiceMap[name][1]
+                                        for name in voiceNameSubset]))
+            songTitleSuffix = iif(songTitleSuffix == "-",
+                                  "ALL", songTitleSuffix)
+            fileSuffix = iif(songTitleSuffix == "ALL",
+                             "", songTitleSuffix.lower())
+
+            albumName = iif(albumNameSuffix == "", songData.albumName,
+                            "%s - %s" % (songData.albumName, albumNameSuffix))
+            songTitle = "%s [%s]" % (songData.title, songTitleSuffix)
+            targetFilePath = ("%s/%s%s%s.m4a"
+                              % (songData.audioTargetDirectoryPath,
+                                 songData.targetFileNamePrefix,
+                                 songData.fileNamePrefix, fileSuffix))
+
+            newEntry = (currentVoiceNameList,
+                        albumName, songTitle, targetFilePath)
+            Logging.trace("--: appending %s for subset %s",
+                          newEntry, voiceNameSubset)
+            result.append(newEntry)
+
+        Logging.trace("<<: %s", result)
+        return result
 
     #--------------------
 
@@ -341,39 +355,26 @@ class AudioTrackManager:
            <songData.voiceNameList> into several combination files and
            converts them to aac format; <songData> defines the voice
            volumes, the relative normalization level, the optional
-           voices as well as the tags and suffices for the final files"""
+           voices as well as the tags and suffices for the final
+           files"""
 
         Logging.trace(">>: songData = %s, voiceNameToVolumeMap = %s",
                       songData, voiceNameToVolumeMap)
 
-        optionalVoiceMap = songData.optionalVoiceNameToSuffixMap
+        cls = self.__class__
         waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
-
         voiceProcessingList = \
-            self._constructSettingsForOptionalVoices(optionalVoiceMap,
-                                                     songData.voiceNameList)
-        albumName = songData.albumName
-        songTitle = songData.title
+            cls.constructSettingsForOptionalVoices(songData)
         attenuationLevel = songData.attenuationLevel
 
         for v in voiceProcessingList:
-            albumNameSuffix, songTitleSuffix, currentVoiceNameList = v
-            currentAlbumName = iif(albumNameSuffix == "", albumName,
-                                   "%s - %s" % (albumName, albumNameSuffix))
-            currentSongTitle = "%s [%s]" % (songTitle, songTitleSuffix)
-
-            self._mixdownToWavFile(currentSongTitle, currentVoiceNameList,
+            currentVoiceNameList, albumName, songTitle, targetFilePath = v
+            self._mixdownToWavFile(songTitle, currentVoiceNameList,
                                    voiceNameToVolumeMap, attenuationLevel,
                                    waveIntermediateFilePath)
-
-            fileSuffix = iif(songTitleSuffix == "ALL",
-                             "", songTitleSuffix.lower())
-            targetFilePath = ("%s/%s%s%s.m4a"
-                              % (songData.audioTargetDirectoryPath,
-                                 songData.audioTargetFileNamePrefix,
-                                 songData.fileNamePrefix, fileSuffix))
             self._compressAudio(waveIntermediateFilePath, songData,
-                                currentSongTitle, currentAlbumName,
-                                targetFilePath)
+                                songTitle, albumName, targetFilePath)
+            OperatingSystem.removeFile(waveIntermediateFilePath,
+                                       songData.debuggingIsActive)
 
         Logging.trace("<<")

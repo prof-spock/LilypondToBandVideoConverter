@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # mla_overallsettings -- services for access to the global configuration file
 #                        of makeLilypondAll
 
@@ -21,18 +22,20 @@ class MLA_OverallSettings:
         self.aacCommand                     = "aac"
         self.ffmpegCommand                  = "ffmpeg"
         self.fluidsynthCommand              = "fluidsynth"
-        self.humanizerConfigurationFileName = "styleHumanization.cfg"
+        self.humanizerConfigurationFilePath = "styleHumanization.cfg"
         self.lilypondCommand                = "lilypond"
         self.lilypondMacroIncludePath       = "/"
-        self.loggingFileName                = ("C:/temp/logs"
+        self.loggingFilePath                = ("C:/temp/logs"
                                                + "/makeLilypondAll.log")
-        self.moveCommand                    = "mv"
-        self.soundFontDirectoryName         = "C:/temp/soundfonts"
+        self.mp4boxCommand                  = "mp4box"
+        self.soundFontDirectoryPath         = "C:/temp/soundfonts"
         self.soundFontNameList              = ""
         self.soxCommand                     = "sox"
-        self.targetDirectoryName            = "generated"
+        self.targetDirectoryPath            = "generated"
         self.tempAudioDirectoryPath         = "/temp"
-        self.tempLilypondFileName           = "temp.ly"
+        self.tempLilypondFilePath           = "temp.ly"
+        self.videoFrameRate                 = 10
+        self.videoScalingFactor             = 4
 
     #--------------------
 
@@ -43,21 +46,23 @@ class MLA_OverallSettings:
         st = (("%s("
                + "aacCommand = '%s', ffmpegCommand = '%s',"
                + " fluidsynthCommand = '%s',"
-               + " humanizerConfigurationFileName = '%s',"
+               + " humanizerConfigurationFilePath = '%s',"
                + " lilypondCommand = '%s', lilypondMacroIncludePath = '%s',"
-               + " loggingFileName = '%s', moveCommand = '%s',"
-               + " soundFontDirectoryName = '%s', soundFontNameList = %s,"
-               + " soxCommand = '%s', targetDirectoryName = '%s',"
+               + " loggingFilePath = '%s', mp4boxCommand = '%s',"
+               + " soundFontDirectoryPath = '%s', soundFontNameList = %s,"
+               + " soxCommand = '%s', targetDirectoryPath = '%s',"
                + " tempAudioDirectoryPath = '%s',"
-               + " tempLilypondFileName = '%s')")
+               + " tempLilypondFilePath = '%s', videoFrameRate = %5.3f,"
+               + " videoScalingFactor = %d)")
               % (className,
                  self.aacCommand, self.ffmpegCommand, self.fluidsynthCommand,
-                 self.humanizerConfigurationFileName, self.lilypondCommand,
-                 self.lilypondMacroIncludePath, self.loggingFileName,
-                 self.moveCommand, self.soundFontDirectoryName,
+                 self.humanizerConfigurationFilePath, self.lilypondCommand,
+                 self.lilypondMacroIncludePath, self.loggingFilePath,
+                 self.mp4boxCommand, self.soundFontDirectoryPath,
                  self.soundFontNameList, self.soxCommand,
-                 self.targetDirectoryName, self.tempAudioDirectoryPath,
-                 self.tempLilypondFileName))
+                 self.targetDirectoryPath, self.tempAudioDirectoryPath,
+                 self.tempLilypondFilePath, self.videoFrameRate,
+                 self.videoScalingFactor))
         return st
 
     #--------------------
@@ -71,55 +76,60 @@ class MLA_OverallSettings:
         ValidityChecker.isString(self.aacCommand, "aacCommand")
         ValidityChecker.isString(self.ffmpegCommand, "ffmpegCommand")
         ValidityChecker.isString(self.fluidsynthCommand, "fluidsynthCommand")
-        ValidityChecker.isString(self.humanizerConfigurationFileName,
-                                 "humanizerConfigurationFileName")
+        ValidityChecker.isString(self.humanizerConfigurationFilePath,
+                                 "humanizerConfigurationFilePath")
         ValidityChecker.isString(self.lilypondCommand, "lilypondCommand")
         ValidityChecker.isString(self.lilypondMacroIncludePath,
                                  "lilypondMacroIncludePath")
-        ValidityChecker.isString(self.loggingFileName, "loggingFileName")
-        ValidityChecker.isString(self.moveCommand, "moveCommand")
-        ValidityChecker.isString(self.soundFontDirectoryName,
-                                 "soundFontDirectoryName")
+        ValidityChecker.isString(self.loggingFilePath, "loggingFilePath")
+        ValidityChecker.isString(self.mp4boxCommand, "mp4boxCommand")
+        ValidityChecker.isString(self.soundFontDirectoryPath,
+                                 "soundFontDirectoryPath")
         ValidityChecker.isString(self.soxCommand, "soxCommand")
-        ValidityChecker.isString(self.targetDirectoryName,
-                                 "targetDirectoryName")
+        ValidityChecker.isString(self.targetDirectoryPath,
+                                 "targetDirectoryPath")
         ValidityChecker.isString(self.tempAudioDirectoryPath,
                                  "tempAudioDirectoryPath")
-        ValidityChecker.isString(self.tempLilypondFileName,
-                                 "tempLilypondFileName")
+        ValidityChecker.isString(self.tempLilypondFilePath,
+                                 "tempLilypondFilePath")
+        ValidityChecker.isFloat(self.videoFrameRate, "videoFrameRate")
+        ValidityChecker.isNatural(self.videoScalingFactor,
+                                  "videoScalingFactor")
 
         Logging.trace("<<: %s", str(self))
 
     #--------------------
 
-    def readFile (self, configurationFileName):
+    def readFile (self, configurationFilePath):
         """Reads data from configuration file with
-           <configurationFileName> into <self>."""
+           <configurationFilePath> into <self>."""
 
-        Logging.trace(">>: '%s'", configurationFileName)
+        Logging.trace(">>: '%s'", configurationFilePath)
 
-        configurationFile = ConfigurationFile(configurationFileName)
+        configurationFile = ConfigurationFile(configurationFilePath)
         getValueProc = configurationFile.getValue
 
         # read all values
         self.aacCommand = getValueProc("aacCommand")
         self.ffmpegCommand = getValueProc("ffmpegCommand")
         self.fluidsynthCommand = getValueProc("fluidsynthCommand")
-        self.humanizerConfigurationFileName = \
-                 getValueProc("humanizerConfigurationFileName")
+        self.humanizerConfigurationFilePath = \
+                 getValueProc("humanizerConfigurationFilePath")
         self.lilypondCommand = getValueProc("lilypondCommand")
         self.lilypondMacroIncludePath = \
                  getValueProc("lilypondMacroIncludePath")
-        self.loggingFileName = getValueProc("loggingFileName", "")
-        self.moveCommand = getValueProc("moveCommand")
-        self.soundFontDirectoryName = getValueProc("soundFontDirectoryName")
+        self.loggingFilePath = getValueProc("loggingFilePath", "")
+        self.mp4boxCommand = getValueProc("mp4boxCommand")
+        self.soundFontDirectoryPath = getValueProc("soundFontDirectoryPath")
         self.soundFontNameList = \
                  convertStringToList(getValueProc("soundFontNames"))
         self.soxCommand = getValueProc("soxCommand")
-        self.targetDirectoryName = getValueProc("targetDirectoryName", ".")
-        self.tempLilypondFileName = getValueProc("tempLilypondFileName",
+        self.targetDirectoryPath = getValueProc("targetDirectoryPath", ".")
+        self.tempLilypondFilePath = getValueProc("tempLilypondFilePath",
                                                  "temp.ly")
         self.tempAudioDirectoryPath = getValueProc("tempAudioDirectoryPath",
                                                    ".")
+        self.videoFrameRate = getValueProc("videoFrameRate", 10.0)
+        self.videoScalingFactor = getValueProc("videoScalingFactor", 4)
 
         Logging.trace("<<")

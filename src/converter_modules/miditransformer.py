@@ -1,4 +1,4 @@
-#!/bin/python
+# -*- coding: utf-8 -*-
 # midiTransformer -- processes midi file and provides several
 #                    transformations on it (e.g. drum humanization,
 #                    volume adaptation, etc.)
@@ -21,7 +21,7 @@ from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
 #====================
 
 maximumInteger = 999999999
-humanizerConfigurationFileName = ""
+humanizerConfigurationFilePath = ""
 humanizedTrackList = []
 
 #====================
@@ -451,7 +451,7 @@ class _HumanizationStrategy:
         scriptFilePath = OperatingSystem.dirname(scriptFileName)
         configurationFilePath = (scriptFilePath
                                  + OperatingSystem.pathSeparator
-                                 + humanizerConfigurationFileName)
+                                 + humanizerConfigurationFilePath)
 
         if not OperatingSystem.hasFile(configurationFilePath):
             Logging.trace("--: ERROR configuration file not found %s",
@@ -1262,11 +1262,11 @@ class MidiTransformer:
     def initialize (cls, configurationFileName, trackList):
         """Sets global variables for this module"""
 
-        global humanizerConfigurationFileName, humanizedTrackList
+        global humanizerConfigurationFilePath, humanizedTrackList
 
         Logging.trace(">>: configurationFileName = '%s', trackList = %s",
                       configurationFileName, trackList)
-        humanizerConfigurationFileName = configurationFileName
+        humanizerConfigurationFilePath = configurationFileName
         humanizedTrackList             = trackList
         Logging.trace("<<")
 

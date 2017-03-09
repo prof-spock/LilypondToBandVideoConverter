@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # configurationfile - provides reading from a configuration file containing
 #                     comments and assignment to variables
 #

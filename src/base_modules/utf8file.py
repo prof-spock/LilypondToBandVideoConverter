@@ -1,4 +1,3 @@
-#!/bin/python
 # -*- coding: utf-8 -*-
 # utf8file - simple wrapper for UTF8 encoded text files
 

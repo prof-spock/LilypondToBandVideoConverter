@@ -1,4 +1,4 @@
-#!/bin/python
+# -*- coding: utf-8 -*-
 # lilypondpngvideogenerator -- processes lilypond file, scans postscript
 #                              file for page boundaries, analyzes tempo
 #                              track and generates MP4 video and
@@ -11,6 +11,7 @@
 import simpleassertion
 from simplelogging import Logging
 from operatingsystem import OperatingSystem
+from ttbase import iif
 import re
 
 #====================
@@ -23,10 +24,6 @@ infinity = 999999
 # ==== configuration settings ====
 # show measure number in subtitle only for 95% of the measure duration
 displayTimePercentage = 0.95
-
-# the factor of magnification used for rendering the score images;
-# later a downscaling is done by that factor
-defaultScaleFactor = 4
 
 # the log level for ffmpeg rendering
 ffmpegLogLevel = "error"
@@ -81,7 +78,7 @@ class Assertion:
 
         if (isinstance(value, int) or isinstance(value, long)
             or isinstance(value, float)):
-            value = repr(value)
+            value = str(value)
 
         isOkay = integerRegexp.match(value)
 
@@ -89,7 +86,7 @@ class Assertion:
             isOkay = floatRegexp.match(value)
 
         if not isOkay:
-            errorTemplate = "a number" if floatIsAllowed else "an integer"
+            errorTemplate = iif(floatIsAllowed, "a number", "an integer")
             errorTemplate = "%s must be " + errorTemplate + " - %s"
         elif rangeKind == "":
             errorTemplate = "%s%s"
@@ -160,8 +157,8 @@ class DurationManager:
                 duration = cls.measureDuration(tempo, measureLength)
 
             currentMeasureDuration = (duration +
-                                      (0 if measureNumber > firstMeasureNumber
-                                      else firstMeasureOffset))
+                                      iif(measureNumber > firstMeasureNumber,
+                                           0, firstMeasureOffset))
             result[measureNumber] = currentMeasureDuration
 
         Logging.trace("<<: %s", repr(result))
@@ -731,16 +728,18 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self, lilypondFileName, targetMp4FileName,
                   targetSubtitleFileName, tempoTrackLineList, countInMeasures,
-                  frameRate, debuggingIsActive=False):
+                  frameRate, scalingFactor, debuggingIsActive=False):
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = '%s', targetMp4FileName = '%s',"
                       + " targetSubtitleFileName = '%s',"
                       + " tempoTrackLineList = %s, countInMeasures = %s,"
-                      + " frameRate = %s, debuggingIsActive = %s",
+                      + " frameRate = %s, scalingFactor = %d,"
+                      + " debuggingIsActive = %s",
                       lilypondFileName, targetMp4FileName,
                       targetSubtitleFileName, tempoTrackLineList,
-                      countInMeasures, frameRate, debuggingIsActive)
+                      countInMeasures, frameRate, scalingFactor,
+                      debuggingIsActive)
 
         self._ffmpegCommand          = ffmpegCommand
         self._lilypondCommand        = lilypondCommand
@@ -756,7 +755,7 @@ class LilypondPngVideoGenerator:
         # video parameters
         self._countInMeasures        = countInMeasures
         self._frameRate              = frameRate
-        self._scaleFactor            = defaultScaleFactor
+        self._scaleFactor            = scalingFactor
 
         self._debuggingIsActive = debuggingIsActive
 

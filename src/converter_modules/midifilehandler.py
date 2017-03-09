@@ -1,4 +1,4 @@
-#!/bin/python
+# -*- coding: utf-8 -*-
 # midiFileHandler -- converts midi file into a text representation
 #                    and writes a midi file from text representation
 #

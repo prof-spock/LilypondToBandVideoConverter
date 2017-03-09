@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # configurationfile - provides reading from a configuration file containing
 #                     comments and assignment to variables
 #
@@ -10,6 +11,10 @@ import re
 from simplelogging import Logging
 from ttbase import iif
 from operatingsystem import OperatingSystem
+
+#====================
+
+missingDefaultValueIndicator = "@!XYZZY"
 
 #====================
 
@@ -305,18 +310,23 @@ class ConfigurationFile:
 
     #--------------------
 
-    def getValue (self, key, isMandatory=True):
-        """Returns value for <key> in configuration file.  If
-           <isMandatory> is set, an error message is logged when there
-           is no associated value."""
+    def getValue (self, key, defaultValue=missingDefaultValueIndicator):
+        """Returns value for <key> in configuration file; if
+           <defaultValue> is missing, an error message is logged when
+           there is no associated value, otherwise <defaultValue> is
+           returned for a missing entry"""
 
-        Logging.trace(">>: key=%s, isMandatory=%s", key, isMandatory)
+        Logging.trace(">>: key = %s, defaultValue = %s", key, defaultValue)
+
+        isMandatory = (defaultValue == missingDefaultValueIndicator)
         result = None
 
         if key in self._keyToValueMap:
             result = self._keyToValueMap[key]
         elif isMandatory:
             Logging.trace("--: cannot find value for %s", key)
+        else:
+            result = defaultValue
 
         Logging.trace("<<: %s", result)
         return result

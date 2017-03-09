@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # TTBase - provides several elementary functions like conditional
 #          expressions
 

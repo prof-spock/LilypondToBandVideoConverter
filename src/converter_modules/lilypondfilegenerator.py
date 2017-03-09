@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # lilypondFileGenerator -- generates a lilypond main file for several
 #                          parameters by inclusion of a structured lilypond
 #                          file with tracks
@@ -256,7 +257,7 @@ class LilypondFile:
         """writes <st> to current lilypond file <self> terminated by a
            newline"""
 
-        Logging.trace("--: %s'", st)
+        Logging.trace("--: '%s'", st)
         self._file.write(st + "\n")
 
     #--------------------
@@ -292,13 +293,7 @@ class LilypondFile:
         self._printLine("\\include \"english.ly\"")
 
         if self._isVideoScore:
-            self._printLine("deviceId = "
-                            + iif2(self._deviceId == "i", "1",
-                                   self._deviceId == "l", "2" , "3"))
-            self._printLine("orientation = "
-                            + iif(self._orientation == "v", "0", "1"))
-            self._printLine("\\include \"" + lilypondMacroIncludePath
-                            + "/video-macros.ly\"")
+            self._writeVideoSettings()
 
         if not self._targetIsPdf and self._lilypondArticulationIsUsed:
             # add reference to articulation file
@@ -499,6 +494,42 @@ class LilypondFile:
 
     #--------------------
 
+    def _writeVideoSettings (self):
+        """puts out the paper, resolution and system size definitions
+           for the video file to be generated"""
+
+        Logging.trace(">>")
+
+        self._printLine("% -- use high resolution and scale it down later")
+        self._printLine("#(ly:set-option 'resolution %d)"
+                        % self._videoEffectiveResolution)
+        self._printLine("")
+        self._printLine("#(set-global-staff-size %d)" % self._videoSystemSize)
+        self._printLine("\paper {")
+
+        self._printLine("    % -- remove all markup --")
+        lilypondParameterList = \
+            ("print-page-number", "print-first-page-number",
+             "evenFooterMarkup", "oddFooterMarkup",
+             "evenHeaderMarkup", "oddHeaderMarkup", "bookTitleMarkup",
+             "scoreTitleMarkup", "ragged-last-bottom")
+
+        for parameter in lilypondParameterList:
+            self._printLine("    %s=##f" % parameter)
+
+        self._printLine("    % define the page sizes")
+        margin = "%6.3f" % self._videoTopBottomMargin
+        self._printLine("    top-margin    = %s" % margin)
+        self._printLine("    bottom-margin = %s" % margin)
+        self._printLine("    paper-width   = %6.2f" % self._videoPaperWidth)
+        self._printLine("    paper-height  = %6.2f" % self._videoPaperHeight)
+        self._printLine("    line-width    = %6.2f" % self._videoLineWidth)
+        self._printLine("}")
+        
+        Logging.trace("<<")
+
+    #--------------------
+
     def _writeVoice (self, voiceName):
         """puts out the score for <voiceName> either as a standalone
            score or a part of a larger score"""
@@ -603,6 +634,14 @@ class LilypondFile:
         self._voiceToLabelMap             = {}
         self._isFirstChordedSystem        = True
 
+        # video parameters (set to arbitrary values)
+        self._videoEffectiveResolution    = 100
+        self._videoTopBottomMargin        = 5
+        self._videoSystemSize             = 25
+        self._videoPaperWidth             = 10
+        self._videoPaperHeight            = 10
+        self._videoLineWidth              = 8
+
         # derived data
         self._targetIsPdf                 = False
         self._isVideoScore                = False
@@ -610,22 +649,50 @@ class LilypondFile:
         Logging.trace("<<: %s", repr(self))
 
     #--------------------
-        
+
+    def __repr__ (self):
+        st = (("LilypondFile(mode = '%s', title = '%s', year = %d,"
+               + " lyricsCountVoc = %d, lyricsCountBgVoc = %d,"
+               + " useSpecialLayoutForExtracts = '%s', voiceNameList = %s,"
+               + " videoEffectiveResolution = %s, videoSystemSize = %s, "
+               + " videoTopBottomMargin = %s, videoPaperWidth = %s,"
+               + " videoPaperHeight = %s, videoLineWidth = %s)")
+              % (self._mode, self._title, self._year,
+                 self._lyricsCountVocals, self._lyricsCountBgVocals,
+                 self._useSpecialLayoutForExtracts,
+                 repr(self._voiceNameList),
+                 self._videoEffectiveResolution, self._videoSystemSize,
+                 self._videoTopBottomMargin, self._videoPaperWidth,
+                 self._videoPaperHeight, self._videoLineWidth))
+
+        return st
+
+    #--------------------
+
+    def close (self):
+        """finalizes lilypond file"""
+
+        Logging.trace(">>: %s", repr(self))
+        self._file.close()
+        Logging.trace("<<")
+
+    #--------------------
+
     def generate (self, includeFileName, mode,
                   voiceNameList, title, year,
                   lyricsCountVocals, lyricsCountBgVocals,
-                  useSpecialLayoutForExtracts, deviceId, orientation):
+                  useSpecialLayoutForExtracts,
+                  ):
         """Sets parameters for generation and starts generation based
            on mode."""
 
         Logging.trace(">>: includeFileName = '%s', mode = '%s',"
                       + " voiceNameList = '%s', title = '%s', year = %d,"
                       + " lyricsCountVoc = %d, lyricsCountBgVoc = %d,"
-                      + " useSpecialLayoutForExtracts = '%s',"
-                      + " deviceId = '%s', orientation = '%s'",
+                      + " useSpecialLayoutForExtracts = '%s'",
                       includeFileName, mode, voiceNameList,
                       title, year, lyricsCountVocals, lyricsCountBgVocals,
-                      useSpecialLayoutForExtracts, deviceId, orientation)
+                      useSpecialLayoutForExtracts)
 
         self._mode                        = mode
         self._includeFileName             = includeFileName
@@ -635,10 +702,6 @@ class LilypondFile:
         self._lyricsCountVocals           = lyricsCountVocals
         self._lyricsCountBgVocals         = lyricsCountBgVocals
         self._useSpecialLayoutForExtracts = useSpecialLayoutForExtracts
-
-        # video parameters
-        self._deviceId                    = deviceId
-        self._orientation                 = orientation
 
         self._voiceToLabelMap             = {}
         self._isFirstChordedSystem        = True
@@ -665,20 +728,22 @@ class LilypondFile:
 
     #--------------------
 
-    def __repr__ (self):
-        return (("LilypondFile(mode = '%s', title = '%s', year = %d,"
-                 + " lyricsCountVoc = %d, lyricsCountBgVoc = %d,"
-                 + " useSpecialLayoutForExtracts = '%s', voiceNameList = %s)")
-                % (self._mode, self._title, self._year,
-                   self._lyricsCountVocals, self._lyricsCountBgVocals,
-                   self._useSpecialLayoutForExtracts,
-                   repr(self._voiceNameList)))
+    def setVideoParameters (self, effectiveResolution, systemSize,
+                            topBottomMargin, paperWidth, paperHeight,
+                            lineWidth):
+        """Sets all parameters needed for subsequent video generation"""
+        
+        Logging.trace(">>: effectiveResolution = %d, systemSize = %d,"
+                      + " topBottomMargin = %4.2f, paperWidth = %5.2f,"
+                      + " paperHeight = %5.2f, lineWidth = %5.2f",
+                      effectiveResolution, systemSize, topBottomMargin,
+                      paperWidth, paperHeight, lineWidth)
 
-    #--------------------
+        self._videoEffectiveResolution = effectiveResolution
+        self._videoSystemSize          = systemSize
+        self._videoTopBottomMargin     = topBottomMargin
+        self._videoPaperWidth          = paperWidth
+        self._videoPaperHeight         = paperHeight
+        self._videoLineWidth           = lineWidth
 
-    def close (self):
-        """finalizes lilypond file"""
-
-        Logging.trace(">>: %s", repr(self))
-        self._file.close()
         Logging.trace("<<")

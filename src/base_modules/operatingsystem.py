@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # operatingsystem -- provides simple facilities for access of operating
 #                    system services
 
@@ -66,7 +67,8 @@ class OperatingSystem:
            directory target with <targetName>."""
 
         Logging.trace(">>: %s -> %s", sourceFileName, targetName)
-        shutil.move(sourceFileName, targetName)
+        shutil.copy(sourceFileName, targetName)
+        os.remove(sourceFileName)
         Logging.trace("<<")
 
     #--------------------
@@ -106,8 +108,8 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def scriptFileName (cls):
-        """Returns file name of calling script."""
+    def scriptFilePath (cls):
+        """Returns file path of calling script."""
 
         Logging.trace(">>")
 

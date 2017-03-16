@@ -1,48 +1,52 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # TTBase - provides several elementary functions like conditional
 #          expressions
 
-#--------------------
+#====================
 
-def iif (condition, true_value, false_value):
+missingValue = "@!XYZZY"
+
+#====================
+
+def iif (condition, trueValue, falseValue):
     """Emulates conditional expressions with full value evaluation."""
 
     if condition:
-        return true_value
+        return trueValue
     else:
-        return false_value
+        return falseValue
 
 #--------------------
 
-def iif2 (condition1, true_value1, condition2, true_value2, false_value2):
+def iif2 (condition1, trueValue1, condition2, trueValue2, falseValue2):
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
-    return iif(condition1, true_value1,
-               iif(condition2, true_value2, false_value2))
+    return iif(condition1, trueValue1,
+               iif(condition2, trueValue2, falseValue2))
 
 #--------------------
 
-def iif3 (condition1, true_value1, condition2, true_value2,
-          condition3, true_value3, false_value3):
+def iif3 (condition1, trueValue1, condition2, trueValue2,
+          condition3, trueValue3, falseValue3):
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
-    return iif(condition1, true_value1,
-               iif2(condition2, true_value2,
-                    condition3, true_value3, false_value3))
+    return iif(condition1, trueValue1,
+               iif2(condition2, trueValue2,
+                    condition3, trueValue3, falseValue3))
 
 #--------------------
 
-def iif4 (condition1, true_value1, condition2, true_value2,
-          condition3, true_value3, condition4, true_value4, false_value4):
+def iif4 (condition1, trueValue1, condition2, trueValue2,
+          condition3, trueValue3, condition4, trueValue4, falseValue4):
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
-    return iif(condition1, true_value1,
-               iif3(condition2, true_value2,
-                    condition3, true_value3,
-                    condition4, true_value4, false_value4))
+    return iif(condition1, trueValue1,
+               iif3(condition2, trueValue2,
+                    condition3, trueValue3,
+                    condition4, trueValue4, falseValue4))
 
 #--------------------
 

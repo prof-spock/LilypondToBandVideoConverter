@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # mla_songconfigurationdata -- services for access to the song-specific
 #                              configuration file of makeLilypondAll
 
@@ -29,7 +29,7 @@ class _VoiceDescriptor:
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         className = self.__class__.__name__
         st = (("%s("
                + "voice = %s, midiChannel = %s, midiInstrument = %s,"
@@ -182,19 +182,32 @@ class MLA_SongConfigurationData:
         Logging.trace(">>: %s", optionalVoiceNames)
 
         result = {}
-        optionalVoicePartList = optionalVoiceNames.split(",")
 
-        for part in optionalVoicePartList:
-            part = part.strip()
+        errorPosition, errorMessage, table = \
+            ConfigurationFile.parseTableDefinitionString(optionalVoiceNames)
 
-            if part > "":
-                voiceName, suffices = part.split(":")
-                songNameSuffix, albumNameSuffix = suffices.strip().split("|")
+        if errorPosition < 0:
+            fieldNameList = [ "songNameSuffix", "albumNameSuffix" ]
+            errorMessage = ""
+
+            for voiceName in table.keys():
+                info = table[voiceName]
+                Logging.trace("--: converting %s = %s", voiceName, info)
+
+                for fieldName in fieldNameList:
+                    if info.get(fieldName) is None:
+                        errorMessage = "no value for %s" % fieldName
+
+                if errorMessage != "":
+                    break
+
+                songNameSuffix  = info["songNameSuffix"]
+                albumNameSuffix = info["albumNameSuffix"]
                 value = (albumNameSuffix, songNameSuffix)
                 result[voiceName] = value
                 Logging.trace("--: %s -> %s", voiceName, str(value))
 
-        Logging.trace("<<: %s", str(result))
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
@@ -257,7 +270,7 @@ class MLA_SongConfigurationData:
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         st = (("_SongConfigurationData("
                + "artistName = '%s', albumName = '%s', albumArtFilePath = '%s',"
                + " audioTargetDirectoryPath = '%s',"

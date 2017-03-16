@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # operatingsystem -- provides simple facilities for access of operating
 #                    system services
 

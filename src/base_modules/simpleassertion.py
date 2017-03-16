@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # assertion - provide simple assertion checking
 
 #====================

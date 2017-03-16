@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # audiotrackmanager -- generates audio tracks from midi file and provides
 #                      several transformations on it (e.g. instrument
 #                      postprocessing and mixdown
@@ -7,26 +7,21 @@
 
 #====================
 
+from configurationfile import ConfigurationFile
 from miditransformer import MidiTransformer
+from mp4tagmanager import MP4TagManager
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, iif, isInRange, MyRandom
 
 #====================
 
-# external commands
-aacCommand        = None
-ffmpegCommand     = None
-fluidsynthCommand = None
-soxCommand        = None
-
-# soundfont data
-soundFontDirectoryName = None
-soundFontNameList      = None
-
-debuggingIsActive = None
-
 processedAudioFileTemplate = "%s/%s-processed.wav"
+tempAudioFileTemplate = "%s/%s-temp%s.wav"
+soundNameSeparator = "|"
+
+# the log level for ffmpeg rendering
+ffmpegLogLevel = "error"
 
 #====================
 
@@ -34,35 +29,42 @@ class AudioTrackManager:
     """This class encapsulates services for audio tracks generated
        from a midi file."""
 
+    _aacCommand                = None
+    _debuggingIsActive         = None
+    _ffmpegCommand             = None
+    _fluidsynthCommand         = None
+    _soundFontDirectoryName    = None
+    _soundFontNameList         = None
+    _soundNameToCommandListMap = None
+    _soxCommand                = None
+
     #--------------------
     # LOCAL FEATURES
     #--------------------
 
-    def _compressAudio (self, audioFilePath, songData, songTitle, albumName,
-                        targetFilePath):
-        """Compresses audio file at <audioFilePath> to AAC file at
-           <targetFilePath> using <songData>, <songTitle> and
-           <albumName> for tagging"""
+    def _compressAudio (self, audioFilePath, songTitle, targetFilePath):
+        """Compresses audio file with <songTitle> at <audioFilePath>
+           to AAC file at <targetFilePath>"""
 
-        Logging.trace(">>: audioFile = '%s', songData = %s,"
-                      + " title = '%s', album = '%s', targetFile = '%s'",
-                      audioFilePath, songData, songTitle, albumName,
-                      targetFilePath)
+        Logging.trace(">>: audioFile = '%s', title = '%s', targetFile = '%s'",
+                      audioFilePath, songTitle, targetFilePath)
 
-        command = ( aacCommand,
-                    "-V100", "--no-optimize",
-                    "--title", songTitle,
-                    "--artist", songData.artistName,
-                    "--band", songData.artistName,
-                    "--album", albumName,
-                    "--track", str(songData.trackNumber),
-                    "--date", str(songData.year),
-                    "--artwork", songData.albumArtFilePath,
-                    "-i", audioFilePath,
-                    "-o", targetFilePath )
+        cls = self.__class__
+
+        if cls._aacCommand is None:
+            command = ( cls._ffmpegCommand,
+                        "-loglevel", ffmpegLogLevel,
+                        "-i", audioFilePath,
+                        "-y", targetFilePath )
+        else:
+            command = ( cls._aacCommand,
+                        "-V100", "--no-optimize",
+                        "-i", audioFilePath,
+                        "-o", targetFilePath )
 
         OperatingSystem.showMessageOnConsole("== convert to AAC: " + songTitle)
         OperatingSystem.executeCommand(command, False)
+
         Logging.trace("<<")
 
     #--------------------
@@ -73,6 +75,8 @@ class AudioTrackManager:
 
         Logging.trace(">>: voice = %s, midiFile = '%s'",
                       voiceName, voiceMidiFilePath)
+
+        cls = self.__class__
 
         # prepare config file for fluidsynth
         fluidsynthSettingsFilePath = ("%s/%s"
@@ -86,15 +90,15 @@ class AudioTrackManager:
                       fluidsynthSettingsFilePath)
 
         concatDirectoryProc = (lambda x: "%s/%s"
-                                         % (soundFontDirectoryName, x))
-        soundFonts = map(concatDirectoryProc, soundFontNameList)
+                                         % (cls._soundFontDirectoryName, x))
+        soundFonts = map(concatDirectoryProc, cls._soundFontNameList)
         targetFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
 
         # processing midi file via fluidsynth
         OperatingSystem.showMessageOnConsole("== fluidsynth "
                                              + targetFilePath)
 
-        command = ([ fluidsynthCommand,
+        command = ([ cls._fluidsynthCommand,
                      "-n", "-i", "-g", "1",
                      "-f", fluidsynthSettingsFilePath,
                      "-F", targetFilePath ]
@@ -105,7 +109,7 @@ class AudioTrackManager:
 
         # cleanup
         OperatingSystem.removeFile(fluidsynthSettingsFilePath,
-                                   debuggingIsActive)
+                                   cls._debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -120,7 +124,9 @@ class AudioTrackManager:
         Logging.trace(">>: voice = %s, midiFile = '%s', targetFile = '%s'",
                       voiceName, midiFilePath, voiceMidiFilePath)
 
-        midiTransformer = MidiTransformer(midiFilePath, debuggingIsActive)
+        cls = self.__class__
+        midiTransformer = MidiTransformer(midiFilePath,
+                                          cls._debuggingIsActive)
         midiTransformer.filterByTrackNamePrefix(voiceName)
         midiTransformer.save(voiceMidiFilePath)
 
@@ -140,7 +146,8 @@ class AudioTrackManager:
         Logging.trace(">>: voiceNames = %s, target = '%s'",
                       voiceNameList, targetFilePath)
 
-        command = [ soxCommand, "--combine", "mix" ]
+        cls = self.__class__
+        command = [ cls._soxCommand, "--combine", "mix" ]
 
         for voiceName in voiceNameList:
             audioFilePath = (processedAudioFileTemplate
@@ -153,6 +160,33 @@ class AudioTrackManager:
         OperatingSystem.showMessageOnConsole("== make mix file: %s"
                                              % songTitle)
         OperatingSystem.executeCommand(command, False)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def _parseConfigurationFile(cls, configurationFilePath):
+        """Fills mapping from sound name to associated command line
+           list from configuration file in <configurationFilePath>"""
+    
+        Logging.trace(">>: %s", configurationFilePath)
+
+        configurationFile = ConfigurationFile(configurationFilePath)
+        getValueProc = configurationFile.getValue
+
+        soundNameListAsString = getValueProc("soundNameList", "")
+        soundNameList = soundNameListAsString.split(soundNameSeparator)
+        cls._soundNameToCommandListMap = {}
+
+        for soundName in soundNameList:
+            soundName = soundName.strip()
+            Logging.trace("--: looking for sound specification %s", soundName)
+            soundSpecification = getValueProc(soundName, "")
+            cls._soundNameToCommandListMap[soundName] = soundSpecification
+
+        Logging.trace("--: soundNameToCommandsMap = %s",
+                      cls._soundNameToCommandListMap)
 
         Logging.trace("<<")
 
@@ -184,30 +218,127 @@ class AudioTrackManager:
         return result
 
     #--------------------
+
+    @classmethod
+    def _splitParameterSequence (cls, parameterSequence):
+        """Splits string <parameterSequence> into list of single words
+           taking quoting into account"""
+
+        Logging.trace(">>: %s", parameterSequence)
+
+        blankChar       = " "
+        singleQuoteChar = "'"
+        doubleQuoteChar = "\""
+
+        ParseState_inLimbo  = 1
+        ParseState_inWord   = 2
+        ParseState_inString = 3
+        
+        parseState = ParseState_inLimbo
+        result = []
+
+        for ch in parameterSequence:
+            parameterIsDone = False
+
+            if parseState == ParseState_inString:
+                if ch != singleQuoteChar:
+                    currentWord += ch
+                else:
+                    parameterIsDone = True
+            elif parseState == ParseState_inWord:
+                if ch == blankChar:
+                    parameterIsDone = True
+                else:
+                    currentWord += ch
+            elif parseState == ParseState_inLimbo:
+                currentWord = ""
+
+                if ch == singleQuoteChar:
+                    parseState = ParseState_inString
+                elif ch != blankChar:
+                    currentWord = ch
+                    parseState = ParseState_inWord
+
+            if parameterIsDone:
+                result.append(currentWord)
+                parseState = ParseState_inLimbo
+
+        currentWord += iif(parseState == ParseState_inString,
+                           doubleQuoteChar, "")
+            
+        if parseState != ParseState_inLimbo:
+            result.append(currentWord)
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    def _tagAudio (self, audioFilePath, songData, songTitle, albumName):
+        """Tags M4A audio file with <songTitle> at <audioFilePath>
+           with tags specified by <songData>, <songTitle> and
+           <albumName>"""
+
+        Logging.trace(">>: audioFile = '%s', songData = %s,"
+                      + " title = '%s', album = '%s'",
+                      audioFilePath, songData, songTitle, albumName)
+
+        artistName = songData.artistName
+
+        tagToValueMap = {}
+        tagToValueMap["album"]       = albumName
+        tagToValueMap["albumArtist"] = artistName
+        tagToValueMap["artist"]      = artistName
+        tagToValueMap["cover"]       = songData.albumArtFilePath
+        tagToValueMap["title"]       = songTitle
+        tagToValueMap["track"]       = songData.trackNumber
+        tagToValueMap["year"]        = songData.year
+
+        OperatingSystem.showMessageOnConsole("== tagging AAC: " + songTitle)
+        MP4TagManager.tagFile(audioFilePath, tagToValueMap)
+
+        Logging.trace("<<")
+        
+    #--------------------
     # EXPORTED FEATURES
     #--------------------
 
     @classmethod
-    def initialize (cls, aacCommand, ffmpegCommand, fluidsynthCommand,
+    def initialize (cls, configurationFileName,
+                    aacCommand, ffmpegCommand, fluidsynthCommand,
                     soxCommand, soundFontDirectoryName, soundFontNameList,
                     debuggingIsActive):
         """Sets some global processing data like e.g. the command
            paths."""
 
-        Logging.trace(">>: aac = '%s', ffmpeg = '%s', fluidsynth = '%s',"
+        Logging.trace(">>: configurationFileName = '%s',"
+                      + " aac = '%s', ffmpeg = '%s', fluidsynth = '%s',"
                       + " sox = '%s', sfDirectory = '%s', sfList = %s,"
                       + " debugging = %s",
-                      aacCommand, ffmpegCommand, fluidsynthCommand,
-                      soxCommand, soundFontDirectoryName,
-                      str(soundFontNameList), debuggingIsActive)
+                      configurationFileName, aacCommand, ffmpegCommand,
+                      fluidsynthCommand, soxCommand, soundFontDirectoryName,
+                      soundFontNameList, debuggingIsActive)
 
-        globals()['aacCommand']             = aacCommand
-        globals()['debuggingIsActive']      = debuggingIsActive
-        globals()['ffmpegCommand']          = ffmpegCommand
-        globals()['fluidsynthCommand']      = fluidsynthCommand
-        globals()['soundFontDirectoryName'] = soundFontDirectoryName
-        globals()['soundFontNameList']      = soundFontNameList
-        globals()['soxCommand']             = soxCommand
+        cls._aacCommand                = aacCommand
+        cls._debuggingIsActive         = debuggingIsActive
+        cls._ffmpegCommand             = ffmpegCommand
+        cls._fluidsynthCommand         = fluidsynthCommand
+        cls._soundFontDirectoryName    = soundFontDirectoryName
+        cls._soundFontNameList         = soundFontNameList
+        cls._soundNameToCommandListMap = {}
+        cls._soxCommand                = soxCommand
+
+        scriptFilePath = OperatingSystem.scriptFilePath()
+        scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
+        configurationFilePath = ("%s/%s"
+                                 % (scriptFileDirectoryPath,
+                                    configurationFileName))
+
+        if not OperatingSystem.hasFile(configurationFilePath):
+            Logging.trace("--: ERROR configuration file not found %s",
+                          configurationFilePath)
+        else:
+            cls._parseConfigurationFile(configurationFilePath)
 
         Logging.trace("<<")
 
@@ -284,13 +415,16 @@ class AudioTrackManager:
 
         Logging.trace(">>")
 
+        cls = self.__class__
         message = "== overriding %s from file" % voiceName
         OperatingSystem.showMessageOnConsole(message)
 
         targetFilePath = (processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        command = (ffmpegCommand,
-                   "-y", "-i", filePath, targetFilePath)
+        command = (cls._ffmpegCommand,
+                   "-loglevel", ffmpegLogLevel,
+                   "-i", filePath,
+                   "-y", targetFilePath)
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
@@ -307,45 +441,77 @@ class AudioTrackManager:
         Logging.trace(">>: voice = %s, midiFile = '%s'",
                       voiceName, midiFilePath)
 
+        cls = self.__class__
         tempMidiFilePath = "tempRender.mid"
         self._makeFilteredMidiFile(voiceName, midiFilePath, tempMidiFilePath)
         self._convertMidiToAudio(tempMidiFilePath, voiceName)
-        OperatingSystem.removeFile(tempMidiFilePath, debuggingIsActive)
+        OperatingSystem.removeFile(tempMidiFilePath, cls._debuggingIsActive)
 
         Logging.trace("<<")
 
     #--------------------
 
     def generateRefinedAudio (self, voiceName, soundVariant, reverbLevel):
-        """Generates refined audio wave file for <voiceName> from
-           raw audio file in target directory; """
+        """Generates refined audio wave file for <voiceName> from raw
+           audio file in target directory; <soundVariant> gives the
+           kind of postprocessing ('COPY', 'STD', 'EXTREME', ...) and
+           <reverbLevel> the percentage of reverb to be used for that
+           voice"""
 
         Logging.trace(">>: voice = %s, variant = %s, reverb = %4.3f",
                       voiceName, soundVariant, reverbLevel)
 
+        cls = self.__class__
         extendedSoundVariant = soundVariant.upper()
+        uppercasedVoiceName = voiceName.upper()
+        isSimpleKeyboard = (uppercasedVoiceName == "KEYBOARDSIMPLE")
 
         if extendedSoundVariant != "COPY":
-            uppercasedVoiceName = voiceName.upper()
-            uppercasedVoiceName = iif(uppercasedVoiceName == "KEYBOARDSIMPLE",
-                                      "KEYBOARD", uppercasedVoiceName)
+            uppercasedVoiceName = iif(isSimpleKeyboard, "KEYBOARD",
+                                      uppercasedVoiceName)
             extendedSoundVariant = "%s_%s" % (uppercasedVoiceName,
                                               extendedSoundVariant)
 
         message = "== processing %s (%s)" % (voiceName, soundVariant)
         OperatingSystem.showMessageOnConsole(message)
 
-        soundProcessorCommand = ("C:/Programme_TT/Multimedia/Audio"
-                                 + "/processSound.bat")
-        reverbLevel = adaptToRange(int(reverbLevel * 128), 0, 127)
-        targetDirectoryPath = self._audioDirectoryPath.replace("/", "\\")
+        # prepare list of sox argument lists for processing
+        reverbCommands = "norm -3 reverb %4.3f" % reverbLevel
 
-        command = (soundProcessorCommand,
-                   extendedSoundVariant, str(reverbLevel),
-                   targetDirectoryPath, voiceName)
-        OperatingSystem.executeCommand(command, False)
+        if extendedSoundVariant in cls._soundNameToCommandListMap:
+            params = cls._soundNameToCommandListMap[extendedSoundVariant]
+        else:
+            params = ""
+            Logging.trace("--: unknown variant %s replaced by empty default",
+                          extendedSoundVariant)
+        
+        params += " " + reverbCommands
+        parameterSequenceList = params.split("tee ")
 
+        if not cls._debuggingIsActive:
+            # when not debugging, there is no need to have intermediate
+            # audio files => use only one single command line
+            parameterSequenceList = [ " ".join(parameterSequenceList) ]
 
+        Logging.trace("--: parameterSeqList = %s", parameterSequenceList)
+        commandCount = len(parameterSequenceList)
+        sourceFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
+        targetFilePath = (processedAudioFileTemplate %
+                          (self._audioDirectoryPath, voiceName))
+        currentSource = sourceFilePath
+
+        for i, parameterSequence in enumerate(parameterSequenceList):
+            tempFilePath = (tempAudioFileTemplate
+                            % (self._audioDirectoryPath, voiceName,
+                               hex(i + 1).upper()))
+            currentTarget = iif(i < commandCount - 1, tempFilePath,
+                                targetFilePath)
+            parameterList = cls._splitParameterSequence(parameterSequence)
+            command = ([cls._soxCommand, currentSource, currentTarget ]
+                       + parameterList)
+            OperatingSystem.executeCommand(command, False)
+            currentSource = currentTarget
+                       
         Logging.trace("<<")
 
     #--------------------
@@ -372,9 +538,11 @@ class AudioTrackManager:
             self._mixdownToWavFile(songTitle, currentVoiceNameList,
                                    voiceNameToVolumeMap, attenuationLevel,
                                    waveIntermediateFilePath)
-            self._compressAudio(waveIntermediateFilePath, songData,
-                                songTitle, albumName, targetFilePath)
+            self._compressAudio(waveIntermediateFilePath, songTitle,
+                                targetFilePath)
+            self._tagAudio(targetFilePath, songData, songTitle, albumName)
+
             OperatingSystem.removeFile(waveIntermediateFilePath,
-                                       songData.debuggingIsActive)
+                                       cls._debuggingIsActive)
 
         Logging.trace("<<")

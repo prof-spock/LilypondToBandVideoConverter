@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # logging - provides primitive logging with logging levels
 #
 # author: Dr. Thomas Tensi, 2014-04

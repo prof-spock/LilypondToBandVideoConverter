@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # midiTransformer -- processes midi file and provides several
 #                    transformations on it (e.g. drum humanization,
 #                    volume adaptation, etc.)
@@ -21,7 +21,7 @@ from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
 #====================
 
 maximumInteger = 999999999
-humanizerConfigurationFilePath = ""
+humanizerConfigurationFileName = ""
 humanizedTrackList = []
 
 #====================
@@ -150,7 +150,7 @@ class _MusicTime:
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         """Returns the string representation of a music time object"""
 
         return ("MusicTime(%s/%s)"
@@ -394,7 +394,7 @@ class _HumanizationStrategy:
         configurationFile = ConfigurationFile(configurationFilePath)
         getValueProc = configurationFile.getValue
 
-        styleNameListAsString = getValueProc("styleNameList", True)
+        styleNameListAsString = getValueProc("styleNameList", "")
         styleNameList = styleNameListAsString.split(cls._styleNameSeparator)
 
         cls._nameToStrategyStringMap = {}
@@ -447,11 +447,11 @@ class _HumanizationStrategy:
 
         Logging.trace(">>")
 
-        scriptFileName = OperatingSystem.scriptFileName()
-        scriptFilePath = OperatingSystem.dirname(scriptFileName)
-        configurationFilePath = (scriptFilePath
-                                 + OperatingSystem.pathSeparator
-                                 + humanizerConfigurationFilePath)
+        scriptFilePath = OperatingSystem.scriptFilePath()
+        scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
+        configurationFilePath = ("%s/%s"
+                                 % (scriptFileDirectoryPath,
+                                    humanizerConfigurationFileName))
 
         if not OperatingSystem.hasFile(configurationFilePath):
             Logging.trace("--: ERROR configuration file not found %s",
@@ -536,7 +536,7 @@ class _HumanizationStrategy:
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         """Returns the string representation of <self>"""
 
         st = ("_HumanizationStrategy(%s, COUNTIN = %s,"
@@ -631,7 +631,7 @@ class _Humanizer:
     
         #--------------------
 
-        def __str__ (self):
+        def __repr__ (self):
             st = ("_HumanizerEvent(midiTime = %s, text = '%s', kind = %s,"
                   + " channel = %s, note = %s, velocity = %s, partner = %s)")
             return (st % (self.midiTime, self.text, self.kind, self.channel,
@@ -1262,11 +1262,11 @@ class MidiTransformer:
     def initialize (cls, configurationFileName, trackList):
         """Sets global variables for this module"""
 
-        global humanizerConfigurationFilePath, humanizedTrackList
+        global humanizerConfigurationFileName, humanizedTrackList
 
         Logging.trace(">>: configurationFileName = '%s', trackList = %s",
                       configurationFileName, trackList)
-        humanizerConfigurationFilePath = configurationFileName
+        humanizerConfigurationFileName = configurationFileName
         humanizedTrackList             = trackList
         Logging.trace("<<")
 

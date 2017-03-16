@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # makeLilypondAll -- script that produces lilypond files and target files
 #                    for single voices, a complete score, a midi file and
 #                    videos based on a configuration file
@@ -43,13 +43,6 @@ _TrackSettingsType = namedtuple("_TrackSettingsType",
                                 "voiceName midiChannel midiInstrument"
                                 + " midiVolume panPosition reverbLevel")
 
-
-_VideoDeviceType = namedtuple("_VideoDeviceType",
-                                "name fileNameSuffix targetVideoDirectory"
-                                + " resolution height width topBottomMargin"
-                                + " leftRightMargin systemSize"
-                                + " subtitleColor subtitleFontSize")
-
 #====================
 
 settingsConfigurationFileName = "makelilypondall.cfg"
@@ -57,44 +50,6 @@ countInMeasures = 2
 
 subtitleFileNameTemplate = "%s_subtitle.srt"
 silentVideoFileNameTemplate = "%s_noaudio%s.mp4"
-
-# orientations and device ids for iPad, Lumia and normal video
-videoDeviceList = [ _VideoDeviceType(name = "ipad",
-                                     fileNameSuffix = "-i-v",
-                                     targetVideoDirectory = "_ipod-Videos",
-                                     resolution = 132,
-                                     height = 1024,
-                                     width = 768,
-                                     topBottomMargin = 5,
-                                     leftRightMargin = 10,
-                                     systemSize = 25,
-                                     subtitleColor = 0X8800FFFF,
-                                     subtitleFontSize = 20),
-                            
-                    _VideoDeviceType(name = "lumia",
-                                     fileNameSuffix = "-l-h",
-                                     targetVideoDirectory = "_lumia-Videos",
-                                     resolution = 282,
-                                     height = 770,
-                                     width = 1280,
-                                     topBottomMargin = 3,
-                                     leftRightMargin = 5,
-                                     systemSize = 15,
-                                     subtitleColor = 0X8800FFFF,
-                                     subtitleFontSize = 30),
-
-                    _VideoDeviceType(name = "internet",
-                                     fileNameSuffix = "-n-h",
-                                     targetVideoDirectory = "_internet-Videos",
-                                     resolution = 75,
-                                     height = 384,
-                                     width = 512,
-                                     topBottomMargin = 5,
-                                     leftRightMargin = 10,
-                                     systemSize = 25,
-                                     subtitleColor = 0X8800FFFF,
-                                     subtitleFontSize = 20)
-                 ]
 
 #--------------------
 
@@ -263,17 +218,18 @@ class _LilypondProcessor:
                       targetFileNamePrefix, str(voiceNameList),
                       lyricsCountVocals, lyricsCountBgVocals)
 
-        lilypondFile = LilypondFile(configData.tempLilypondFilePath)
+        tempLilypondFilePath = configData.tempLilypondFilePath
+        lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(songData.includeFilePath, processingMode,
                               voiceNameList,
                               songData.title, songData.year,
                               lyricsCountVocals, lyricsCountBgVocals,
-                              songData.useSpecialLayoutForExtracts,
-                              "", "")
-        cls._processLilypond(configData.tempLilypondFilePath,
-                             targetFileNamePrefix)
+                              songData.useSpecialLayoutForExtracts)
+        cls._processLilypond(tempLilypondFilePath, targetFileNamePrefix)
         OperatingSystem.moveFile(targetFileNamePrefix + ".pdf",
                                  configData.targetDirectoryPath)
+        OperatingSystem.removeFile(tempLilypondFilePath,
+                                   songData.debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -291,7 +247,7 @@ class _LilypondProcessor:
                                              + targetFileNamePrefix)
         command = (cls._lilypondCommand,
                    "--output", targetFileNamePrefix,
-                   configData.tempLilypondFilePath)
+                   lilypondFilePath)
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
@@ -307,16 +263,18 @@ class _LilypondProcessor:
 
         Logging.trace(">>")
 
+        tempSubtitleFilePath = "tempSubtitle.srt"
+        tempMp4FilePath = "tempVideoWithSubtitles.mp4"
+
         # --- shift subtitles ---
         subtitleFilePath = "%s/%s" % (configData.targetDirectoryPath,
                                       (subtitleFileNameTemplate
                                        % songData.fileNamePrefix))
-        tempSubtitleFilePath = "tempSubtitle.srt"
         VideoAudioCombiner.shiftSubtitleFile(subtitleFilePath,
                                              tempSubtitleFilePath,
                                              songData.shiftOffset)
 
-        for videoDevice in videoDeviceList:
+        for videoDevice in configData.videoDeviceList:
             silentMp4FilePath = (("%s/" + silentVideoFileNameTemplate)
                                  % (configData.targetDirectoryPath,
                                     songData.fileNamePrefix,
@@ -324,23 +282,19 @@ class _LilypondProcessor:
 
             if not songData.useHardVideoSubtitles:
                 videoFilePath = silentMp4FilePath
-                subtitleOption = "#handler=sbtl"
-                subtitleOptionList = [ "-add",
-                                       sourceVideoFilePath + subtitleOption ]
+                effectiveSubtitleFilePath = tempSubtitleFilePath
             else:
-                tempMp4FilePath = "tempVideoWithSubtitles.mp4"
                 videoFilePath = tempMp4FilePath
-                subtitleOptionList = []
+                effectiveSubtitleFilePath = ""
                 VideoAudioCombiner.insertHardSubtitles( \
                                         silentMp4FilePath,
                                         tempSubtitleFilePath,
-                                        tempMp4FilePath,
+                                        videoFilePath,
                                         songData.shiftOffset,
                                         videoDevice.subtitleColor,
                                         videoDevice.subtitleFontSize)
 
-            targetDirectoryPath = ("C:/Videodateien/%s"
-                                   % videoDevice.targetVideoDirectory)
+            targetDirectoryPath = videoDevice.targetVideoDirectory
             ValidityChecker.isDirectory(targetDirectoryPath,
                                         "video target directory")
             targetVideoFilePath = ("%s/%s%s-%s.mp4"
@@ -353,14 +307,19 @@ class _LilypondProcessor:
 
             VideoAudioCombiner.combine(songData.voiceNameList, trackDataList,
                                        videoFilePath, targetVideoFilePath,
-                                       subtitleOptionList)
+                                       effectiveSubtitleFilePath)
 
             mediaType = "TV Show"
             VideoAudioCombiner.tagVideoFile(targetVideoFilePath,
                                             songData.albumName,
                                             songData.artistName,
+                                            songData.albumArtFilePath,
                                             songData.title, mediaType,
                                             songData.year)
+
+        debuggingIsActive = songData.debuggingIsActive
+        OperatingSystem.removeFile(tempSubtitleFilePath, debuggingIsActive)
+        OperatingSystem.removeFile(tempMp4FilePath, debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -372,37 +331,36 @@ class _LilypondProcessor:
 
         Logging.trace(">>")
 
-        lilypondFile = LilypondFile(configData.tempLilypondFilePath)
+        debuggingIsActive = songData.debuggingIsActive
+        tempLilypondFilePath = configData.tempLilypondFilePath
+        lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(songData.includeFilePath, "midi",
                               songData.voiceNameList, "", songData.year,
                               songData.lyricsCountVocals,
                               songData.lyricsCountBgVocals,
-                              songData.useSpecialLayoutForExtracts,
-                              "", "")
+                              songData.useSpecialLayoutForExtracts)
 
         tempMidiFileNamePrefix = songData.fileNamePrefix + "-temp"
         tempMidiFileName = tempMidiFileNamePrefix + ".mid"
         targetMidiFileName = (cls._midiFileNameTemplate
                               % songData.fileNamePrefix)
 
-        cls._processLilypond(configData.tempLilypondFilePath,
-                             tempMidiFileNamePrefix)
+        cls._processLilypond(tempLilypondFilePath, tempMidiFileNamePrefix)
 
         # postprocess MIDI file
         trackToSettingsMap = cls._calculateTrackToSettingsMap()
 
-        midiTransformer = MidiTransformer(tempMidiFileName,
-                                          songData.debuggingIsActive)
+        midiTransformer = MidiTransformer(tempMidiFileName, debuggingIsActive)
         midiTransformer.addMissingTrackNames()
         midiTransformer.humanizeTracks(songData.styleHumanizationKind)
         midiTransformer.positionInstruments(trackToSettingsMap)
         midiTransformer.addProcessingDateToTracks()
-        midiTransformer.save(targetMidiFilePath)
+        midiTransformer.save(targetMidiFileName)
 
-        OperatingSystem._moveFile(targetMidiFilePath,
-                                  configData.targetDirectoryPath)
-        OperatingSystem.removeFile(tempMidiFileName,
-                                   songData.debuggingIsActive)
+        OperatingSystem.moveFile(targetMidiFileName,
+                                 configData.targetDirectoryPath)
+        OperatingSystem.removeFile(tempMidiFileName, debuggingIsActive)
+        OperatingSystem.removeFile(tempLilypondFilePath, debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -508,11 +466,13 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         mmPerInch = 25.4
+        debuggingIsActive = songData.debuggingIsActive
         targetSubtitleFileName = (subtitleFileNameTemplate
                                   % songData.fileNamePrefix)
+        tempLilypondFilePath = configData.tempLilypondFilePath
 
-        for videoDevice in videoDeviceList:
-            message = ("== generating video for %s" % videoDevice.name)
+        for videoDevice in configData.videoDeviceList:
+            message = ("== generating silent video for %s" % videoDevice.name)
             OperatingSystem.showMessageOnConsole(message)
 
             effectiveVideoResolution = (videoDevice.resolution
@@ -521,7 +481,7 @@ class _LilypondProcessor:
             videoWidth  = videoDevice.width  * factor
             videoHeight = videoDevice.height * factor
             videoLineWidth = videoWidth - 2 * videoDevice.leftRightMargin
-            lilypondFile = LilypondFile(configData.tempLilypondFilePath)
+            lilypondFile = LilypondFile(tempLilypondFilePath)
             lilypondFile.setVideoParameters(effectiveVideoResolution,
                                             videoDevice.systemSize,
                                             videoDevice.topBottomMargin,
@@ -537,14 +497,14 @@ class _LilypondProcessor:
                                  % (songData.fileNamePrefix,
                                     videoDevice.fileNameSuffix))
             videoGenerator = \
-                LilypondPngVideoGenerator(configData.tempLilypondFilePath,
+                LilypondPngVideoGenerator(tempLilypondFilePath,
                                           targetMp4FileName,
                                           targetSubtitleFileName,
                                           songData.tempoTrackList,
                                           countInMeasures,
                                           configData.videoFrameRate,
                                           configData.videoScalingFactor,
-                                          songData.debuggingIsActive)
+                                          debuggingIsActive)
             videoGenerator.process()
             videoGenerator.cleanup()
 
@@ -552,6 +512,8 @@ class _LilypondProcessor:
                                      configData.targetDirectoryPath)
             OperatingSystem.moveFile(targetSubtitleFileName,
                                      configData.targetDirectoryPath)
+
+        OperatingSystem.removeFile(tempLilypondFilePath, debuggingIsActive)
 
         Logging.trace("<<")
 
@@ -626,14 +588,15 @@ def initialize ():
     songData = MLA_SongConfigurationData()
     songData.readFile(songConfigurationFileName, selectedVoiceNameList)
 
-    AudioTrackManager.initialize(configData.aacCommand,
+    AudioTrackManager.initialize(configData.soundProcessorConfigFileName,
+                                 configData.aacCommand,
                                  configData.ffmpegCommand,
                                  configData.fluidsynthCommand,
                                  configData.soxCommand,
                                  configData.soundFontDirectoryPath,
                                  configData.soundFontNameList,
                                  songData.debuggingIsActive)
-    MidiTransformer.initialize(configData.humanizerConfigurationFilePath,
+    MidiTransformer.initialize(configData.humanizerConfigurationFileName,
                                songData.humanizedVoiceNameList)
 
     Logging.trace("<<")
@@ -653,6 +616,7 @@ def main ():
         Logging.initialize(Logging.Level_verbose, configData.loggingFilePath)
         # repeat reading of config data for having it logged
         configData.readFile(configurationFilePath)
+        configData.checkValidity()
         
     initialize()
 

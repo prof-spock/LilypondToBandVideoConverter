@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # validitychecker - allows checking of validity of values (typically
 #                   of input parameters from the command line)
 #

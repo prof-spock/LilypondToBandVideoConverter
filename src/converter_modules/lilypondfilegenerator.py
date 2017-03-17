@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # lilypondFileGenerator -- generates a lilypond main file for several
 #                          parameters by inclusion of a structured lilypond
 #                          file with tracks
@@ -681,8 +681,7 @@ class LilypondFile:
     def generate (self, includeFileName, mode,
                   voiceNameList, title, year,
                   lyricsCountVocals, lyricsCountBgVocals,
-                  useSpecialLayoutForExtracts,
-                  ):
+                  useSpecialLayoutForExtracts):
         """Sets parameters for generation and starts generation based
            on mode."""
 
@@ -693,6 +692,9 @@ class LilypondFile:
                       includeFileName, mode, voiceNameList,
                       title, year, lyricsCountVocals, lyricsCountBgVocals,
                       useSpecialLayoutForExtracts)
+
+        useSpecialLayoutForExtracts = \
+            (useSpecialLayoutForExtracts and (mode == "voice"))
 
         self._mode                        = mode
         self._includeFileName             = includeFileName

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # lilypondpngvideogenerator -- processes lilypond file, scans postscript
 #                              file for page boundaries, analyzes tempo
 #                              track and generates MP4 video and

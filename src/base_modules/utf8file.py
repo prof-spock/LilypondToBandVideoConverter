@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8-unix -*-
 # utf8file - simple wrapper for UTF8 encoded text files
 
 #============================================================

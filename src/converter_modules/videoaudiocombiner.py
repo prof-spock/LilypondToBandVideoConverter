@@ -1,79 +1,21 @@
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8-unix -*-
 # videoaudiocombiner -- services for combining silent video files with
 #                       audio tracks and measure counting subtitles
 
 #====================
 
 import sys
-
-import mutagen.mp4
 import re
 
-from simplelogging import Logging
+from mp4tagmanager import MP4TagManager
 from operatingsystem import OperatingSystem
+from simplelogging import Logging
 from ttbase import convertStringToList, iif
 from validitychecker import ValidityChecker
 
 #====================
 
-class MP4TagManager:
-    """This class encapsulates the handling of quicktime mp4 tags for
-       a video file and provides an updater as single service."""
-
-    _nameToIdMap = { "album"           : u"©alb",
-                     "albumArtist"     : "aART",
-                     "artist"          : u"©ART",
-                     "itunesMediaType" : "stik",
-                     "title"           : u"©nam",
-                     "tvShowName"      : "tvsh",
-                     "year"            : u"©day" }
-
-    _tagNameAndValueToNewValueMap = {
-        "itunesMediaType" : {
-            "Normal"      : str(unichr(1)),
-            "Audiobook"   : str(unichr(2)),
-            "Music Video" : str(unichr(6)),
-            "Movie"       : str(unichr(9)),
-            "TV Show"     : str(unichr(10)),
-            "Booklet"     : str(unichr(11)),
-            "Ringtone"    : str(unichr(14))
-            }
-        }
-    
-    #--------------------
-
-    @classmethod
-    def tagVideoFile (cls, videoFilePath, tagToValueMap):
-        """Tags video file in <videoFilePath> with MP4 tags from
-           <tagToValueMap>"""
-
-        Logging.trace(">>: fileName = '%s', map = %s", videoFilePath,
-                      tagToValueMap)
-
-        tagList = mutagen.mp4.MP4(videoFilePath)
-        tagNameList = cls._nameToIdMap.keys()
-
-        for tagName in tagNameList:
-            isOkay = (tagName in tagToValueMap
-                      and tagToValueMap[tagName] is not None)
-
-            if isOkay:
-                technicalTagName = cls._nameToIdMap[tagName]
-                newValue = tagToValueMap[tagName]
-
-                if tagName in cls._tagNameAndValueToNewValueMap:
-                    newValue = \
-                        cls._tagNameAndValueToNewValueMap[tagName][newValue]
-
-                Logging.trace("--: set %s to '%s'", tagName, newValue)
-                tagList[technicalTagName.encode("latin-1")] = str(newValue)
-
-        tagList.save()
-        Logging.trace("<<")
-
-#====================
-
-class SubtitleShifter:
+class _SubtitleShifter:
     """This class provides services to shift an SRT subtitle line list
        by some duration."""
 
@@ -155,8 +97,90 @@ class VideoAudioCombiner:
        files generated from lilypond scores with sound audio tracks
        and measure counting subtitles."""
 
-    ffmpegCommand = None
-    mp4boxCommand = None
+    _mp4boxCommandIsUsed = True
+    _ffmpegCommand = None
+    _mp4boxCommand = None
+
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
+
+    @classmethod
+    def _combineWithFfmpeg (cls, sourceVideoFilePath, audioTrackDataList,
+                            subtitleFilePath, targetVideoFilePath):
+        """Combines video in <sourceVideoFilePath> and audio tracks
+           specified by <audioTrackDataList> to new file in
+           <targetVideoFilePath>; if <subtitleFilePath> is not empty,
+           a subtile is added"""
+
+        # TODO: this ffmpeg rendering does not produce quicktime
+        # compliant videos
+
+        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
+                      + " audioTracks = %s, subtitleFile = '%s'",
+                      sourceVideoFilePath, audioTrackDataList,
+                      subtitleFilePath, targetVideoFilePath)
+        
+        trackFilePathList    = []
+        mapDefinitionList    = []
+        metadataSettingsList = []
+
+        for i, element in enumerate(audioTrackDataList):
+            (audioFilePath, language, description) = element
+            trackFilePathList.extend([ "-i", audioFilePath ])
+            mapDefinitionList.extend([ "-map", "%d:a" % (i + 1) ])
+            metaDataTag = "-metadata:s:a:%d" % (i + 1)
+            metadataSettingsList.extend([ metaDataTag,
+                                          "title=\"%s\"" % description,
+                                          metaDataTag,
+                                          "language=\"%s\"" % language ])
+
+        if subtitleFilePath > "":
+            i = len(audioTrackDataList)
+            trackFilePathList.extend([ "-i", subtitleFilePath ])
+            mapDefinitionList.extend([ "-map", "%d:s" % (i + 1) ])
+
+        command = ([ cls._ffmpegCommand, "-i", sourceVideoFilePath ]
+                   + trackFilePathList
+                   + [ "-map", "v:0" ] + mapDefinitionList
+                   + metadataSettingsList
+                   + ["-vcodec", "copy", "-acodec", "copy",
+                      "-scodec", "mov_text", "-y", targetVideoFilePath ])
+
+        Logging.trace("<<: %s", command)
+        return command
+
+    #--------------------
+
+    @classmethod
+    def _combineWithMp4box (cls, sourceVideoFilePath, audioTrackDataList,
+                            subtitleFilePath, targetVideoFilePath):
+        """Combines video in <sourceVideoFilePath> and audio tracks
+           specified by <audioTrackDataList> to new file in
+           <targetVideoFilePath>; if <subtitleFilePath> is not empty,
+           a subtile is added"""
+
+        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
+                      + " audioTracks = %s, subtitleFile = '%s'",
+                      sourceVideoFilePath, audioTrackDataList,
+                      subtitleFilePath, targetVideoFilePath)
+        
+        command = [ cls._mp4boxCommand,
+                    "-isma", "-ipod", "-strict-error",
+                    sourceVideoFilePath ]
+
+        for (audioFilePath, language, description) in audioTrackDataList:
+            option = ("%s#audio:group=2:lang=%s:name=\"%s\""
+                      % (audioFilePath, language, description))
+            command.extend([ "-add", option ])
+
+        if subtitleFilePath > "":
+            command.extend([ "-add", subtitleFilePath + "#handler=sbtl" ])
+
+        command.extend([ "-out", targetVideoFilePath ])
+
+        Logging.trace("<<: %s", command)
+        return command
 
     #--------------------
     # EXPORTED FEATURES
@@ -169,8 +193,8 @@ class VideoAudioCombiner:
         Logging.trace(">>: ffmpegCommand = '%s', mp4boxCommand = '%s'",
                       ffmpegCommand, mp4boxCommand)
 
-        cls.ffmpegCommand = ffmpegCommand
-        cls.mp4boxCommand = mp4boxCommand
+        cls._ffmpegCommand = ffmpegCommand
+        cls._mp4boxCommand = mp4boxCommand
 
         Logging.trace("<<")
 
@@ -179,19 +203,19 @@ class VideoAudioCombiner:
     
     @classmethod
     def combine (cls, voiceNameList, trackDataList, sourceVideoFilePath,
-                 targetVideoFilePath, subtitleOptionList):
+                 targetVideoFilePath, subtitleFilePath):
         """Combines all final audio files (characterized by
            <trackDataList>) and the video given by
            <sourceVideoFilePath> into video in <targetVideoFilePath>;
-           if <subtitleOptionList> is not empty, subtitles are added
-           as additional tracks; <voiceNameList> gives the list of all
-           voices"""
+           if <subtitleFilePath> is not empty, the given subtitle file
+           is added as an additional track; <voiceNameList> gives the
+           list of all voices"""
 
         Logging.trace(">>: voiceNameList = %s, trackDataList = %s,"
                       + " sourceVideo = '%s', targetVideo = '%s',"
-                      + " subtitleOptions = %s",
+                      + " subtitleFilePath = %s",
                       voiceNameList, trackDataList, sourceVideoFilePath,
-                      targetVideoFilePath, subtitleOptionList)
+                      targetVideoFilePath, subtitleFilePath)
 
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
@@ -199,24 +223,33 @@ class VideoAudioCombiner:
         st = "== combining audio and video for " + targetVideoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
-        command = [ cls.mp4boxCommand,
-                    "-isma", "-ipod", "-strict-error",
-                    sourceVideoFilePath ]
+        languageList = [ "nor", "fra", "eng", "deu" ]
+        audioTrackDataList = []
 
-        for audioTrackData in trackDataList:
-            currentVoiceNameList, _, _, targetFilePath = audioTrackData
+        for i, audioTrackData in enumerate(trackDataList):
+            currentVoiceNameList, _, _, audioFilePath = audioTrackData
             removedVoiceList = list(set(voiceNameList) -
                                     set(currentVoiceNameList))
-            trackName = ", ".join(map(lambda x: "-" + x, removedVoiceList))
-            trackName = iif(trackName == "", "ALL", trackName)
-            Logging.trace("--: trackName = %s", trackName)
-            option = targetFilePath + "#audio:group=2:name=" + trackName
-            command.extend([ "-add", option ])
+            trackDescription = ", ".join(map(lambda x: "-" + x,
+                                             removedVoiceList))
+            trackDescription = iif(trackDescription == "",
+                                   "ALL", trackDescription)
+            Logging.trace("--: trackDescription = %s", trackDescription)
+            element = (audioFilePath, languageList[i], trackDescription)
+            audioTrackDataList.append(element)
 
-        command.extend(subtitleOptionList)
-        command.extend([ "-out", targetVideoFilePath ])
+        if cls._mp4boxCommandIsUsed:
+            command = cls._combineWithMp4box(sourceVideoFilePath,
+                                             audioTrackDataList,
+                                             subtitleFilePath,
+                                             targetVideoFilePath)
+        else:
+            command = cls._combineWithFfmpeg(sourceVideoFilePath,
+                                             audioTrackDataList,
+                                             subtitleFilePath,
+                                             targetVideoFilePath)
+
         OperatingSystem.executeCommand(command, False)
-
         Logging.trace("<<")
 
     #--------------------
@@ -249,7 +282,7 @@ class VideoAudioCombiner:
                           % (subtitleFilePath, subtitleColor,
                              subtitleFontSize))
 
-        command = (cls.ffmpegCommand,
+        command = (cls._ffmpegCommand,
                    "-loglevel", "error",
                    "-itsoffset", str(shiftOffset),
                    "-i", sourceVideoFilePath,
@@ -277,7 +310,7 @@ class VideoAudioCombiner:
         lineList = subtitleFile.readlines()
         subtitleFile.close()
 
-        lineList = SubtitleShifter.applyShift(lineList, shiftOffset)
+        lineList = _SubtitleShifter.applyShift(lineList, shiftOffset)
 
         targetSubtitleFile = open(targetSubtitleFilePath, "w")
         targetSubtitleFile.write("\n".join(lineList))
@@ -288,8 +321,8 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def tagVideoFile (cls, videoFilePath,
-                      albumName, artistName, title, mediaType, year):
+    def tagVideoFile (cls, videoFilePath, albumName, artistName,
+                      albumArtFilePath, title, mediaType, year):
         """Adds some quicktime/MP4 tags to video file with
            <videoFilePath>"""
 
@@ -304,11 +337,12 @@ class VideoAudioCombiner:
         tagToValueMap["album"]           = albumName
         tagToValueMap["albumArtist"]     = artistName
         tagToValueMap["artist"]          = artistName
+        tagToValueMap["cover"]           = albumArtFilePath
         tagToValueMap["itunesMediaType"] = mediaType
         tagToValueMap["title"]           = title
         tagToValueMap["tvShowName"]      = albumName
         tagToValueMap["year"]            = year
 
-        MP4TagManager.tagVideoFile(videoFilePath, tagToValueMap)
+        MP4TagManager.tagFile(videoFilePath, tagToValueMap)
         
         Logging.trace("<<")

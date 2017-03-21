@@ -206,6 +206,28 @@ class _LilypondProcessor:
         return result
         
     #--------------------
+        
+    @classmethod
+    def _findVoiceLists (cls, songData, voiceNameList):
+        """Calculates list of overridden voice and remaining list of selected
+           voices"""
+
+        overriddenVoiceNameList = songData.voiceNameToOverrideFileMap.keys()
+
+        Logging.trace(">>: overriddenVoiceList = %s, voiceList = %s",
+                      overriddenVoiceNameList, voiceNameList)
+
+        overriddenVoiceNameList = list(set(voiceNameList)
+                                       & set(overriddenVoiceNameList))
+        voiceNameList = voiceNameList[:]
+        voiceNameList = list(set(voiceNameList)
+                             - set(overriddenVoiceNameList))
+        result = (overriddenVoiceNameList, voiceNameList)
+
+        Logging.trace("<<: result = %s", result)
+        return result
+
+    #--------------------
 
     @classmethod
     def _makePdf (cls, processingMode, targetFileNamePrefix, voiceNameList,
@@ -400,7 +422,8 @@ class _LilypondProcessor:
              AudioTrackManager(configData.tempAudioDirectoryPath)
 
         for voiceName in selectedVoiceNameList:
-            audioTrackManager.generateRawAudio(midiFilePath, voiceName)
+            audioTrackManager.generateRawAudio(midiFilePath, voiceName,
+                                               songData.shiftOffset)
 
         Logging.trace("<<")
 
@@ -412,21 +435,11 @@ class _LilypondProcessor:
 
         Logging.trace(">>")
 
-        voiceNameList = selectedVoiceNameList[:]
         audioTrackManager = \
              AudioTrackManager(configData.tempAudioDirectoryPath)
 
-        # check whether the overridden voices are in list of selected
-        # voices and remove them
-        overriddenVoiceNameList = songData.voiceNameToOverrideFileMap.keys()
-        overriddenVoiceNameList = list(set(voiceNameList)
-                                       & set(overriddenVoiceNameList))
-        voiceNameList = list(set(voiceNameList)
-                             - set(overriddenVoiceNameList))
-
-        Logging.trace("--: effective voiceNameList = %s,"
-                      + " overriddenVoiceNameList = %s",
-                      voiceNameList, overriddenVoiceNameList)
+        overriddenVoiceNameList, voiceNameList = \
+            cls._findVoiceLists(songData, selectedVoiceNameList)
 
         for voiceName in voiceNameList:
             Logging.trace("--: processing voice %s", voiceName)
@@ -438,7 +451,8 @@ class _LilypondProcessor:
 
         for voiceName in overriddenVoiceNameList:
             overrideFile = songData.voiceNameToOverrideFileMap[voiceName]
-            audioTrackManager.copyOverrideFile(overrideFile, voiceName)
+            audioTrackManager.copyOverrideFile(overrideFile, voiceName,
+                                               songData.shiftOffset)
 
         Logging.trace("<<")
 

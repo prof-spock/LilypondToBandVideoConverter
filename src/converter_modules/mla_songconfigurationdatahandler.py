@@ -125,8 +125,14 @@ class MLA_SongConfigurationData:
                                   "useSpecialLayoutForExtracts")
         ValidityChecker.isString(self.styleHumanizationKind,
                                  "styleHumanizationKind")
+        ValidityChecker.isFloat(self.parallelTrackVolume,
+                                "parallelTrackVolume")
         ValidityChecker.isFloat(self.shiftOffset, "shiftOffset")
         ValidityChecker.isFloat(self.attenuationLevel, "attenuationLevel")
+
+        if self.parallelTrackFilePath != "":
+            ValidityChecker.isReadableFile(self.parallelTrackFilePath,
+                                           "parallelTrackFilePath")
 
         # additional rules
         ValidityChecker.isValid(" " not in self.fileNamePrefix,
@@ -233,6 +239,35 @@ class MLA_SongConfigurationData:
         return result
 
     #--------------------
+
+    def _splitParallelTrackInfo (self, parallelTrackInfo):
+        """Splits string <parallelTrackInfo> given for parallel track
+           into file path, track volume and shift offset"""
+
+        Logging.trace(">>: %s", parallelTrackInfo)
+
+        defaultFilePath = ""
+        defaultVolume   = 1.0
+        defaultOffset   = 0.0
+        
+        if parallelTrackInfo == "":
+            partList = [ defaultFilePath ]
+        else:
+            partList = parallelTrackInfo.split("/")
+
+        if len(partList) == 1:
+            partList.append(str(defaultVolume))
+
+        if len(partList) == 2:
+            partList.append(str(defaultOffset))
+            
+        self.parallelTrackFilePath = partList[0]
+        self.parallelTrackVolume   = float(partList[1])
+        self.shiftOffset           = float(partList[2])
+
+        Logging.trace("<<: %s", partList)
+        
+    #--------------------
     # EXPORTED FEATURES
     #--------------------
 
@@ -264,6 +299,8 @@ class MLA_SongConfigurationData:
         self.voiceNameList         = ""
         self.voiceNameToVoiceDataMap = ""
         self.voiceNameToOverrideFileMap = {}
+        self.parallelTrackFilePath = ""
+        self.parallelTrackVolume = 1.0
         self.shiftOffset    = None
         self.tempoTrackList = ""
         self.attenuationLevel = 0
@@ -285,7 +322,8 @@ class MLA_SongConfigurationData:
                + " styleHumanizationKind = %s, humanizedVoiceNameList = %s,"
                + " voiceNameList = %s, voiceNameToVoiceDataMap = %s,"
                + " voiceNameToOverrideFileMap = %s, videoVoiceNameList = %s,"
-               + " tempoTrackList = %s, shiftOffset = %5.3f,"
+               + " tempoTrackList = %s, parallelTrackFilePath = '%s',"
+               + " parallelTrackVolume = %4.3f, shiftOffset = %5.3f,"
                + " attenuationLevel = %5.3f, useHardVideoSubtitles = %s)")
               % (self.artistName, self.albumName, self.albumArtFilePath,
                  self.audioTargetDirectoryPath, self.targetFileNamePrefix,
@@ -298,6 +336,7 @@ class MLA_SongConfigurationData:
                  self.humanizedVoiceNameList, self.voiceNameList,
                  self.voiceNameToVoiceDataMap, self.voiceNameToOverrideFileMap,
                  self.videoVoiceNameList, self.tempoTrackList,
+                 self.parallelTrackFilePath, self.parallelTrackVolume,
                  self.shiftOffset, self.attenuationLevel,
                  self.useHardVideoSubtitles))
 
@@ -338,10 +377,10 @@ class MLA_SongConfigurationData:
         self.useSpecialLayoutForExtracts = \
                  getValueProc("useSpecialLayoutForExtracts", False)
         self.styleHumanizationKind = getValueProc("styleHumanizationKind")
-        self.shiftOffset = getValueProc("shiftOffset", 0.0)
         self.attenuationLevel = getValueProc("attenuationLevel", 0.0)
 
         tempoTrack          = getValueProc("tempoTrack")
+
         videoVoiceNames     = getValueProc("videoVoices", "")
         humanizedVoiceNames = getValueProc("humanizedVoicesList", "")
 
@@ -356,6 +395,8 @@ class MLA_SongConfigurationData:
 
         overrideFiles = getValueProc("overrideFiles", "")
         optionalVoiceNames = getValueProc("optionalVoices", "")
+        parallelTrackInfo   = getValueProc("parallelTrack", "")
+        self._splitParallelTrackInfo(parallelTrackInfo)
 
         self._checkValidity()
         self._checkStringLists(voiceNames, midiChannels, midiInstruments,

@@ -69,12 +69,12 @@ class AudioTrackManager:
 
     #--------------------
 
-    def _convertMidiToAudio (self, voiceMidiFilePath, voiceName):
+    def _convertMidiToAudio (self, voiceMidiFilePath, targetFilePath):
         """Converts voice data in midi file with <voiceMidiFilePath>
-           to raw audio file in audio directory with <voiceName>"""
+           to raw audio file with <targetFilePath>"""
 
-        Logging.trace(">>: voice = %s, midiFile = '%s'",
-                      voiceName, voiceMidiFilePath)
+        Logging.trace(">>: midiFile = '%s', targetFile = '%s'",
+                      voiceMidiFilePath, targetFilePath)
 
         cls = self.__class__
 
@@ -92,7 +92,6 @@ class AudioTrackManager:
         concatDirectoryProc = (lambda x: "%s/%s"
                                          % (cls._soundFontDirectoryName, x))
         soundFonts = map(concatDirectoryProc, cls._soundFontNameList)
-        targetFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
 
         # processing midi file via fluidsynth
         OperatingSystem.showMessageOnConsole("== fluidsynth "
@@ -135,13 +134,16 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, songTitle, voiceNameList,
-                           voiceNameToVolumeMap, attenuationLevel,
+                           voiceNameToVolumeMap, shiftOffset,
+                           parallelTrackFilePath, attenuationLevel,
                            targetFilePath):
         """Constructs and executes a command for audio mixdown of song
            with <songTitle> to target file with <targetFilePath> from
            given <voiceNameList>, the mapping to volumes
            <voiceNameToVolumeMap> with loudness attenuation given by
-           <attenuationLevel>"""
+           <attenuationLevel>; if <shiftOffset> is greater zero and
+           <parallelTrackPath> is not empty, all audio is shifted and
+           the parallel track is added"""
 
         Logging.trace(">>: voiceNames = %s, target = '%s'",
                       voiceNameList, targetFilePath)
@@ -155,6 +157,10 @@ class AudioTrackManager:
             volume = voiceNameToVolumeMap.get(voiceName, 1)
             command += [ "-v", volume, audioFilePath ]
 
+        if parallelTrackFilePath != "":
+            volume = voiceNameToVolumeMap["parallel"]
+            command += [ "-v", str(volume), parallelTrackFilePath ]
+            
         command += [ targetFilePath, "norm", str(attenuationLevel) ]
 
         OperatingSystem.showMessageOnConsole("== make mix file: %s"
@@ -217,6 +223,26 @@ class AudioTrackManager:
         Logging.trace("<<: %s", result)
         return result
 
+    #--------------------
+
+    @classmethod
+    def _shiftAudioFile (cls, audioFilePath, shiftedFilePath, shiftOffset):
+        """Shifts audio file in <audioFilePath> to shifted audio in
+           <shiftedFilePath> with silence prefix of length <shiftOffset>"""
+
+        Logging.trace(">>: infile = '%s', outfile = '%s',"
+                      + " shiftOffset = %7.3f",
+                      audioFilePath, shiftedFilePath, shiftOffset)
+
+        OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
+                                             % (shiftedFilePath, shiftOffset))
+        command = (cls._soxCommand, audioFilePath, shiftedFilePath,
+                   "pad", ("%7.3f" % shiftOffset))
+        OperatingSystem.executeCommand(command, False,
+                                       stdout=OperatingSystem.nullDevice)
+        
+        Logging.trace("<<")
+        
     #--------------------
 
     @classmethod
@@ -409,11 +435,12 @@ class AudioTrackManager:
 
     #--------------------
 
-    def copyOverrideFile (self, filePath, voiceName):
+    def copyOverrideFile (self, filePath, voiceName, shiftOffset):
         """Sets refined file from <filePath> for voice with
-           <voiceName>"""
+           <voiceName> and applies <shiftOffset>"""
 
-        Logging.trace(">>")
+        Logging.trace(">>: file = '%s', voice = %s, offset = %7.3f",
+                      filePath, voiceName, shiftOffset)
 
         cls = self.__class__
         message = "== overriding %s from file" % voiceName
@@ -421,30 +448,43 @@ class AudioTrackManager:
 
         targetFilePath = (processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        command = (cls._ffmpegCommand,
-                   "-loglevel", ffmpegLogLevel,
-                   "-i", filePath,
-                   "-y", targetFilePath)
+        command = (cls._soxCommand,
+                   filePath, targetFilePath, "pad", "%7.3f" % shiftOffset)
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def generateRawAudio (self, midiFilePath, voiceName):
+    def generateRawAudio (self, midiFilePath, voiceName, shiftOffset):
         """Generates audio wave file for <voiceName> from midi file
            with <midiFilePath> in target directory; if several midi
            tracks match voice name, the resulting audio files are
            mixed; output is dry (no chorus, reverb and delay) and
-           contains leading and trailing silent passages"""
+           contains leading and trailing silent passages; if
+           <shiftOffset> is greater that zero, the target file is
+           shifted by that amount"""
 
-        Logging.trace(">>: voice = %s, midiFile = '%s'",
-                      voiceName, midiFilePath)
+        Logging.trace(">>: voice = %s, midiFile = '%s', shiftOffset = %7.3f",
+                      voiceName, midiFilePath, shiftOffset)
 
         cls = self.__class__
         tempMidiFilePath = "tempRender.mid"
+        isShifted = (shiftOffset > 0)
+        defaultTemplate = "%s/%s.wav"
+        filePathTemplate = iif(isShifted, "%s/%s-raw.wav", defaultTemplate)
+        audioFilePath = filePathTemplate % (self._audioDirectoryPath,
+                                            voiceName)
+
         self._makeFilteredMidiFile(voiceName, midiFilePath, tempMidiFilePath)
-        self._convertMidiToAudio(tempMidiFilePath, voiceName)
+        self._convertMidiToAudio(tempMidiFilePath, audioFilePath)
+
+        if isShifted:
+            targetFilePath = defaultTemplate % (self._audioDirectoryPath,
+                                                voiceName)
+            cls._shiftAudioFile(audioFilePath, targetFilePath, shiftOffset)
+            OperatingSystem.removeFile(audioFilePath, cls._debuggingIsActive)
+            
         OperatingSystem.removeFile(tempMidiFilePath, cls._debuggingIsActive)
 
         Logging.trace("<<")
@@ -528,15 +568,26 @@ class AudioTrackManager:
                       songData, voiceNameToVolumeMap)
 
         cls = self.__class__
+
+        if songData.parallelTrackFilePath != "":
+            voiceNameToVolumeMap["parallel"] = songData.parallelTrackVolume
+
         waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
         voiceProcessingList = \
             cls.constructSettingsForOptionalVoices(songData)
+
         attenuationLevel = songData.attenuationLevel
+        # the attenuation level should be adapted from -18dbFS to
+        # -8dbFS, so 10dB are added
+        attenuationLevel += 10
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, targetFilePath = v
             self._mixdownToWavFile(songTitle, currentVoiceNameList,
-                                   voiceNameToVolumeMap, attenuationLevel,
+                                   voiceNameToVolumeMap,
+                                   songData.shiftOffset,
+                                   songData.parallelTrackFilePath,
+                                   attenuationLevel,
                                    waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,
                                 targetFilePath)

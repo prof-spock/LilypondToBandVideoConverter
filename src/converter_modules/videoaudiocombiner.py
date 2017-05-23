@@ -34,7 +34,8 @@ class _SubtitleShifter:
         minutes, remainingTime = divmod(remainingTime, 60)
         seconds, remainingTime = divmod(remainingTime, 1)
         milliseconds = 1000 * remainingTime
-        result = "%02d:%02d:%02d,%03d" % (hours, minutes, seconds, milliseconds)
+        result = ("%02d:%02d:%02d,%03d"
+                  % (hours, minutes, seconds, milliseconds))
 
         Logging.trace("<<: %s", result)
         return result

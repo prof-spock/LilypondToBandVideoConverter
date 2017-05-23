@@ -71,7 +71,8 @@ def intersection (listA, listB):
 #--------------------
 
 def makeMap (listA, listB):
-    """Returns a map from the elements in <listA> to <listB>."""
+    """Returns a map from the elements in <listA> to <listB> assuming
+       that list lengths are equal"""
 
     result = {}
 
@@ -152,8 +153,7 @@ class _LilypondProcessor:
     """Handles generation of extracts, score, midi file and silent
        video."""
 
-    _lilypondCommand = "lilypond"
-    _moveCommand     = "mv"
+    _lilypondCommand = None
     _midiFileNameTemplate = "%s-std.mid"
 
     #--------------------
@@ -376,7 +376,7 @@ class _LilypondProcessor:
         midiTransformer.addMissingTrackNames()
         midiTransformer.humanizeTracks(songData.styleHumanizationKind)
         midiTransformer.positionInstruments(trackToSettingsMap)
-        midiTransformer.addProcessingDateToTracks()
+        midiTransformer.addProcessingDateToTracks(trackToSettingsMap.keys())
         midiTransformer.save(targetMidiFileName)
 
         OperatingSystem.moveFile(targetMidiFileName,
@@ -589,7 +589,9 @@ def initialize ():
 
     Logging.trace(">>")
 
+    # initialize all the submodules with configuration information
     LilypondFile.initialize(configData.lilypondMacroIncludePath)
+    _LilypondProcessor._lilypondCommand = configData.lilypondCommand
     LilypondPngVideoGenerator.initialize(configData.ffmpegCommand,
                                          configData.lilypondCommand)
     VideoAudioCombiner.initialize(configData.ffmpegCommand,
@@ -607,6 +609,7 @@ def initialize ():
                                  configData.ffmpegCommand,
                                  configData.fluidsynthCommand,
                                  configData.soxCommand,
+                                 configData.soxGlobalOptions,
                                  configData.soundFontDirectoryPath,
                                  configData.soundFontNameList,
                                  songData.debuggingIsActive)

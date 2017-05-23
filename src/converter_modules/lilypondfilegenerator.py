@@ -351,7 +351,7 @@ class LilypondFile:
 
         self._printLine("\\score {")
         self._printLine("  <<")
-        self._printLine("    \\initialTempo \\countIn \\tempoTrack")
+        self._printLine("    { \\initialTempo \\countIn \\tempoTrack }")
 
         prefix = ("\\unfoldRepeats"
                   + iif(self._lilypondArticulationIsUsed, " \\articulate", ""))

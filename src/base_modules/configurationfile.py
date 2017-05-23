@@ -183,6 +183,7 @@ class ConfigurationFile:
 
         for i, currentLine in enumerate(lineList):
             currentLine = currentLine.rstrip()
+            cumulatedLine += iif(cumulatedLine == "", "", " ")
 
             if (currentLine.endswith(cls._continuationMarker)
                 and i < lineListLength - 1):

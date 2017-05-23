@@ -122,6 +122,7 @@ class MLA_OverallSettings:
         self.soundFontDirectoryPath         = "C:/temp/soundfonts"
         self.soundFontNameList              = ""
         self.soxCommand                     = "sox"
+        self.soxGlobalOptions               = ""
         self.targetDirectoryPath            = "generated"
         self.tempAudioDirectoryPath         = "/temp"
         self.tempLilypondFilePath           = "temp.ly"
@@ -143,8 +144,8 @@ class MLA_OverallSettings:
                + " lilypondCommand = '%s', lilypondMacroIncludePath = '%s',"
                + " loggingFilePath = '%s', mp4boxCommand = '%s',"
                + " soundFontDirectoryPath = '%s', soundFontNameList = %s,"
-               + " soxCommand = '%s', targetDirectoryPath = '%s',"
-               + " tempAudioDirectoryPath = '%s',"
+               + " soxCommand = '%s', soxGlobalOptions = '%s',"
+               + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
                + " tempLilypondFilePath = '%s', videoDeviceList = %s,"
                + " videoFrameRate = %5.3f, videoScalingFactor = %d)")
               % (className,
@@ -154,9 +155,10 @@ class MLA_OverallSettings:
                  self.lilypondMacroIncludePath, self.loggingFilePath,
                  self.mp4boxCommand, self.soundFontDirectoryPath,
                  self.soundFontNameList, self.soxCommand,
-                 self.targetDirectoryPath, self.tempAudioDirectoryPath,
-                 self.tempLilypondFilePath, self.videoDeviceList,
-                 self.videoFrameRate, self.videoScalingFactor))
+                 self.soxGlobalOptions, self.targetDirectoryPath,
+                 self.tempAudioDirectoryPath, self.tempLilypondFilePath,
+                 self.videoDeviceList, self.videoFrameRate,
+                 self.videoScalingFactor))
         return st
 
     #--------------------
@@ -181,6 +183,7 @@ class MLA_OverallSettings:
         ValidityChecker.isString(self.soundFontDirectoryPath,
                                  "soundFontDirectoryPath")
         ValidityChecker.isString(self.soxCommand, "soxCommand")
+        ValidityChecker.isString(self.soxGlobalOptions, "soxGlobalOptions")
         ValidityChecker.isString(self.targetDirectoryPath,
                                  "targetDirectoryPath")
         ValidityChecker.isString(self.tempAudioDirectoryPath,
@@ -221,6 +224,7 @@ class MLA_OverallSettings:
         self.soundFontNameList = \
                  convertStringToList(getValueProc("soundFontNames"))
         self.soxCommand = getValueProc("soxCommand")
+        self.soxGlobalOptions = getValueProc("soxGlobalOptions", "")
         self.targetDirectoryPath = getValueProc("targetDirectoryPath", ".")
         self.tempLilypondFilePath = getValueProc("tempLilypondFilePath",
                                                  "temp.ly")

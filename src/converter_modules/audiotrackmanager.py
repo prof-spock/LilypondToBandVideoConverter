@@ -37,6 +37,7 @@ class AudioTrackManager:
     _soundFontNameList         = None
     _soundNameToCommandListMap = None
     _soxCommand                = None
+    _soxGlobalOptionList       = None
 
     #--------------------
     # LOCAL FEATURES
@@ -54,6 +55,7 @@ class AudioTrackManager:
         if cls._aacCommand is None:
             command = ( cls._ffmpegCommand,
                         "-loglevel", ffmpegLogLevel,
+                        "-aac_tns", "0",                        
                         "-i", audioFilePath,
                         "-y", targetFilePath )
         else:
@@ -134,22 +136,21 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, songTitle, voiceNameList,
-                           voiceNameToVolumeMap, shiftOffset,
-                           parallelTrackFilePath, attenuationLevel,
-                           targetFilePath):
-        """Constructs and executes a command for audio mixdown of song
-           with <songTitle> to target file with <targetFilePath> from
-           given <voiceNameList>, the mapping to volumes
-           <voiceNameToVolumeMap> with loudness attenuation given by
-           <attenuationLevel>; if <shiftOffset> is greater zero and
-           <parallelTrackPath> is not empty, all audio is shifted and
-           the parallel track is added"""
+                           voiceNameToVolumeMap, parallelTrackFilePath,
+                           attenuationLevel, targetFilePath):
+        """Constructs and executes a command for audio mixdown of song with
+           <songTitle> to target file with <targetFilePath> from given
+           <voiceNameList>, the mapping to volumes <voiceNameToVolumeMap> with
+           loudness attenuation given by <attenuationLevel>; if
+           <parallelTrackPath> is not empty, the parallel track is added"""
 
         Logging.trace(">>: voiceNames = %s, target = '%s'",
                       voiceNameList, targetFilePath)
 
         cls = self.__class__
-        command = [ cls._soxCommand, "--combine", "mix" ]
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ "--combine", "mix" ])
 
         for voiceName in voiceNameList:
             audioFilePath = (processedAudioFileTemplate
@@ -236,8 +237,10 @@ class AudioTrackManager:
 
         OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
                                              % (shiftedFilePath, shiftOffset))
-        command = (cls._soxCommand, audioFilePath, shiftedFilePath,
-                   "pad", ("%7.3f" % shiftOffset))
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ audioFilePath, shiftedFilePath,
+                       "pad", ("%7.3f" % shiftOffset) ])
         OperatingSystem.executeCommand(command, False,
                                        stdout=OperatingSystem.nullDevice)
         
@@ -332,18 +335,19 @@ class AudioTrackManager:
     @classmethod
     def initialize (cls, configurationFileName,
                     aacCommand, ffmpegCommand, fluidsynthCommand,
-                    soxCommand, soundFontDirectoryName, soundFontNameList,
-                    debuggingIsActive):
+                    soxCommand, soxGlobalOptions, soundFontDirectoryName,
+                    soundFontNameList, debuggingIsActive):
         """Sets some global processing data like e.g. the command
            paths."""
 
         Logging.trace(">>: configurationFileName = '%s',"
                       + " aac = '%s', ffmpeg = '%s', fluidsynth = '%s',"
-                      + " sox = '%s', sfDirectory = '%s', sfList = %s,"
-                      + " debugging = %s",
+                      + " sox = '%s', soxOptions = '%s', sfDirectory = '%s',"
+                      + " sfList = %s, debugging = %s",
                       configurationFileName, aacCommand, ffmpegCommand,
-                      fluidsynthCommand, soxCommand, soundFontDirectoryName,
-                      soundFontNameList, debuggingIsActive)
+                      fluidsynthCommand, soxCommand, soxGlobalOptions,
+                      soundFontDirectoryName, soundFontNameList,
+                      debuggingIsActive)
 
         cls._aacCommand                = aacCommand
         cls._debuggingIsActive         = debuggingIsActive
@@ -353,6 +357,7 @@ class AudioTrackManager:
         cls._soundFontNameList         = soundFontNameList
         cls._soundNameToCommandListMap = {}
         cls._soxCommand                = soxCommand
+        cls._soxGlobalOptionList       = soxGlobalOptions.split()
 
         scriptFilePath = OperatingSystem.scriptFilePath()
         scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
@@ -448,8 +453,10 @@ class AudioTrackManager:
 
         targetFilePath = (processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        command = (cls._soxCommand,
-                   filePath, targetFilePath, "pad", "%7.3f" % shiftOffset)
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ filePath, targetFilePath,
+                       "pad", ("%7.3f" % shiftOffset) ])
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
@@ -516,7 +523,8 @@ class AudioTrackManager:
         OperatingSystem.showMessageOnConsole(message)
 
         # prepare list of sox argument lists for processing
-        reverbCommands = "norm -3 reverb %4.3f" % reverbLevel
+        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
+        reverbCommands = "norm -3 reverb %d" % reverbLevel
 
         if extendedSoundVariant in cls._soundNameToCommandListMap:
             params = cls._soundNameToCommandListMap[extendedSoundVariant]
@@ -547,7 +555,9 @@ class AudioTrackManager:
             currentTarget = iif(i < commandCount - 1, tempFilePath,
                                 targetFilePath)
             parameterList = cls._splitParameterSequence(parameterSequence)
-            command = ([cls._soxCommand, currentSource, currentTarget ]
+            command = ([ cls._soxCommand ]
+                       + cls._soxGlobalOptionList
+                       + [ currentSource, currentTarget ]
                        + parameterList)
             OperatingSystem.executeCommand(command, False)
             currentSource = currentTarget
@@ -577,15 +587,11 @@ class AudioTrackManager:
             cls.constructSettingsForOptionalVoices(songData)
 
         attenuationLevel = songData.attenuationLevel
-        # the attenuation level should be adapted from -18dbFS to
-        # -8dbFS, so 10dB are added
-        attenuationLevel += 10
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, targetFilePath = v
             self._mixdownToWavFile(songTitle, currentVoiceNameList,
                                    voiceNameToVolumeMap,
-                                   songData.shiftOffset,
                                    songData.parallelTrackFilePath,
                                    attenuationLevel,
                                    waveIntermediateFilePath)

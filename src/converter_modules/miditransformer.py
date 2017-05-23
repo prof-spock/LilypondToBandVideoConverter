@@ -22,7 +22,7 @@ from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
 
 maximumInteger = 999999999
 humanizerConfigurationFileName = ""
-humanizedTrackList = []
+humanizedTrackNameList = []
 
 #====================
 
@@ -1259,15 +1259,15 @@ class MidiTransformer:
     #--------------------
 
     @classmethod
-    def initialize (cls, configurationFileName, trackList):
+    def initialize (cls, configurationFileName, trackNameList):
         """Sets global variables for this module"""
 
-        global humanizerConfigurationFileName, humanizedTrackList
+        global humanizerConfigurationFileName, humanizedTrackNameList
 
         Logging.trace(">>: configurationFileName = '%s', trackList = %s",
-                      configurationFileName, trackList)
+                      configurationFileName, trackNameList)
         humanizerConfigurationFileName = configurationFileName
-        humanizedTrackList             = trackList
+        humanizedTrackNameList         = trackNameList
         Logging.trace("<<")
 
     #--------------------
@@ -1364,16 +1364,17 @@ class MidiTransformer:
 
     #--------------------
 
-    def addProcessingDateToTracks (self):
-        """Tags all instrument tracks in <self> with a meta text with
-           the processing date"""
+    def addProcessingDateToTracks (self, trackNameList):
+
+        """Tags all instrument tracks in <self> having a track name in
+           <trackNameList> with a meta text with the processing date"""
 
         Logging.trace(">>")
 
         cls = self.__class__
- 
-        tagLine = ("0 Meta Text \"processed at %s\""
-                   % datetime.now().strftime("%Y-%m-%dT%H%M"))
+
+        tagLinePrefix = "0 Meta Text \""
+        tagLineSuffix = " at %s\"" % datetime.now().strftime("%Y-%m-%dT%H%M")
 
         lineList = []
         lineBuffer = _LineBuffer(lineList)
@@ -1396,7 +1397,12 @@ class MidiTransformer:
                     trackName = matchResult.group(1)
                     Logging.trace("--: trackName = %s", trackName)
 
-                    if trackName in humanizedTrackList:
+                    if trackName in trackNameList:
+                        tagLine = (tagLinePrefix
+                                   + iif(trackName in humanizedTrackNameList,
+                                         "humanized", "processed")
+                                   + tagLineSuffix)
+                        Logging.trace("--: tagLine = %s", tagLine)
                         lineBuffer.writeLine(tagLine)
 
         lineBuffer.flush()
@@ -1433,10 +1439,13 @@ class MidiTransformer:
                     trackName = matchResult.group(1)
                     Logging.trace("--: trackName = %s", trackName)
                 elif cls._trackEndRegExp.match(currentLine):
-                    if trackName.startswith(trackNamePrefix) or isFirstTrack:
-                        # this is a track to be maintained
-                        Logging.trace("--: track is maintained")
-                    else:
+                    trackIsMaintained = (trackName.startswith(trackNamePrefix)
+                                         or isFirstTrack)
+                    message = "track is " + iif(trackIsMaintained,
+                                                "maintained", "skipped")
+                    Logging.trace("--: " + message)
+
+                    if not trackIsMaintained:
                         self._makeEmptyTrack(lineBuffer)
 
                     lineBuffer.flush()
@@ -1512,7 +1521,7 @@ class MidiTransformer:
                         matchResult = cls._trackNameRegExp.search(currentLine)
                         trackName = matchResult.group(1)
                         Logging.trace("--: trackName = %s", trackName)
-                        trackKind = iif(trackName in humanizedTrackList,
+                        trackKind = iif(trackName in humanizedTrackNameList,
                                         TrackKind_instrument, TrackKind_other)
 
             self._lineList = lineList

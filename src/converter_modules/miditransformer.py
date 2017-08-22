@@ -22,7 +22,7 @@ from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
 
 maximumInteger = 999999999
 humanizerConfigurationFileName = ""
-humanizedTrackNameList = []
+humanizedTrackNameSet = set()
 
 #====================
 
@@ -408,7 +408,7 @@ class _HumanizationStrategy:
             strategyAsString = getValueProc(adaptedStyleName, True)
             cls._nameToStrategyStringMap[styleName] = strategyAsString
 
-        variationFactors = getValueProc("variationFactors", True)
+        variationFactors = getValueProc("variationFactors")
         variationFactorRegExp = re.compile(r"([a-z]+:[0-9]+/[0-9]+ ?)+")
         Assertion.check(variationFactorRegExp.match(variationFactors),
                         ("wrong format for variationFactors: %s"
@@ -449,15 +449,7 @@ class _HumanizationStrategy:
 
         scriptFilePath = OperatingSystem.scriptFilePath()
         scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
-        configurationFilePath = ("%s/%s"
-                                 % (scriptFileDirectoryPath,
-                                    humanizerConfigurationFileName))
-
-        if not OperatingSystem.hasFile(configurationFilePath):
-            Logging.trace("--: ERROR configuration file not found %s",
-                          configurationFilePath)
-        else:
-            cls._parseConfigurationFile(configurationFilePath)
+        cls._parseConfigurationFile(humanizerConfigurationFileName)
 
         Logging.trace("<<")
 
@@ -1259,15 +1251,15 @@ class MidiTransformer:
     #--------------------
 
     @classmethod
-    def initialize (cls, configurationFileName, trackNameList):
+    def initialize (cls, configurationFileName, trackNameSet):
         """Sets global variables for this module"""
 
-        global humanizerConfigurationFileName, humanizedTrackNameList
+        global humanizerConfigurationFileName, humanizedTrackNameSet
 
         Logging.trace(">>: configurationFileName = '%s', trackList = %s",
-                      configurationFileName, trackNameList)
+                      configurationFileName, trackNameSet)
         humanizerConfigurationFileName = configurationFileName
-        humanizedTrackNameList         = trackNameList
+        humanizedTrackNameSet          = trackNameSet
         Logging.trace("<<")
 
     #--------------------
@@ -1399,7 +1391,7 @@ class MidiTransformer:
 
                     if trackName in trackNameList:
                         tagLine = (tagLinePrefix
-                                   + iif(trackName in humanizedTrackNameList,
+                                   + iif(trackName in humanizedTrackNameSet,
                                          "humanized", "processed")
                                    + tagLineSuffix)
                         Logging.trace("--: tagLine = %s", tagLine)
@@ -1521,7 +1513,7 @@ class MidiTransformer:
                         matchResult = cls._trackNameRegExp.search(currentLine)
                         trackName = matchResult.group(1)
                         Logging.trace("--: trackName = %s", trackName)
-                        trackKind = iif(trackName in humanizedTrackNameList,
+                        trackKind = iif(trackName in humanizedTrackNameSet,
                                         TrackKind_instrument, TrackKind_other)
 
             self._lineList = lineList

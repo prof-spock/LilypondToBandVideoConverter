@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # logging - provides primitive logging with logging levels
 #
 # author: Dr. Thomas Tensi, 2014-04
@@ -8,6 +7,7 @@
 import atexit
 import codecs
 import sys
+
 from ttbase import iif
 
 #====================
@@ -23,7 +23,13 @@ class Logging:
     _referenceLevel = Level_none
     _fileName       = ""
     _fileIsOpen     = None
+    _fileIsKeptOpen = None
     _file           = None
+    _isEnabled      = True
+
+    _buffer = []
+    # buffers log data before log file is opened, otherwise a
+    # write-through will be done
 
     # --------------------
     # LOCAL FEATURES
@@ -75,18 +81,99 @@ class Logging:
             cls._file.close()
         
     #--------------------
+
+    @classmethod
+    def _openOrCreateFile (cls, isNew):
+        """Creates or reopens logging file depending on value of
+           <isNew>"""
+
+        if cls._fileName == "":
+            cls._file = None
+        elif cls._fileName == "STDERR":
+            cls._file = sys.stderr
+        else:
+            mode = iif(isNew, "w", "a")
+            cls._file = codecs.open(cls._fileName, mode, "utf-8",
+                                    errors='replace')
+
+        cls._fileIsOpen = (cls._file is not None)
+  
+    #--------------------
+
+    @classmethod
+    def _writeLine (cls, st):
+        """Reopens logging file and writes single line <st>"""
+
+        if cls._isEnabled:
+            st = st + '\n'
+            
+            if cls._fileName == "":
+                # no output file => put line to buffer
+                cls._buffer.append(st)
+            else:
+                if not cls._fileIsKeptOpen:
+                    cls._openOrCreateFile(False)
+
+                if cls._file is None:
+                    # output file cannot be accessed => put line to buffer
+                    cls._buffer.append(st)
+                else:
+                    cls._file.write(st)
+
+                if not cls._fileIsKeptOpen:
+                    cls._file.close()
+
+    #--------------------
     # EXPORTED FEATURES
     #--------------------
 
     @classmethod
-    def initialize (cls, referenceLevel, fileName=""):
-        """Defines logging target file via <fileName> and also
-           logging reference level."""
+    def initialize (cls):
+        """Starts logging"""
 
-        cls._referenceLevel = referenceLevel
-        cls._fileName       = fileName
-        cls._fileIsOpen     = False
+        cls._writeLine("START LOGGING")
         atexit.register(cls._closeFileConditionally)
+    
+    #--------------------
+
+    @classmethod
+    def setEnabled (cls, isEnabled):
+        """Sets logging to active or inactive"""
+
+        cls._isEnabled = isEnabled
+
+    #--------------------
+
+    @classmethod
+    def setLevel (cls, loggingLevel):
+        """Sets logging reference level to <loggingLevel>"""
+
+        cls._referenceLevel = loggingLevel
+
+    #--------------------
+
+    @classmethod
+    def setFileName (cls, fileName, isKeptOpen=True):
+        """Sets file name for logging to <fileName>; if <isKeptOpen>
+           is set, the logging file is not closed after each log entry"""
+
+        if cls._fileName == fileName:
+            cls._writeLine("logging file %s already open => skip" % fileName)
+        else:
+            cls._fileName       = fileName
+            cls._fileIsKeptOpen = isKeptOpen
+            cls._openOrCreateFile(True)
+
+            if cls._file is None:
+                cls._fileName = ""
+            else:
+                for line in cls._buffer:
+                    cls._file.write(line)
+
+                cls._buffer = []
+
+            if not cls._fileIsKeptOpen:
+                cls._file.close()
 
     #--------------------
 
@@ -94,6 +181,7 @@ class Logging:
     def finalize (cls):
         """Ends logging."""
 
+        cls._writeLine("END LOGGING")
         cls._closeFileConditionally()
 
     #--------------------
@@ -103,21 +191,9 @@ class Logging:
         """Writes <st> as a line to log file, when <level> is below or
            equal to the reference level."""
 
-        st += '\n'
-
         if cls._referenceLevel >= level:
             # log message is significant 
-
-            if cls._fileName == "":
-                sys.stderr.write(st)
-            else:
-                if not cls._fileIsOpen:
-                    cls._file = codecs.open(cls._fileName, "w", "utf-8",
-                                            errors='replace')
-                    cls._fileIsOpen = True
- 
-                cls._file.write(st)
-
+            cls._writeLine(st)
 
     #--------------------
 

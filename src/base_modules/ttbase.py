@@ -56,12 +56,15 @@ def convertStringToList (st, separator=",", kind="S"):
        <kind> is 'I' or 'F' the elements are transformed into ints or
        floats"""
 
-    result = map(lambda x: x.strip(), st.split(separator))
+    if st.strip() == "":
+        result = []
+    else:
+        result = map(lambda x: x.strip(), st.split(separator))
 
-    if kind == "I":
-        result = map(lambda x: int(x), result)
-    elif kind == "F":
-        result = map(lambda x: float(x), result)
+        if kind == "I":
+            result = map(lambda x: int(x), result)
+        elif kind == "F":
+            result = map(lambda x: float(x), result)
         
     return result
 

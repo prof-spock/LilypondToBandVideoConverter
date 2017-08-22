@@ -37,14 +37,15 @@ class AudioTrackManager:
     _soundFontNameList         = None
     _soundNameToCommandListMap = None
     _soxCommand                = None
+    _soxGlobalOptionList       = None
 
     #--------------------
     # LOCAL FEATURES
     #--------------------
 
     def _compressAudio (self, audioFilePath, songTitle, targetFilePath):
-        """Compresses audio file with <songTitle> at <audioFilePath>
-           to AAC file at <targetFilePath>"""
+        """Compresses audio file with <songTitle> in path with
+          <audioFilePath> to AAC file at <targetFilePath>"""
 
         Logging.trace(">>: audioFile = '%s', title = '%s', targetFile = '%s'",
                       audioFilePath, songTitle, targetFilePath)
@@ -54,6 +55,7 @@ class AudioTrackManager:
         if cls._aacCommand is None:
             command = ( cls._ffmpegCommand,
                         "-loglevel", ffmpegLogLevel,
+                        "-aac_tns", "0",                        
                         "-i", audioFilePath,
                         "-y", targetFilePath )
         else:
@@ -80,8 +82,8 @@ class AudioTrackManager:
 
         # prepare config file for fluidsynth
         fluidsynthSettingsFilePath = ("%s/%s"
-                                      % (self._audioDirectoryPath,
-                                         "fluidsynthsettings.txt"))
+                                          % (self._audioDirectoryPath,
+                                            "fluidsynthsettings.txt"))
         fluidsynthSettingsFile = open(fluidsynthSettingsFilePath, "w")
         st = "rev_setlevel 0\nrev_setwidth 1.5\nrev_setroomsize 0.5"
         fluidsynthSettingsFile.write(st)
@@ -116,6 +118,7 @@ class AudioTrackManager:
 
     def _makeFilteredMidiFile (self, voiceName, midiFilePath,
                                voiceMidiFilePath):
+
         """Filters tracks in midi file named <midiFilePath> belonging
            to voice with <voiceName> and writes them to
            <voiceMidiFilePath>"""
@@ -134,22 +137,21 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, songTitle, voiceNameList,
-                           voiceNameToVolumeMap, shiftOffset,
-                           parallelTrackFilePath, attenuationLevel,
-                           targetFilePath):
-        """Constructs and executes a command for audio mixdown of song
-           with <songTitle> to target file with <targetFilePath> from
-           given <voiceNameList>, the mapping to volumes
-           <voiceNameToVolumeMap> with loudness attenuation given by
-           <attenuationLevel>; if <shiftOffset> is greater zero and
-           <parallelTrackPath> is not empty, all audio is shifted and
-           the parallel track is added"""
+                           voiceNameToVolumeMap, parallelTrackFilePath,
+                           attenuationLevel, targetFilePath):
+        """Constructs and executes a command for audio mixdown of song with
+           <songTitle> to target file with <targetFilePath> from given
+           <voiceNameList>, the mapping to volumes <voiceNameToVolumeMap> with
+           loudness attenuation given by <attenuationLevel>; if
+           <parallelTrackPath> is not empty, the parallel track is added"""
 
         Logging.trace(">>: voiceNames = %s, target = '%s'",
                       voiceNameList, targetFilePath)
 
         cls = self.__class__
-        command = [ cls._soxCommand, "--combine", "mix" ]
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ "--combine", "mix" ])
 
         for voiceName in voiceNameList:
             audioFilePath = (processedAudioFileTemplate
@@ -236,8 +238,10 @@ class AudioTrackManager:
 
         OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
                                              % (shiftedFilePath, shiftOffset))
-        command = (cls._soxCommand, audioFilePath, shiftedFilePath,
-                   "pad", ("%7.3f" % shiftOffset))
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ audioFilePath, shiftedFilePath,
+                       "pad", ("%7.3f" % shiftOffset) ])
         OperatingSystem.executeCommand(command, False,
                                        stdout=OperatingSystem.nullDevice)
         
@@ -300,25 +304,25 @@ class AudioTrackManager:
 
     #--------------------
 
-    def _tagAudio (self, audioFilePath, songData, songTitle, albumName):
+    def _tagAudio (self, audioFilePath, configData, songTitle, albumName):
         """Tags M4A audio file with <songTitle> at <audioFilePath>
-           with tags specified by <songData>, <songTitle> and
+           with tags specified by <configData>, <songTitle> and
            <albumName>"""
 
-        Logging.trace(">>: audioFile = '%s', songData = %s,"
+        Logging.trace(">>: audioFile = '%s', configData = %s,"
                       + " title = '%s', album = '%s'",
-                      audioFilePath, songData, songTitle, albumName)
+                      audioFilePath, configData, songTitle, albumName)
 
-        artistName = songData.artistName
+        artistName = configData.artistName
 
         tagToValueMap = {}
         tagToValueMap["album"]       = albumName
         tagToValueMap["albumArtist"] = artistName
         tagToValueMap["artist"]      = artistName
-        tagToValueMap["cover"]       = songData.albumArtFilePath
+        tagToValueMap["cover"]       = configData.albumArtFilePath
         tagToValueMap["title"]       = songTitle
-        tagToValueMap["track"]       = songData.trackNumber
-        tagToValueMap["year"]        = songData.year
+        tagToValueMap["track"]       = configData.trackNumber
+        tagToValueMap["year"]        = configData.songYear
 
         OperatingSystem.showMessageOnConsole("== tagging AAC: " + songTitle)
         MP4TagManager.tagFile(audioFilePath, tagToValueMap)
@@ -330,20 +334,21 @@ class AudioTrackManager:
     #--------------------
 
     @classmethod
-    def initialize (cls, configurationFileName,
+    def initialize (cls, configurationFilePath,
                     aacCommand, ffmpegCommand, fluidsynthCommand,
-                    soxCommand, soundFontDirectoryName, soundFontNameList,
-                    debuggingIsActive):
+                    soxCommand, soxGlobalOptions, soundFontDirectoryName,
+                    soundFontNameList, debuggingIsActive):
         """Sets some global processing data like e.g. the command
            paths."""
 
-        Logging.trace(">>: configurationFileName = '%s',"
+        Logging.trace(">>: configurationFilePath = '%s',"
                       + " aac = '%s', ffmpeg = '%s', fluidsynth = '%s',"
-                      + " sox = '%s', sfDirectory = '%s', sfList = %s,"
-                      + " debugging = %s",
-                      configurationFileName, aacCommand, ffmpegCommand,
-                      fluidsynthCommand, soxCommand, soundFontDirectoryName,
-                      soundFontNameList, debuggingIsActive)
+                      + " sox = '%s', soxOptions = '%s', sfDirectory = '%s',"
+                      + " sfList = %s, debugging = %s",
+                      configurationFilePath, aacCommand, ffmpegCommand,
+                      fluidsynthCommand, soxCommand, soxGlobalOptions,
+                      soundFontDirectoryName, soundFontNameList,
+                      debuggingIsActive)
 
         cls._aacCommand                = aacCommand
         cls._debuggingIsActive         = debuggingIsActive
@@ -353,18 +358,9 @@ class AudioTrackManager:
         cls._soundFontNameList         = soundFontNameList
         cls._soundNameToCommandListMap = {}
         cls._soxCommand                = soxCommand
+        cls._soxGlobalOptionList       = soxGlobalOptions.split()
 
-        scriptFilePath = OperatingSystem.scriptFilePath()
-        scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
-        configurationFilePath = ("%s/%s"
-                                 % (scriptFileDirectoryPath,
-                                    configurationFileName))
-
-        if not OperatingSystem.hasFile(configurationFilePath):
-            Logging.trace("--: ERROR configuration file not found %s",
-                          configurationFilePath)
-        else:
-            cls._parseConfigurationFile(configurationFilePath)
+        cls._parseConfigurationFile(configurationFilePath)
 
         Logging.trace("<<")
 
@@ -383,10 +379,10 @@ class AudioTrackManager:
     # --------------------
 
     @classmethod
-    def constructSettingsForOptionalVoices (cls, songData):
+    def constructSettingsForOptionalVoices (cls, configData):
         """Constructs a list of quadruples from mapping
-           <songData.optionalVoiceNameToSuffixMap> of optional voices
-           and given <songData.voiceNameList>, where each tuple
+           <configData.optionalVoiceNameToSuffixMap> of optional voices
+           and given <configData.voiceNameList>, where each tuple
            represents a target audio file with the voice name list
            used, its album name, its song title and its target file
            path"""
@@ -394,7 +390,7 @@ class AudioTrackManager:
         Logging.trace(">>")
 
         result = []
-        optionalVoiceMap = songData.optionalVoiceNameToSuffixMap
+        optionalVoiceMap = configData.optionalVoiceNameToSuffixMap
 
         # calculate power set as list
         optionalVoiceList = optionalVoiceMap.keys()
@@ -404,7 +400,7 @@ class AudioTrackManager:
         for i in xrange(voiceNameSubsetCount):
             j = -(i+1)
             voiceNameSubset      = voiceNameSubsetList[i]
-            currentVoiceNameList = list(set(songData.voiceNameList)
+            currentVoiceNameList = list(set(configData.voiceNameList)
                                         - set(voiceNameSubset))
             albumNameSuffix = "_".join([optionalVoiceMap[name][0]
                                         for name in voiceNameSubset])
@@ -416,13 +412,13 @@ class AudioTrackManager:
             fileSuffix = iif(songTitleSuffix == "ALL",
                              "", songTitleSuffix.lower())
 
-            albumName = iif(albumNameSuffix == "", songData.albumName,
-                            "%s - %s" % (songData.albumName, albumNameSuffix))
-            songTitle = "%s [%s]" % (songData.title, songTitleSuffix)
+            albumName = iif(albumNameSuffix == "", configData.albumName,
+                            "%s - %s" % (configData.albumName, albumNameSuffix))
+            songTitle = "%s [%s]" % (configData.title, songTitleSuffix)
             targetFilePath = ("%s/%s%s%s.m4a"
-                              % (songData.audioTargetDirectoryPath,
-                                 songData.targetFileNamePrefix,
-                                 songData.fileNamePrefix, fileSuffix))
+                              % (configData.audioTargetDirectoryPath,
+                                 configData.targetFileNamePrefix,
+                                 configData.fileNamePrefix, fileSuffix))
 
             newEntry = (currentVoiceNameList,
                         albumName, songTitle, targetFilePath)
@@ -448,8 +444,10 @@ class AudioTrackManager:
 
         targetFilePath = (processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        command = (cls._soxCommand,
-                   filePath, targetFilePath, "pad", "%7.3f" % shiftOffset)
+        command = ([ cls._soxCommand ]
+                   + cls._soxGlobalOptionList
+                   + [ filePath, targetFilePath,
+                       "pad", ("%7.3f" % shiftOffset) ])
         OperatingSystem.executeCommand(command, False)
 
         Logging.trace("<<")
@@ -516,7 +514,8 @@ class AudioTrackManager:
         OperatingSystem.showMessageOnConsole(message)
 
         # prepare list of sox argument lists for processing
-        reverbCommands = "norm -3 reverb %4.3f" % reverbLevel
+        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
+        reverbCommands = "norm -3 reverb %d" % reverbLevel
 
         if extendedSoundVariant in cls._soundNameToCommandListMap:
             params = cls._soundNameToCommandListMap[extendedSoundVariant]
@@ -547,7 +546,9 @@ class AudioTrackManager:
             currentTarget = iif(i < commandCount - 1, tempFilePath,
                                 targetFilePath)
             parameterList = cls._splitParameterSequence(parameterSequence)
-            command = ([cls._soxCommand, currentSource, currentTarget ]
+            command = ([ cls._soxCommand ]
+                       + cls._soxGlobalOptionList
+                       + [ currentSource, currentTarget ]
                        + parameterList)
             OperatingSystem.executeCommand(command, False)
             currentSource = currentTarget
@@ -556,42 +557,38 @@ class AudioTrackManager:
 
     #--------------------
 
-    def mixdown (self, songData, voiceNameToVolumeMap):
+    def mixdown (self, configData, voiceNameToVolumeMap):
         """Combines the processed audio files for all voices in
-           <songData.voiceNameList> into several combination files and
-           converts them to aac format; <songData> defines the voice
+           <configData.voiceNameList> into several combination files and
+           converts them to aac format; <configData> defines the voice
            volumes, the relative normalization level, the optional
            voices as well as the tags and suffices for the final
            files"""
 
-        Logging.trace(">>: songData = %s, voiceNameToVolumeMap = %s",
-                      songData, voiceNameToVolumeMap)
+        Logging.trace(">>: configData = %s, voiceNameToVolumeMap = %s",
+                      configData, voiceNameToVolumeMap)
 
         cls = self.__class__
 
-        if songData.parallelTrackFilePath != "":
-            voiceNameToVolumeMap["parallel"] = songData.parallelTrackVolume
+        if configData.parallelTrackFilePath != "":
+            voiceNameToVolumeMap["parallel"] = configData.parallelTrackVolume
 
         waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
         voiceProcessingList = \
-            cls.constructSettingsForOptionalVoices(songData)
+            cls.constructSettingsForOptionalVoices(configData)
 
-        attenuationLevel = songData.attenuationLevel
-        # the attenuation level should be adapted from -18dbFS to
-        # -8dbFS, so 10dB are added
-        attenuationLevel += 10
+        attenuationLevel = configData.attenuationLevel
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, targetFilePath = v
             self._mixdownToWavFile(songTitle, currentVoiceNameList,
                                    voiceNameToVolumeMap,
-                                   songData.shiftOffset,
-                                   songData.parallelTrackFilePath,
+                                   configData.parallelTrackFilePath,
                                    attenuationLevel,
                                    waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,
                                 targetFilePath)
-            self._tagAudio(targetFilePath, songData, songTitle, albumName)
+            self._tagAudio(targetFilePath, configData, songTitle, albumName)
 
             OperatingSystem.removeFile(waveIntermediateFilePath,
                                        cls._debuggingIsActive)

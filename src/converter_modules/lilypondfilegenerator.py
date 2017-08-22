@@ -52,17 +52,14 @@ from utf8file import UTF8File
 # configuration constants
 #-------------------------
 
-lilypondMacroIncludePath = None
-lilypondVersion = "2.18.2"
+songMeasureToTempoMap        = None
 
 # lilypond articulation: use articulate.ly
-# special drum notation: use Weinberg canonical drum notation
 # tabulature tag: name of tabulature tag (data is removed from standard
 #                 guitar staff)
 
 tabulatureTag = "tabulature"
 lilypondArticulationIsUsed = False
-specialDrumNotationIsUsed = True
 
 #-------------------------
 # mappings for instruments
@@ -101,18 +98,6 @@ instrumentToShortNameMap = { "bass"           : "bs",
                              "strings"        : "str",
                              "synthesizer"    : "syn",
                              "vocals"         : "voc" }
-
-#--------------------
-#--------------------
-
-def Map_getWithDefault (map, key, defaultValue):
-    """checks for <key> in <map> and returns associated value,
-       otherwise <defaultValue> is returned"""
-
-    if key in map:
-        return map[key]
-    else:
-        return defaultValue
 
 #--------------------
 #--------------------
@@ -230,13 +215,14 @@ class LilypondFile:
 
         canonicalVoiceName = \
             (self._canonicalVoiceName(voiceName)
-             + iif2(self._isVideoScore, "Video",
-                    self._useSpecialLayoutForExtracts, "Standalone", ""))
+             + iif3(self._isVideoScore, "Video",
+                    self._mode == "voice", "Standalone",
+                    self._mode == "midi", "Midi", ""))
 
         st = (st
               + "\\keyAndTime "
-              + iif(self._isVideoScore, "\\initialTempo ", "")
-              + iif(isPartOfFullScore, "", "\\compressFullBarRests ")
+              + iif(isPartOfFullScore, "",
+                    "\\initialTempo \\compressFullBarRests ")
               + iif(isGuitar, "\\removeWithTag #'" + tabulatureTag + " ", "")
               + "\\" + canonicalVoiceName)
 
@@ -265,7 +251,7 @@ class LilypondFile:
     def _writeFullScore (self):
         """writes a complete score for all voices to <self>"""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         self._printLine("\\score {")
         self._printLine("  <<")
@@ -285,28 +271,33 @@ class LilypondFile:
         """writes the header of a lilypond file also including the
            music-file to <self>"""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
-        self._printLine("\\version \"" + lilypondVersion + "\"")
-        self._printLine("\\include \"" + lilypondMacroIncludePath
-                        + "/DrTT-macros.ly\"")
-        self._printLine("\\include \"english.ly\"")
+        # print initial tempo for all target files
+        initialTempo = songMeasureToTempoMap[1][0]
+        self._printLine("initialTempo = { \\tempo 4 = %d }" % initialTempo)
 
-        if self._isVideoScore:
-            self._writeVideoSettings()
-
+        if not self._targetIsPdf:
+            self._writeNonPdfHeader()
+            self._printLine("")
+            
         if not self._targetIsPdf and self._lilypondArticulationIsUsed:
             # add reference to articulation file
             self._printLine("\\include \"articulate.ly\"")
-
-        self._printLine("")
+            self._printLine("")
 
         if self._targetIsPdf:
             self._writePdfLayoutHeader()
+            self._printLine("")
 
+        # include the specific note stuff
         self._printLine("% include note stuff")
         self._printLine("\\include \"" + self._includeFileName + "\"")
         self._printLine("")
+
+        if self._isVideoScore:
+            self._writeVideoSettings()
+            self._printLine("")
 
         Logging.trace("<<")
 
@@ -321,7 +312,7 @@ class LilypondFile:
         Logging.trace(">>: file = %s, isPartOfFullScore = %d,"
                       + " staffInstrSettingA = '%s',"
                       + " staffInstrSettingB = '%s'",
-                      repr(self), isPartOfFullScore,
+                      self, isPartOfFullScore,
                       staffInstrumentSettingA, staffInstrumentSettingB)
 
         self._printLine("    \\new PianoStaff <<")
@@ -344,14 +335,52 @@ class LilypondFile:
 
     #--------------------
 
+    def _writeNonPdfHeader (self):
+        """writes the header of a lilypond file based on <self> targetting for
+           a MIDI file or a video"""
+
+        Logging.trace(">>: %s", self)
+
+        # print count-in definition
+        self._printLine("countIn = { R1*2\\mf }")
+        self._printLine("drumsCountIn = \\drummode"
+                        + " { ss2\\mf ss | ss4 ss ss ss | }")
+       
+        # print tempo track
+        self._printLine("tempoTrack = {")
+        measureList = songMeasureToTempoMap.keys()
+        measureList.sort()
+        previousMeasure = 0
+        indentation = "    "
+
+        for measure in measureList:
+            if measure == 1:
+                st = indentation + "\\initialTempo"
+            else:
+                tempo = songMeasureToTempoMap[measure][0]
+                skipCount = measure - previousMeasure
+                st = ("%s\\skip 1*%d\n%s%%%d\n%s\\tempo 4 =%d"
+                      % (indentation, skipCount,
+                         indentation, measure,
+                         indentation, tempo))
+
+            previousMeasure = measure
+            self._printLine(st)
+                
+        self._printLine("}")
+
+        Logging.trace("<<")
+
+    #--------------------
+
     def _writeMidiScore (self):
         """sets up a complete score for MIDI output for all voices"""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         self._printLine("\\score {")
         self._printLine("  <<")
-        self._printLine("    \\initialTempo \\countIn \\tempoTrack")
+        self._printLine("    { \\initialTempo \\countIn \\tempoTrack }")
 
         prefix = ("\\unfoldRepeats"
                   + iif(self._lilypondArticulationIsUsed, " \\articulate", ""))
@@ -429,7 +458,7 @@ class LilypondFile:
                       + " isPartOfFullScore = %d,"
                       + " staffInstrSettingA = '%s',"
                       + " staffInstrSettingB = '%s'",
-                      repr(self), voiceName, voiceStaff,
+                      self, voiceName, voiceStaff,
                       isDrumVoice, isVocalsVoice, isPartOfFullScore,
                       staffInstrumentSettingA, staffInstrumentSettingB)
         
@@ -439,11 +468,6 @@ class LilypondFile:
             self._printLine("    \\new " + voiceStaff + " \\with { ")
             self._printLine("      \\consists \"Instrument_name_engraver\"")
             self._printLine("    }{")
-
-            if self._specialDrumNotationIsUsed:
-                self._printLine(indentation
-                                + "\\set DrumStaff.drumStyleTable = "
-                                + "#(alist->hash-table weinbergdrumset) ")
 
         if isPartOfFullScore and not self._isVideoScore:
             self._printLine(indentation + staffInstrumentSettingA)
@@ -476,7 +500,7 @@ class LilypondFile:
     def _writePdfLayoutHeader (self):
         """writes all layout settings for a PDF output to <self>"""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         self._printLine("%===================")
         self._printLine("%= GLOBAL SETTINGS =")
@@ -484,7 +508,7 @@ class LilypondFile:
         self._printLine("")
         self._printLine("\\header {")
         self._printLine("    title = \"" + self._title + "\"")
-        st = ("    composer = \"arranged by Dr. T.T., %d\"" % self._year)
+        st = ("    composer = \"%s\"" % self._composerText)
         self._printLine(st)
         self._printLine("    tagline = ##f")
         self._printLine("}")
@@ -603,13 +627,14 @@ class LilypondFile:
     #--------------------
 
     @classmethod
-    def initialize (cls, macroIncludePath):
+    def initialize (cls, measureToTempoMap):
         """Sets module-specific configuration variables"""
 
-        global lilypondMacroIncludePath
+        global songMeasureToTempoMap
 
-        Logging.trace(">>: macroIncludePath = '%s'", macroIncludePath)
-        lilypondMacroIncludePath = macroIncludePath
+        Logging.trace(">>: measureToTempoMap = %s", measureToTempoMap)
+        songMeasureToTempoMap = measureToTempoMap
+        
         Logging.trace("<<")
 
     #--------------------
@@ -624,13 +649,11 @@ class LilypondFile:
         self._includeFileName             = ""
         self._title                       = ""
         self._voiceNameList               = []
-        self._year                        = 0
+        self._composerText                = ""
         self._lyricsCountVocals           = 0
         self._lyricsCountBgVocals         = 0
-        self._useSpecialLayoutForExtracts = False
         
         self._lilypondArticulationIsUsed  = lilypondArticulationIsUsed
-        self._specialDrumNotationIsUsed   = specialDrumNotationIsUsed
         self._voiceToLabelMap             = {}
         self._isFirstChordedSystem        = True
 
@@ -646,21 +669,20 @@ class LilypondFile:
         self._targetIsPdf                 = False
         self._isVideoScore                = False
 
-        Logging.trace("<<: %s", repr(self))
+        Logging.trace("<<: %s", self)
 
     #--------------------
 
-    def __repr__ (self):
-        st = (("LilypondFile(mode = '%s', title = '%s', year = %d,"
+    def __str__ (self):
+        st = (("LilypondFile(mode = '%s', title = '%s', composerText = '%s',"
                + " lyricsCountVoc = %d, lyricsCountBgVoc = %d,"
-               + " useSpecialLayoutForExtracts = '%s', voiceNameList = %s,"
+               + " voiceNameList = %s,"
                + " videoEffectiveResolution = %s, videoSystemSize = %s, "
                + " videoTopBottomMargin = %s, videoPaperWidth = %s,"
                + " videoPaperHeight = %s, videoLineWidth = %s)")
-              % (self._mode, self._title, self._year,
+              % (self._mode, self._title, self._composerText,
                  self._lyricsCountVocals, self._lyricsCountBgVocals,
-                 self._useSpecialLayoutForExtracts,
-                 repr(self._voiceNameList),
+                 self._voiceNameList,
                  self._videoEffectiveResolution, self._videoSystemSize,
                  self._videoTopBottomMargin, self._videoPaperWidth,
                  self._videoPaperHeight, self._videoLineWidth))
@@ -672,38 +694,33 @@ class LilypondFile:
     def close (self):
         """finalizes lilypond file"""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
         self._file.close()
         Logging.trace("<<")
 
     #--------------------
 
     def generate (self, includeFileName, mode,
-                  voiceNameList, title, year,
-                  lyricsCountVocals, lyricsCountBgVocals,
-                  useSpecialLayoutForExtracts):
+                  voiceNameList, title, composerText,
+                  lyricsCountVocals, lyricsCountBgVocals):
         """Sets parameters for generation and starts generation based
            on mode."""
 
         Logging.trace(">>: includeFileName = '%s', mode = '%s',"
-                      + " voiceNameList = '%s', title = '%s', year = %d,"
-                      + " lyricsCountVoc = %d, lyricsCountBgVoc = %d,"
-                      + " useSpecialLayoutForExtracts = '%s'",
+                      + " voiceNameList = '%s', title = '%s',"
+                      + " composerText = '%s',"
+                      + " lyricsCountVoc = %d, lyricsCountBgVoc = %d",
                       includeFileName, mode, voiceNameList,
-                      title, year, lyricsCountVocals, lyricsCountBgVocals,
-                      useSpecialLayoutForExtracts)
-
-        useSpecialLayoutForExtracts = \
-            (useSpecialLayoutForExtracts and (mode == "voice"))
+                      title, composerText, lyricsCountVocals,
+                      lyricsCountBgVocals)
 
         self._mode                        = mode
         self._includeFileName             = includeFileName
         self._title                       = title
+        self._composerText                = composerText
         self._voiceNameList               = voiceNameList
-        self._year                        = year
         self._lyricsCountVocals           = lyricsCountVocals
         self._lyricsCountBgVocals         = lyricsCountBgVocals
-        self._useSpecialLayoutForExtracts = useSpecialLayoutForExtracts
 
         self._voiceToLabelMap             = {}
         self._isFirstChordedSystem        = True
@@ -712,7 +729,7 @@ class LilypondFile:
         self._targetIsPdf                 = (mode in ["voice", "score"])
         self._isVideoScore                = (mode == "video")
 
-        Logging.trace("--: %s", repr(self))
+        Logging.trace("--: %s", self)
 
         self._writeHeader()
 

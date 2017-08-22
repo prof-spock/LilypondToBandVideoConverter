@@ -23,10 +23,13 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def basename (cls, fileName):
-        """Returns <fileName> without extension."""
+    def basename (cls, fileName, extensionIsShown=False):
+        """Returns <fileName> without leading path."""
 
-        return os.path.splitext(fileName)[0]
+        shortFileName = os.path.basename(fileName)
+        partList = os.path.splitext(shortFileName)
+        result = (shortFileName if extensionIsShown else partList[0])
+        return result
 
     #--------------------
 
@@ -58,6 +61,18 @@ class OperatingSystem:
         """Tells whether <fileName> signifies a file."""
 
         return os.path.isfile(fileName)
+
+    #--------------------
+
+    @classmethod
+    def homeDirectoryPath (cls):
+        """Returns home directory path."""
+
+        Logging.trace(">>")
+
+        result = os.path.expanduser("~")
+        Logging.trace("<<: %s", result)
+        return result
 
     #--------------------
 
@@ -103,7 +118,6 @@ class OperatingSystem:
         else:
             Logging.trace("--: removing '%s'", fileName)
             os.remove(fileName)
-
 
     #--------------------
 

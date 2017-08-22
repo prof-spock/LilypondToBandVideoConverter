@@ -7,8 +7,10 @@
 #====================
 
 import os
-from simplelogging import Logging
+import re
 import sys
+
+from simplelogging import Logging
 from ttbase import iif
 
 #====================
@@ -104,6 +106,49 @@ class ValidityChecker:
     #--------------------
 
     @classmethod
+    def isNumberString (cls, value, valueName, floatIsAllowed, rangeKind=""):
+        """Checks whether string <value> with name <valueName> is
+           representation of a correct number. <floatIsAllowed> tells
+           whether non-integer values are okay, <rangeKind> gives an
+           boundary condition about the range."""
+
+        Logging.trace(">>: %s = '%s' (%s), floatIsOk = %s, rangeKind = '%s'",
+                      valueName, value, type(value), floatIsAllowed, rangeKind)
+
+        floatRegexp   = re.compile(r"^[0-9]+(\.[0-9]*)?$")
+        integerRegexp = re.compile(r"^[0-9]+$")
+
+        if (isinstance(value, int) or isinstance(value, long)
+            or isinstance(value, float)):
+            value = str(value)
+
+        isOkay = integerRegexp.match(value)
+
+        if floatIsAllowed and not isOkay:
+            isOkay = floatRegexp.match(value)
+
+        if not isOkay:
+            errorTemplate = iif(floatIsAllowed, "a number", "an integer")
+            errorTemplate = "%s must be " + errorTemplate + " - %s"
+        elif rangeKind == "":
+            errorTemplate = "%s%s"
+        else:
+            if rangeKind == ">0":
+                errorTemplate = "positive"
+                isOkay = (value > 0)
+            elif rangeKind == ">=0":
+                errorTemplate = "positive or zero"
+                isOkay = (value >= 0)
+
+            errorTemplate = "%s must be " + errorTemplate + " - %s"
+
+        cls.isValid(isOkay, errorTemplate % (valueName, repr(value)))
+
+        Logging.trace("<<: %s", isOkay)
+
+    #--------------------
+
+    @classmethod
     def isReadableFile (cls, pathName, valueName=None):
         """Checks whether file given by <pathName> is readable,
            otherwise exists program with a message."""
@@ -150,5 +195,6 @@ class ValidityChecker:
                       repr(condition), message)
 
         if not condition:
-            Logging.log("ERROR: " + message)
-            sys.exit(1)
+            message = "ERROR: " + message
+            Logging.log(message)
+            sys.exit(message)

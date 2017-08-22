@@ -8,11 +8,13 @@
 
 #====================
 
+import re
+
 import simpleassertion
 from simplelogging import Logging
 from operatingsystem import OperatingSystem
 from ttbase import iif
-import re
+from validitychecker import ValidityChecker
 
 #====================
 
@@ -64,49 +66,6 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def ensureNumber (cls, value, valueName, floatIsAllowed, rangeKind=""):
-        """Checks whether string <value> with name <valueName> is
-           representation of a correct number. <floatIsAllowed> tells
-           whether non-integer values are okay, <rangeKind> gives an
-           boundary condition about the range."""
-
-        Logging.trace(">>: %s = '%s' (%s), floatIsOk = %s, rangeKind = '%s'",
-                      valueName, value, type(value), floatIsAllowed, rangeKind)
-
-        floatRegexp   = re.compile(r"^[0-9]+(\.[0-9]*)?$")
-        integerRegexp = re.compile(r"^[0-9]+$")
-
-        if (isinstance(value, int) or isinstance(value, long)
-            or isinstance(value, float)):
-            value = str(value)
-
-        isOkay = integerRegexp.match(value)
-
-        if floatIsAllowed and not isOkay:
-            isOkay = floatRegexp.match(value)
-
-        if not isOkay:
-            errorTemplate = iif(floatIsAllowed, "a number", "an integer")
-            errorTemplate = "%s must be " + errorTemplate + " - %s"
-        elif rangeKind == "":
-            errorTemplate = "%s%s"
-        else:
-            if rangeKind == ">0":
-                errorTemplate = "positive"
-                isOkay = (value > 0)
-            elif rangeKind == ">=0":
-                errorTemplate = "positive or zero"
-                isOkay = (value >= 0)
-
-            errorTemplate = "%s must be " + errorTemplate + " - %s"
-
-        cls.check(isOkay, errorTemplate % (valueName, repr(value)))
-
-        Logging.trace("<<: %s", isOkay)
-
-    #--------------------
-
-    @classmethod
     def ensureProgramAvailability (cls, programName, programPath, option):
         """Checks whether program on <programPath> is available and otherwise
            gives error message and exits. <option> is the only
@@ -138,8 +97,7 @@ class DurationManager:
 
         Logging.trace(">>: measureToTempoMap = %s, countInMeasures = %d,"
                       + " lastMeasureNumber = %d",
-                      repr(measureToTempoMap), countInMeasures,
-                      lastMeasureNumber)
+                      measureToTempoMap, countInMeasures, lastMeasureNumber)
 
         firstMeasureNumber = 1
 
@@ -161,7 +119,7 @@ class DurationManager:
                                            0, firstMeasureOffset))
             result[measureNumber] = currentMeasureDuration
 
-        Logging.trace("<<: %s", repr(result))
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
@@ -173,7 +131,7 @@ class DurationManager:
            durations <measureToDurationMap>"""
 
         Logging.trace(">>: pToM = %s, mToD = %s",
-                      repr(pageToMeasureMap), repr(measureToDurationMap))
+                      pageToMeasureMap, measureToDurationMap)
 
         result = []
         previousPageMeasureNumber = min(measureToDurationMap.keys())
@@ -195,7 +153,7 @@ class DurationManager:
                 result.append(pageDuration)
                 previousPageMeasureNumber = currentPageMeasureNumber
 
-        Logging.trace("<<: %s", repr(result))
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
@@ -220,7 +178,7 @@ class DurationManager:
            <frameRate>."""
 
         Logging.trace(">>: durations = %s, frameRate = %f",
-                      repr(durationList), frameRate)
+                      durationList, frameRate)
 
         frameDuration = 1.0 / frameRate
         unallocatedDuration = 0
@@ -232,7 +190,7 @@ class DurationManager:
             unallocatedDuration = duration - effectiveDuration
             durationList[i] = effectiveDuration
 
-        Logging.trace("<<: %s", repr(durationList))
+        Logging.trace("<<: %s", durationList)
 
 #============================================================
 
@@ -337,7 +295,7 @@ class PostscriptFile:
         lastMeasureNumber = maximumMeasureNumber + 8
         result[maximumPageNumber] = lastMeasureNumber
 
-        Logging.trace("<<: %s", repr(result))
+        Logging.trace("<<: %s", result)
         return result
 
 #============================================================
@@ -386,10 +344,10 @@ class MP4Video:
                                             "-version")
 
         # check the numeric parameters
-        Assertion.ensureNumber(cls._scaleFactor, "scale factor",
-                              floatIsAllowed=False, rangeKind=">0")
-        Assertion.ensureNumber(cls._frameRate, "frame rate",
-                               floatIsAllowed=True, rangeKind=">0"),
+        ValidityChecker.isNumberString(cls._scaleFactor, "scale factor",
+                                       floatIsAllowed=False, rangeKind=">0")
+        ValidityChecker.isNumberString(cls._frameRate, "frame rate",
+                                       floatIsAllowed=True, rangeKind=">0"),
         cls._scaleFactor = int(cls._scaleFactor)
         cls._frameRate   = float(cls._frameRate)
 
@@ -423,7 +381,7 @@ class MP4Video:
         """Generate an MP4 video from durations in <pageDurationList>
            and generated PNG images."""
 
-        Logging.trace(">>: %s", repr(pageDurationList))
+        Logging.trace(">>: %s", pageDurationList)
 
         # for each page an MP4 fragment file is generated and finally
         # concatenated into the target file
@@ -435,11 +393,11 @@ class MP4Video:
             concatSpecificationFile.write("file '%s'\n" % intermediateFileName)
             requiredNumberOfFrames = int(cls._frameRate * pageDuration) + 1
             command = (cls._ffmpegCommand,
-                       "-framerate", "1/" + repr(requiredNumberOfFrames),
-                       "-i", cls._pageFileNameTemplate % page,
+                       "-framerate", "1/" + str(requiredNumberOfFrames),
+                       "-i", str(cls._pageFileNameTemplate % page),
                        "-vf", "scale=iw/%d:ih/%d" % (cls._scaleFactor,
                                                      cls._scaleFactor),
-                       "-r", repr(cls._frameRate),
+                       "-r", str(cls._frameRate),
                        "-t", "%02.2f" % pageDuration,
                        "-pix_fmt", "yuv420p",
                        "-loglevel", cls._generatorLogLevel,
@@ -513,7 +471,7 @@ class SubtitleFile:
            <countInMeasures>."""
 
         Logging.trace(">>: mToDMap = %s, countIn = %d",
-                      repr(measureToDurationMap), countInMeasures)
+                      measureToDurationMap, countInMeasures)
 
         measureNumberList = measureToDurationMap.keys()
         measureNumberList.sort()
@@ -571,64 +529,6 @@ class SubtitleFile:
 
 #============================================================
 
-class TempoTrack:
-    """Represents tempo track with mappings from measure number to
-       tempo (in beats per minute) and measure length (in quarters)."""
-
-    _defaultMeasureLength = 4 # quarters
-
-    #--------------------
-
-    @classmethod
-    def measureToTempoMap (cls, lineList):
-        """Scans <lineList> for mappings from measure number to tempo
-           and measure length indications and returns those in a map.
-           Note that intermediate measures just maintain the previous
-           tempo and length indication (as expected)."""
-
-        Logging.trace(">>: %s", lineList)
-
-        result = {}
-
-        separator = "/"
-        mappingRegexp = re.compile(r"(\w+) *-> *([\w\/]+)")
-        measureLength = cls._defaultMeasureLength
-
-        for line in lineList:
-            line = line.strip(" \t\r\n")
-
-            if line.count == 0 or line.startswith("--"):
-                pass
-            elif mappingRegexp.search(line):
-                matchList = mappingRegexp.match(line)
-                measure  = int(matchList.group(1))
-                measureLengthAndTempo = matchList.group(2)
-                separatorPosition = measureLengthAndTempo.find(separator)
-
-                if separatorPosition < 0:
-                    tempo = measureLengthAndTempo
-                else:
-                    measureLength = measureLengthAndTempo[:separatorPosition]
-                    tempo = measureLengthAndTempo[separatorPosition+1:]
-                    Assertion.ensureNumber(measureLength,
-                                           "tempo track measure length",
-                                           floatIsAllowed=True,
-                                           rangeKind=">0")
-                    measureLength = float(measureLength)
-                    
-                Assertion.ensureNumber(tempo, "tempo track tempo",
-                                       floatIsAllowed=True, rangeKind=">0")
-                tempo = float(tempo)
-
-                Logging.trace("--: tempo - %d -> %f/%f",
-                              measure, measureLength, tempo)
-                result[measure] = (tempo, measureLength)
-
-        Logging.trace("<<: %s", repr(result))
-        return result
-                   
-#============================================================
-
 class LilypondPngVideoGenerator:
     """Responsible for the main processing methods."""
 
@@ -640,7 +540,7 @@ class LilypondPngVideoGenerator:
         """Checks whether data given is plausible for subsequent
            processing."""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         # check the executables
         Assertion.ensureProgramAvailability("lilypond", self._lilypondCommand,
@@ -650,11 +550,12 @@ class LilypondPngVideoGenerator:
         Assertion.ensureFileExistence(self._lilypondFileName, "lilypond")
 
         # check the numeric parameters
-        Assertion.ensureNumber(self._countInMeasures, "count-in measures",
-                               floatIsAllowed=True)
-        Assertion.ensureNumber(self._frameRate, "frame rate",
-                               floatIsAllowed=True, rangeKind=">0")
-        Assertion.check(len(self._tempoTrackLineList) > 0,
+        ValidityChecker.isNumberString(self._countInMeasures,
+                                       "count-in measures",
+                                       floatIsAllowed=True)
+        ValidityChecker.isNumberString(self._frameRate, "frame rate",
+                                       floatIsAllowed=True, rangeKind=">0")
+        Assertion.check(len(self._measureToTempoMap) > 0,
                         "at least one tempo must be specified")
         
         self._countInMeasures = float(self._countInMeasures)
@@ -669,7 +570,7 @@ class LilypondPngVideoGenerator:
         """Initializes other data in different classes from current
            object."""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         # set commands
         MP4Video._ffmpegCommand = self._ffmpegCommand
@@ -727,17 +628,17 @@ class LilypondPngVideoGenerator:
     #--------------------
 
     def __init__ (self, lilypondFileName, targetMp4FileName,
-                  targetSubtitleFileName, tempoTrackLineList, countInMeasures,
+                  targetSubtitleFileName, measureToTempoMap, countInMeasures,
                   frameRate, scalingFactor, debuggingIsActive=False):
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = '%s', targetMp4FileName = '%s',"
                       + " targetSubtitleFileName = '%s',"
-                      + " tempoTrackLineList = %s, countInMeasures = %s,"
+                      + " measureToTempoMap = %s, countInMeasures = %s,"
                       + " frameRate = %s, scalingFactor = %d,"
                       + " debuggingIsActive = %s",
                       lilypondFileName, targetMp4FileName,
-                      targetSubtitleFileName, tempoTrackLineList,
+                      targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
                       debuggingIsActive)
 
@@ -750,7 +651,7 @@ class LilypondPngVideoGenerator:
         self._postscriptFileName     = self._pictureFileStem + ".ps"
         self._targetMp4FileName      = targetMp4FileName
         self._targetSubtitleFileName = targetSubtitleFileName
-        self._tempoTrackLineList     = tempoTrackLineList
+        self._measureToTempoMap      = measureToTempoMap
 
         # video parameters
         self._countInMeasures        = countInMeasures
@@ -765,11 +666,11 @@ class LilypondPngVideoGenerator:
         # -- check consistency of data
         self._checkParameters()
 
-        Logging.trace("<<: %s", repr(self))
+        Logging.trace("<<: %s", self)
 
     #--------------------
 
-    def __repr__ (self):
+    def __str__ (self):
         """Returns strings representation of <self>."""
 
         className = self.__class__.__name__
@@ -777,12 +678,12 @@ class LilypondPngVideoGenerator:
                    + " lilypondFileName = '%s', pictureFileStem = '%s',"
                    + " postscriptFileName = '%s', targetMp4FileName = '%s',"
                    + " targetSubtitleFileName = '%s',"
-                   + " tempoTrackLineList = %s, countInMeasures = %s,"
+                   + " measureToTempoMap = %s, countInMeasures = %s,"
                    + " frameRate = %s, debuggingIsActive = %s)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
                    self._postscriptFileName, self._targetMp4FileName,
-                   self._targetSubtitleFileName, self._tempoTrackLineList,
+                   self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
                    self._debuggingIsActive))
         return result
@@ -806,7 +707,7 @@ class LilypondPngVideoGenerator:
     def process (self):
         """Coordinates the processing of all other modules."""
 
-        Logging.trace(">>: %s", repr(self))
+        Logging.trace(">>: %s", self)
 
         try:
             self._processLilypondFile()
@@ -818,14 +719,10 @@ class LilypondPngVideoGenerator:
             lastMeasureNumber = max(pageToMeasureMap.values())
             Logging.trace("--: lastMeasureNumber = %d ", lastMeasureNumber)
 
-            # parse tempo track file for tempo track map
-            measureToTempoMap = \
-                TempoTrack.measureToTempoMap(self._tempoTrackLineList)
-
             # generate ffmpeg command fragment from frame rate, page
             # to measure map and measure to tempo map
             measureToDurationMap = \
-                DurationManager.measureToDurationMap(measureToTempoMap,
+                DurationManager.measureToDurationMap(self._measureToTempoMap,
                                                      self._countInMeasures,
                                                      lastMeasureNumber)
             pageDurationList = \

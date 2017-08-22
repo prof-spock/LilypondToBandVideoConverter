@@ -8,6 +8,7 @@
 
 import codecs
 import re
+
 from simplelogging import Logging
 from ttbase import iif, missingValue
 from operatingsystem import OperatingSystem
@@ -60,6 +61,8 @@ class ConfigurationFile:
     _identifierCharRegExp = re.compile(r"[A-Za-z0-9_]")
     _escapeCharacter = "\\"
     _doubleQuoteCharacter = '"'
+
+    _searchPathList = ["."]
 
     #--------------------
     # LOCAL FEATURES
@@ -183,6 +186,7 @@ class ConfigurationFile:
 
         for i, currentLine in enumerate(lineList):
             currentLine = currentLine.rstrip()
+            cumulatedLine += iif(cumulatedLine == "", "", " ")
 
             if (currentLine.endswith(cls._continuationMarker)
                 and i < lineListLength - 1):
@@ -384,33 +388,74 @@ class ConfigurationFile:
         Logging.trace(">>: %s", fileName)
 
         cls = self.__class__
-        configurationFile = codecs.open(fileName, "r", "utf-8")
-        configFileLineList = configurationFile.readlines()
-        configurationFile.close()
+        originalFileName = fileName
+        fileName = self._lookupFileName(originalFileName)
 
-        for currentLine in configFileLineList:
-            currentLine = currentLine.strip()
-            isImportLine = currentLine.startswith(cls._importCommandName)
+        if fileName is None:
+            Logging.trace("--: cannot find '%s'", originalFileName)
+            isOkay = False
+        else:
+            configurationFile = codecs.open(fileName, "r", "utf-8")
+            configFileLineList = configurationFile.readlines()
+            configurationFile.close()
+            isOkay = True
 
-            if isImportLine:
-                importedFileName = currentLine.split('"')[1]
-                currentLine = cls._commentMarker + " " + currentLine
+            for currentLine in configFileLineList:
+                currentLine = currentLine.strip()
+                isImportLine = currentLine.startswith(cls._importCommandName)
 
-            lineList.append(currentLine)
+                if isImportLine:
+                    importedFileName = currentLine.split('"')[1]
+                    currentLine = cls._commentMarker + " " + currentLine
 
-            if isImportLine:
-                isAbsolutePath = (importedFileName.startswith("/")
-                                  or importedFileName[1] == ":")
+                lineList.append(currentLine)
 
-                if not isAbsolutePath:
-                    directoryName = OperatingSystem.dirname(fileName)
-                    directoryName += iif(directoryName > "", "/", "")
-                    importedFileName = directoryName + importedFileName
+                if isImportLine:
+                    isAbsolutePath = (importedFileName.startswith("/")
+                                      or importedFileName.startswith("\\")
+                                      or importedFileName[1] == ":")
 
-                self._readFile(importedFileName, lineList)
+                    if isAbsolutePath:
+                        directoryPrefix = ""
+                    else:
+                        directoryName = OperatingSystem.dirname(fileName)
+                        directoryPrefix = iif(directoryName == ".", "",
+                                              directoryName
+                                              + iif(directoryName > "",
+                                                    "/", ""))
 
-        Logging.trace("<<")
+                    importedFileName = directoryPrefix + importedFileName
+                    Logging.trace("--: IMPORT '%s'", importedFileName)
+                    self._readFile(importedFileName, lineList)
+
+        Logging.trace("<<: %s", isOkay)
+        return isOkay
             
+    #--------------------
+
+    def _lookupFileName (self, originalFileName):
+        """Returns file name in search paths based on <originalFileName>"""
+
+        Logging.trace(">>: %s", originalFileName)
+
+        cls = self.__class__
+        result = None
+        separator = OperatingSystem.pathSeparator
+
+        for directoryName in cls._searchPathList:
+            simpleFileName = OperatingSystem.basename(originalFileName, True)
+            fileName = iif(directoryName == ".", originalFileName,
+                            directoryName + separator + simpleFileName)
+            isFound = OperatingSystem.hasFile(fileName)
+            Logging.trace("--: '%s' -> found = %s", fileName, isFound)
+
+            if isFound:
+                result = fileName
+                break
+
+        Logging.trace("<<: %s", result)
+        return result
+    
     #--------------------
 
     @classmethod
@@ -497,6 +542,16 @@ class ConfigurationFile:
     # EXPORTED FEATURES
     #--------------------
 
+    @classmethod
+    def setSearchPaths (cls, searchPathList):
+        """Sets list of search paths to <searchPathList>."""
+
+        Logging.trace(">>: %s", searchPathList)
+        cls._searchPathList = ["."] + searchPathList
+        Logging.trace("<<")
+
+    #--------------------
+
     def __init__ (self, fileName):
         """Parses configuration file given by <fileName> and sets
            internal key to value map."""
@@ -505,7 +560,7 @@ class ConfigurationFile:
 
         self._keyToValueMap = {}
         lineList = []
-        self._readFile(fileName, lineList)
+        isOkay = self._readFile(fileName, lineList)
         self._parseConfiguration(lineList)
 
         Logging.trace("<<")

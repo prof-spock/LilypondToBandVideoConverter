@@ -1,0 +1,508 @@
+%-*- coding: utf-8 -*-
+\documentclass[titlepage,twoside,12pt,a4paper]{report}
+  \usepackage{array}
+  \usepackage{color}
+  \usepackage{fancyhdr}
+  \usepackage{graphicx}
+  \usepackage{ifthen}
+  \usepackage{latexsym}
+  \usepackage{longtable}
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \pagestyle{fancy}
+%
+% Kopf-/Fusszeilen
+%
+  \fancyhead[LE,RO]{\slshape \rightmark}
+  \chead{}
+  \fancyhead[LO,RE]{}
+  \fancyfoot[LO,RE]{Dr.~Thomas Tensi}
+  \chead{LilypondToBandVideoConverter Documentation}
+  \fancyfoot[LE,RO]{\thepage}
+
+
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+  \addtolength{\headheight}{\baselineskip}
+
+%====================
+% LOCAL COMMANDS
+%====================
+
+  \newcommand{\assignedTo}{\(\rightarrow\)}
+
+  \newcommand{\centeredExternalPicture}[2][]{%
+    \begin{center}
+      \includegraphics[#1]{figures/#2}%
+    \end{center}
+  }
+
+  \newenvironment{centeredfigure}%
+	{\begin{figure}[htb]\begin{center}}%
+	{\end{center}\end{figure}}
+
+
+  \newcommand{\embeddedCode}[1]{\texttt{#1}}
+
+  \newenvironment{code}{\vspace*{-\medskipamount}%
+                        \begin{list}{\topsep 0mm}%
+                        \item\relax\small\tt}%
+                       {\end{list}\smallskip}
+
+  \newenvironment{filetext}[1]{\begin{code}\textbf{#1}\\}
+                              {\end{code}}
+
+  \newcommand{\hyperlink}[1]{\texttt{\color{blue}#1}}
+  \newcommand{\identifier}[1]{\texttt{#1}}
+  \newcommand{\ltbvc}{LilypondToBandVideoConverter}
+  \newcommand{\ltbvcCommand}{makelilypondall.py~}
+  \newcommand{\metaLeft}{\guillemotleft}
+  \newcommand{\metaRight}{\guillemotright}
+  \newcommand{\TODO}[1]{\emph{\textbf{TODO:} #1}}
+
+%############################################################
+\begin{document}
+
+\title{\ltbvc\ - Automated Generation of Notation Videos with Backing Tracks}
+\author{Dr.~Thomas Tensi}
+\date{2017-06-12}
+\maketitle
+
+\tableofcontents
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+
+%================
+\chapter{Summary}
+%================
+
+The \emph{\ltbvc} is an application built from several python scripts
+that orchestrate standard command-line tools to convert a music piece
+(a song) written in the lilypond notation to
+
+\begin{itemize}
+  \item a PDF score of the whole song,
+  \item several PDF voice extracts,
+  \item a MIDI file with all voices (with some preprocessing applied
+        for humanization),
+  \item audio mix files with several subsets of voices (specified
+        by configuration), and
+  \item video files for several output devices visualizing the score
+        notation pages and having the mixes as mutually selectable audio
+        tracks as backing tracks.
+\end{itemize}
+
+The central aim is to have a video file with several audio tracks
+containing mixes of different voice subsets to be used as selectable
+backing tracks.  The video itself shows a score with ``pages'' turned
+at the right time and an indication of the current measure as a
+subtitle.
+
+So one might have a score video to be displayed on some device (like a
+tablet) that issues synchronously a backing track without e.g. vocals,
+guitar and keyboard, but with bass and drums.  Hence a (partial) band
+can play the missing voices live (reading the score) and have the
+other voices coming from the backing track.
+
+For processing a song one must have
+\begin{itemize}
+
+  \item a lilypond include file with the score information containing
+        specific lilypond identifiers (cf. lilypond fragment file
+        syntax), and
+
+  \item a configuration file giving details like the voices occuring
+        in the song, their associated midi instrument, target audio
+        volume, list of mutable voices for the audio tracks
+        etc. (cf. song configuration file syntax)
+
+\end{itemize}
+
+Based on those files the python scripts --~together with some
+open-source command-line software like ffmpeg~-- produce all the
+target files either incrementally or altogether.
+
+All this could also be done with standard lilypond files using command
+line tools.  But the \ltbvc\ application automates a lot of that:
+based on data given in a song-dependent configuration file plus the
+lilypond fragment for the notes of the voices it adds boilerplate
+lilypond fragments, parametrizes the tool chain and calls the
+necessary programs automatically.
+
+%=====================
+\chapter{Requirements}
+%=====================
+
+All the scripts are written in python and can be installed as a python
+package.  The package requires Python 2.7.
+
+Additionally the following software has to be available:
+\begin{description}
+
+  \item [lilypond:] for generating the score pdf, voice extract pdfs,
+        the raw midi file and the score images used in the video files
+        (from \hyperlink{http://lilypond.org/},
+
+  \item [ffmpeg:] for video generation and video postprocessing (from
+        \hyperlink{http://ffmpeg.org/}),
+
+  \item [fluidsynth:] for generation of voice audio files from a midi
+        file (from \hyperlink{http://www.fluidsynth.org/}),
+
+  \item [sox:] for instrument-specific postprocessing of audio files
+        for the target mix files as well as the mixdown (from
+        \hyperlink{http://sox.sourceforge.net/}, and
+
+  \item [qaac (optionally):] the AAC-encoder for the final audio mix
+        file compression (from
+        \hyperlink{https://sites.google.com/site/qaacpage/}).
+
+\end{description}
+
+The location of all those commands as well as a few other settings has
+to be defined in a global configuration file for the \ltbvc\
+(cf. overall configuration file syntax)
+
+%=================
+\chapter{Glossary}
+%=================
+
+Because the different programs do not completely agree in their
+terminology, a single terminology (defined here) is hopefully used
+consistently:
+
+\begin{description}
+
+  \item [voice:]
+        a polyphonic part of a composition belonging to a single
+        instrument to be notated in one or several musical staffs
+
+  \item [song:]
+        a collection of several parallel voices forming a musical piece
+
+  \item [album:]
+        a collection of several related songs (e.g. related by year,
+        artist, etc.)
+
+  \item [audio track:]
+        the audio rendition of a subset of all song voices (typically
+        within the final notation video)
+
+\end{description}
+
+%==============
+\chapter{Usage}
+%==============
+
+The \ltbvc\ is a commandline program with the following syntax:
+\begin{code}
+  \ltbvcCommand [-h] --phases PHASELIST [--voices VOICELIST]
+                configurationFilePath
+\end{code}
+
+The options have the following meaning:
+\begin{description}
+
+  \item [\embeddedCode{-h}]
+        makes the program show all the commandline options and exit
+
+  \item [\embeddedCode{--phases PHASELIST}]
+        specifies the processing phases or combination of processing
+        phases to be applied; is a slash-separated identifier list
+        from the set \embeddedCode{ \{all, preprocess, postprocess,
+        voices, score, midi, silentvideo, rawaudio, refinedaudio,
+        mixdown, finalvideo\}}
+
+  \item [\embeddedCode{--voices VOICELIST}]
+        gives the slash-separated list of voices where current phase
+        should be done on (e.g. only on vocals and on drums); those
+        voice names should be a subset of the list of voices given in
+        the configuration file and in the associated lilypond file;
+        this option is optional, when it is not given, all voices are
+        used \TODO{ensure that this logic applies to all phases!}
+
+  \item [\embeddedCode{configurationFilePath}]
+        gives the path to the configuration file specifying all
+        information about the song to be processed
+
+\end{description}
+                          
+The several processing phases of \ltbvc\ produce the several outputs
+incrementally.  Those phases have the following meanings:
+
+\begin{description}
+
+  \item [voices:]
+        generates PDF notation files for single voices as extracts
+        (might use compacted versions if specified),
+  
+  \item [score:]
+        generates a single PDF file containing all voices as a score,
+                 
+  \item [midi:]
+        generates a MIDI file containing all voices with specified
+        instruments, pan positions and volumes,
+               
+  \item [silentvideo:]
+        generates (intermediate) silent videos containing the score
+        pages for several output devices (with configurable resolution
+        and size),
+
+  \item [rawaudio:]
+        generates (intermediate) audio files for all the instrument
+        voices,
+
+  \item [refinedaudio:]
+        generates (intermediate) audio files for all the instrument
+        voices with additional sound processing applied,
+
+  \item [mixdown:]
+        generates final compressed audio files with submixes of all
+        instruments voices based on the refined audio files with
+        specified volume balance (where the submix variants are
+        configurable)
+
+  \item [finalvideo:]
+        generates a final video file with all submixes as selectable
+        audio tracks and with a measure indication as subtitle
+
+\end{description}
+
+The combining phase names are
+
+\begin{description}
+  \item [preprocess:]
+        combining all the phases \embeddedCode{voices},
+        \embeddedCode{score}, \embeddedCode{midi} and
+        \embeddedCode{silentvideo} for generation of voice extract
+        PDFs and score PDF, MIDI file as well the silent videos for
+        all video devices
+
+  \item [postprocess:]
+        combining all the phases \embeddedCode{rawaudio},
+        \embeddedCode{refinedaudio}, \embeddedCode{mixdown} and
+        \embeddedCode{finalvideo} for generation of the intermediate
+        raw and refined WAV files, the submixes as compressed audios
+        and the final videos for all video devices
+
+
+  \item [all:]
+        full processing i.e. \embeddedCode{preprocess} and
+        \embeddedCode{postprocess}
+
+\end{description}
+
+So for example
+\begin{code}
+  \ltbvcCommand --phases voices/score --voices vocals/strings/drums config.txt
+\end{code}
+
+will generate the voice extracts for vocals, strings and drums as well
+as a song score with those three voices specified in file
+\embeddedCode{config.txt}.  The vertical order within the score as
+well as other layout parameters are given by the order of voice
+descriptions and specific variables in the configuration file.
+
+\begin{centeredfigure}
+  \TODO{DEPENDENCY DIAGRAM}
+  %\centeredExternalPicture{schema-1.mps}
+  \caption{Dependencies between Generation Phases}
+  \label{figure:phaseDependencies}
+\end{centeredfigure}
+
+Of course, those phases are not independent.  Several phases rely on
+results produced by other phases.
+Figure~\ref{figure:phaseDependencies} shows how the phases depend on
+each other.  E.g. the phase \embeddedCode{rawaudio} needs a midi file
+as input containing all voices to be rendered as audio files.  When
+using compound phases or when specifying several phases for a single
+run of the \ltbvc\ application, the phases are processed in a correct
+order, but when doing a manual selection of phases, you have to make
+sure that the dependencies given are obeyed.
+
+\TODO{implement proper exception handling: stop on failure with
+      message, check for missing inputs}
+
+%============================
+\chapter{Configuration Files}
+%============================
+
+Variables controlling the song processing have to be defined in the
+configuration file for a song.  The name of this file is given as a
+mandatory parameter for the application.
+
+Note that typically there is not a single configuration file, but a
+song configuration file including others with global definitions (like
+e.g. defining the location of the ffmpeg command).  Although there is
+some internal program logic separating the variables into different
+domains for global setup variables, album related variables and song
+variables, this is somewhat academincal: a variable definition can be
+given in any place.
+
+The configuration file(s) are searched for in the following locations
+in the given order:
+\begin{itemize}
+  \item the current directory
+  \item the directory ~/.ltbvc within the user's home directory
+  \item the directory config and ../config relative to the directory
+        of the python program files
+\end{itemize}
+
+\TODO{implement that location search}
+
+%==================================
+\chapter{Configuration File Syntax}
+%==================================
+
+Each configuration file has a simple line-oriented syntax as follows:
+\begin{itemize}
+
+  \item Leading and trailing whitespace in a line is ignored.
+        Other whitespace is only interpreted as token separator.
+
+  \item A line starting with a comment marker ``-\relax-'' or completely
+        empty is ignored.
+
+  \item A line ending with a continuation marker
+        ``\textvisiblespace\textbackslash'' is combined with the
+        following line.
+
+  \item Each relevant line starts with an identifier followed by an
+        equal sign and the associated value.  The associated value may
+        be an integer, a real, a boolean or a string.  By this
+        assignment the value is associated with the variable given by
+        the identifier.  A subsequent assignment to the same
+        variable will replace that value.
+
+  \item An identifier is a sequence of lower- and uppercase letters or
+        underscores.
+
+  \item One may define such variables arbitrarily.
+
+  \item An integer literal is a digit sequence, a real value is a digit
+        sequence with at most one decimal point, a boolean value is either
+        the string ``true'' or ``false'' and a string value is a
+        character sequence enclosed by double quotes.  Two double
+        quotes within a string are interpreted as a double quote
+        character.
+
+  \item When a variable identifier occurs on the right hand side of an
+        assignment, it is replaced by its associated value.  If there is
+        none, this is an error.
+
+  \item A sequence of adjacent string literals or variables with
+        string contents are concatenated into a single string value.
+        \TODO{convert number to string in a string context}
+
+  \item A line starting with ``INCLUDE'' followed by a string
+        specifies the name of a file to be included in place.
+        \TODO{There is no provision against multiple includes of the
+        same file or circular includes.}
+
+\end{itemize}
+
+Assume for an example the following definitions in two files ``test.text''
+and ``config.txt'':
+
+\begin{filetext}{test.txt}
+  -- test file to be included elsewhere\\
+  voiceNames = "vocals, guitar, drums"\\
+  initialTempo = "90"\\
+  year = 2017
+\end{filetext}
+
+\begin{filetext}{config.txt}
+  -- including test file\\
+  INCLUDE "test.txt"\\
+  voiceNames = "vocals, guitar"\\
+  \\
+  tempoTrack = "1 -> " initialTempo "|20 -> 67"
+\end{filetext}
+
+leads to the following overall variable settings:
+
+\begin{code}
+  initialTempo \assignedTo\ "90"\\
+  year \assignedTo\ 2017\\
+  voiceNames \assignedTo\ "vocals, guitar"\\
+  tempoTrack \assignedTo\ "1 -> 90|20 -> 67"\\
+\end{code}
+
+%======================
+\chapter{Lilypond File}
+%======================
+
+The lilypond file used for a song contains lilypond macros.  At least
+there must be definitions for the following items:
+
+\begin{description}
+
+  \item [\embeddedCode{keyAndTime}:]
+        tells the key and time of the song and assumes that this
+        applies to all voices
+
+  \item [\embeddedCode{\metaLeft voice\metaRight} for each voice given
+        in the configuration file:]
+        the musical expression for a voice to be used in the score
+
+  \item [\embeddedCode{\metaLeft voice\metaRight Midi} for each voice given
+        in the configuration file:]
+        the musical expression for a voice to be used in the score
+
+\end{description}
+
+All voices are given by the configuration variable
+\embeddedCode{voices}.
+
+The above looks more complicated than necessary.  But often you will
+reuse lilypond macros and typically the MIDI macro
+\embeddedCode{\metaLeft voice\metaRight Midi} is the same as the score
+macro \embeddedCode{\metaLeft voice\metaRight} only with \emph{all
+  repeats unfolded}.
+
+
+
+
+There are also variables that make other
+lilypond macros mandatory.  The following table gives the
+configuration variable, the corresponding lilypond macro(s) and a
+short description:
+
+{\tiny
+\begin{tabular}{| >{\embeddedCode\bgroup}l<{\egroup} |
+                  >{\embeddedCode\bgroup}l<{\egroup} |
+                  p{8cm} |}
+  standaloneVoices & \metaLeft voice\metaRight Standalone
+  & for each voice given in the list the lilypond macro gives the
+    musical expression for a voice to be rendered in the corresponding
+    voice extract\\
+  chordedVoices & \metaLeft voice\metaRight Chords
+  & for each voice given in the list the lilypond macro gives the musical
+    expression for the chords to be rendered in the \emph{score}\\
+  chordedStandaloneVoices & \metaLeft voice\metaRight ChordsStandalone
+  & for each voice given in the list the lilypond macro gives the musical
+    expression for the chords to be rendered in the corresponding
+    \emph{voice extract}\\
+  videoVoices &  \metaLeft voice\metaRight Video
+\end{tabular}
+}
+
+several lilypond macro definitions.  There are none required, but
+typical definitions are
+
+\begin{itemize}
+
+  \item a ``\textbackslash version'' command signifying the minimum
+        lilypond version to be used and
+  
+  \item an ``\textbackslash include'' for the pitch description language
+        (like e.g. \textbackslash \"english.ly\"),
+
+\end{itemize}
+
+When there is no include file, a default version is used and the pitch
+description language is set to be English.
+
+
+\end{document}

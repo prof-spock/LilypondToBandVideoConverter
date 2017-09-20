@@ -15,34 +15,6 @@ from operatingsystem import OperatingSystem
 
 #====================
 
-class _Token:
-    """Simple token within table definition string parser"""
-
-    Kind_number        = "number"
-    Kind_string        = "string"
-    Kind_operator      = "operator"
-    Kind_floatNumber   = "float"
-    Kind_integerNumber = "integer"
-
-    #--------------------
-
-    def __init__ (self, start, kind, value):
-        """Initializes token with start position, token kind and value"""
-
-        self.start = start
-        self.kind  = kind
-        self.value = value
-        
-    #--------------------
-
-    def __repr__ (self):
-        """String representation for token <self>"""
-
-        st = "_Token(%s, %s, '%s')" % (self.start, self.kind, self.value)
-        return st
-        
-#====================
-
 class ConfigurationFile:
     """Provides services for reading a configuration file with key -
        value assignments.  The parsing process calculates a map from
@@ -208,32 +180,6 @@ class ConfigurationFile:
 
     #--------------------
 
-    @classmethod
-    def _mustHave (cls, token, kindList, valueList=None):
-        """Ensures that <token> is of a kind in <kindList>; if
-           <valueList> is not none, token value is also checked"""
-
-        Logging.trace(">>: token = %s, kindList = %s, valueList = '%s'",
-                      token, kindList, valueList)
-
-        errorPosition = -1
-        errorMessage  = ""
-
-        if token.kind not in kindList:
-            errorPosition = token.start
-            errorMessage  = ("expected kind from %s, found %s"
-                             % (kindList, token.kind))
-        elif valueList is not None and token.value not in valueList:
-            errorPosition = token.start
-            errorMessage  = ("expected value from %s, found %s"
-                             % (valueList, token.value))
-
-        result = (errorPosition, errorMessage)
-        Logging.trace("<<: %s", result)
-        return result
-
-    #--------------------
-
     def _parseConfiguration (self, lineList):
         """Parses configuration file data given by <lineList> and updates
            key to value map."""
@@ -311,81 +257,13 @@ class ConfigurationFile:
 
     #--------------------
 
-    @classmethod
-    def _parseTableString (cls, tokenList, position):
-        """Parses <tokenList> containing a table definition mapping
-           keys to values where values may be tables itself; returns
-           triple of dictionary object, error position within string
-           and error message"""
-
-        Logging.trace(">>: %d, %s", position, tokenList)
-
-        table = {}
-        errorPosition = -1
-        errorMessage = ""
-
-        ParseState_inLimbo    = 0
-        ParseState_atKey      = 1
-        ParseState_atColon    = 2
-        ParseState_atValue    = 3
-        ParseState_afterValue = 4
-        ParseState_done       = 5
-        
-        parseState = ParseState_inLimbo
-
-        currentKey   = None
-        currentValue = None
-
-        while parseState != ParseState_done:
-            token = tokenList[position]
-            nextParseState = parseState + 1
-
-            if parseState == ParseState_inLimbo:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], "{")
-            elif parseState == ParseState_atKey:
-                allowedTokenKindList = [ _Token.Kind_number,
-                                         _Token.Kind_string ]
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, allowedTokenKindList, None)
-                currentKey = token.value
-            elif parseState == ParseState_atColon:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], ":")
-            elif parseState == ParseState_atValue:
-                if token.kind != _Token.Kind_operator:
-                    currentValue = token.value
-                else:
-                    # value is a table itself => recursion
-                    errorPosition, errorMessage = \
-                        cls._mustHave(token, [ _Token.Kind_operator ], "{")
-                    
-                    if errorPosition < 0:
-                        errorPosition, errorMessage, currentValue, position = \
-                             cls._parseTableString(tokenList, position)
-                        
-                table[currentKey] = currentValue
-            elif parseState == ParseState_afterValue:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], ",}")
-                nextParseState = iif(token.value == "}", ParseState_done,
-                                     ParseState_atKey)
-                
-            parseState = iif(errorPosition >= 0, ParseState_done,
-                             nextParseState)
-            position += iif(parseState == ParseState_done, 0, 1)
-
-        result = (errorPosition, errorMessage, table, position)
-        Logging.trace("<<: %s", result)
-        return result
-
-    #--------------------
-
-    def _readFile (self, fileName, lineList):
+    def _readFile (self, fileName, lineList, visitedFileSet):
         """Appends lines of configuration file with <fileName> to
-           <lineList>; also handles embedded imports of files"""
+           <lineList>; also handles embedded imports of files; <visitedFileSet>
+           tells which files have already been visited"""
 
-        Logging.trace(">>: %s", fileName)
+        Logging.trace(">>: fileName = '%s', visitedFiles = %s",
+                      fileName, visitedFileSet)
 
         cls = self.__class__
         originalFileName = fileName
@@ -394,7 +272,10 @@ class ConfigurationFile:
         if fileName is None:
             Logging.trace("--: cannot find '%s'", originalFileName)
             isOkay = False
+        elif fileName in visitedFileSet:
+            Logging.trace("--: file already included '%s'", originalFileName)
         else:
+            visitedFileSet.update(fileName)
             configurationFile = codecs.open(fileName, "r", "utf-8")
             configFileLineList = configurationFile.readlines()
             configurationFile.close()
@@ -426,7 +307,7 @@ class ConfigurationFile:
 
                     importedFileName = directoryPrefix + importedFileName
                     Logging.trace("--: IMPORT '%s'", importedFileName)
-                    self._readFile(importedFileName, lineList)
+                    self._readFile(importedFileName, lineList, visitedFileSet)
 
         Logging.trace("<<: %s", isOkay)
         return isOkay
@@ -457,88 +338,6 @@ class ConfigurationFile:
         return result
     
     #--------------------
-
-    @classmethod
-    def _tokenizeTableString (cls, st):
-        """Converts table definition string into list of tokens where
-           a token is a pair of kind and value"""
-
-        Logging.trace(">>: %s", st)
-
-        ScanState_inLimbo  = 0
-        ScanState_inString = 1
-        ScanState_inNumber = 2
-
-        digits    = "0123456789"
-        operators = "{}:,"
-
-        tokenList = []
-        errorPosition, errorMessage = -1, ""
-        tokenStart, tokenKind, tokenValue = None, None, None
-        scanState = ScanState_inLimbo
-        i = 0
-
-        while i < len(st):
-            ch = st[i]
-            tokenIsDone = False
-
-            if scanState == ScanState_inLimbo:
-                if ch == " ":
-                    pass
-                elif not ch in "'" + operators + digits:
-                    tokenValue = None
-                    errorPosition = i
-                    errorMessage = "illegal character %s" % ch
-                    break
-                else:
-                    tokenStart = i
-                    tokenValue = iif(ch == "'", "", ch)
-
-                    if ch == "'":
-                        tokenKind = _Token.Kind_string
-                        scanState = ScanState_inString
-                    elif ch in operators:
-                        tokenKind = _Token.Kind_operator
-                        tokenIsDone = True
-                    elif ch in digits:
-                        tokenKind = _Token.Kind_integerNumber
-                        scanState = ScanState_inNumber
-            elif scanState == ScanState_inString:
-                if ch != "'":
-                    tokenValue += ch
-                else:
-                    tokenIsDone = True
-            elif scanState == ScanState_inNumber:
-                if ch in digits:
-                    tokenValue += ch
-                elif ch == ".":
-                    tokenKind = _Token.Kind_floatNumber
-                    tokenValue += ch
-                else:
-                    i -= 1
-                    tokenIsDone = True
-                    tokenValue = iif(tokenKind == _Token.Kind_floatNumber,
-                                     float(tokenValue), int(tokenValue))
-                    tokenKind = _Token.Kind_number
-
-            if tokenIsDone:
-                token = _Token(tokenStart, tokenKind, tokenValue)
-                Logging.trace("--: adding %s", token)
-                tokenList.append(token)
-                tokenValue = None
-                scanState = ScanState_inLimbo
-
-            i += 1
-
-        if tokenValue is not None:
-            errorPosition = i
-            errorMessage = "unterminated token %s" % tokenKind
-
-        result = (errorPosition, errorMessage, tokenList)
-        Logging.trace("<<: %s", result)
-        return result
-        
-    #--------------------
     # EXPORTED FEATURES
     #--------------------
 
@@ -559,8 +358,9 @@ class ConfigurationFile:
         Logging.trace(">>: %s", fileName)
 
         self._keyToValueMap = {}
+        visitedFileSet = set()
         lineList = []
-        isOkay = self._readFile(fileName, lineList)
+        isOkay = self._readFile(fileName, lineList, visitedFileSet)
         self._parseConfiguration(lineList)
 
         Logging.trace("<<")
@@ -590,23 +390,10 @@ class ConfigurationFile:
 
     #--------------------
 
-    @classmethod
-    def parseTableDefinitionString (cls, st):
-        """Parses <st> as configuration string containing a table
-           definition mapping keys to values where values may be
-           tables itself; returns triple of dictionary object, error
-           position within string and error message"""
+    def getKeySet (self):
+        """Returns set of all keys in configuration file"""
 
-        Logging.trace(">>: %s", st)
-
-        st = "{" + st + "}"
-        errorPosition, errorMessage, tokenList = cls._tokenizeTableString(st)
-
-        if errorPosition < 0:
-            errorPosition, errorMessage, table, newPosition = \
-                cls._parseTableString(tokenList, 0)
-
-        errorPosition = errorPosition + iif(errorPosition > 0, -1, 0)
-        result = (errorPosition, errorMessage, table)
+        Logging.trace(">>")
+        result = set(self._keyToValueMap.keys())
         Logging.trace("<<: %s", result)
         return result

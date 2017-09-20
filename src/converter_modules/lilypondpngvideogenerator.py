@@ -629,36 +629,36 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self, lilypondFileName, targetMp4FileName,
                   targetSubtitleFileName, measureToTempoMap, countInMeasures,
-                  frameRate, scalingFactor, debuggingIsActive=False):
+                  frameRate, scalingFactor, intermediateFilesAreKept=False):
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = '%s', targetMp4FileName = '%s',"
                       + " targetSubtitleFileName = '%s',"
                       + " measureToTempoMap = %s, countInMeasures = %s,"
                       + " frameRate = %s, scalingFactor = %d,"
-                      + " debuggingIsActive = %s",
+                      + " intermediateFilesAreKept = %s",
                       lilypondFileName, targetMp4FileName,
                       targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
-                      debuggingIsActive)
+                      intermediateFilesAreKept)
 
-        self._ffmpegCommand          = ffmpegCommand
-        self._lilypondCommand        = lilypondCommand
+        self._ffmpegCommand            = ffmpegCommand
+        self._lilypondCommand          = lilypondCommand
 
         # files
-        self._lilypondFileName       = lilypondFileName
-        self._pictureFileStem        = "temp_frame"
-        self._postscriptFileName     = self._pictureFileStem + ".ps"
-        self._targetMp4FileName      = targetMp4FileName
-        self._targetSubtitleFileName = targetSubtitleFileName
-        self._measureToTempoMap      = measureToTempoMap
+        self._lilypondFileName         = lilypondFileName
+        self._pictureFileStem          = "temp_frame"
+        self._postscriptFileName       = self._pictureFileStem + ".ps"
+        self._targetMp4FileName        = targetMp4FileName
+        self._targetSubtitleFileName   = targetSubtitleFileName
+        self._measureToTempoMap        = measureToTempoMap
 
         # video parameters
-        self._countInMeasures        = countInMeasures
-        self._frameRate              = frameRate
-        self._scaleFactor            = scalingFactor
+        self._countInMeasures          = countInMeasures
+        self._frameRate                = frameRate
+        self._scaleFactor              = scalingFactor
 
-        self._debuggingIsActive = debuggingIsActive
+        self._intermediateFilesAreKept = intermediateFilesAreKept
 
         # -- initialize other modules
         self._initializeOtherModuleData()
@@ -679,13 +679,13 @@ class LilypondPngVideoGenerator:
                    + " postscriptFileName = '%s', targetMp4FileName = '%s',"
                    + " targetSubtitleFileName = '%s',"
                    + " measureToTempoMap = %s, countInMeasures = %s,"
-                   + " frameRate = %s, debuggingIsActive = %s)") %
+                   + " frameRate = %s, intermediateFilesAreKept = %s)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
                    self._postscriptFileName, self._targetMp4FileName,
                    self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
-                   self._debuggingIsActive))
+                   self._intermediateFilesAreKept))
         return result
 
     #--------------------
@@ -695,7 +695,7 @@ class LilypondPngVideoGenerator:
 
         Logging.trace(">>")
 
-        if not self._debuggingIsActive:
+        if not self._intermediateFilesAreKept:
             OperatingSystem.removeFile(self._postscriptFileName)
             MP4Video.cleanup()
             SubtitleFile.cleanup()

@@ -7,21 +7,23 @@
 
 #====================
 
-from configurationfile import ConfigurationFile
 from datetime import datetime
 import math
-from midifilehandler import MidiFileHandler
-from operatingsystem import OperatingSystem
 import random
 import re
+
+from midifilehandler import MidiFileHandler
+from operatingsystem import OperatingSystem
 from simpleassertion import Assertion
 from simplelogging import Logging
-from ttbase import adaptToRange, iif, iif2, iif4, isInRange, MyRandom
+from ttbase import adaptToRange, convertStringToMap, \
+                   iif, iif2, iif4, isInRange, MyRandom
 
 #====================
 
 maximumInteger = 999999999
-humanizerConfigurationFileName = ""
+voiceNameToVariationFactorMap  = {}
+humanizationStyleNameToTextMap = {}
 humanizedTrackNameSet = set()
 
 #====================
@@ -359,82 +361,18 @@ class _MusicTime:
 
 #====================
 
-class _HumanizationStrategy:
+class _HumanizationStyle:
     """This class encapsulates all services for midi track
-       humanization. The strategy describes how many count-in measures
+       humanization. The style describes how many count-in measures
        are skipped, how the timing and the velocity may be changed
        depending on the position of a hit within a measure."""
 
-    _partSeparator      = "/"
-    _tagSeparator       = ":"
-    _keyValueSeparator  = ":"
-    _entrySeparator     = ","
-    _styleNameSeparator = "|"
-    _nameToStrategyStringMap = None
-    _instrumentToScalingFactorPairMap = None
-    _defaultStrategyAsString = ("COUNTIN: 2"
-                                + "/"
-                                + "TIMING: 1:0, 2:25, 3:10, 4:25, S:D50,"
-                                + " OTHER:D35"
-                                + "/"
-                                + "VELOCITY: 1:115, 2:100, 3:110, 4:100,"
-                                + " S:105, OTHER:85, SLACK:10")
-
-    #--------------------
-    # LOCAL FEATURES
-    #--------------------
-
-    @classmethod
-    def _parseConfigurationFile(cls, configurationFilePath):
-        """Fills mapping from strategy name to associated strategy
-           string effectively from already checked configuration file"""
-    
-        Logging.trace(">>: %s", configurationFilePath)
-
-        configurationFile = ConfigurationFile(configurationFilePath)
-        getValueProc = configurationFile.getValue
-
-        styleNameListAsString = getValueProc("styleNameList", "")
-        styleNameList = styleNameListAsString.split(cls._styleNameSeparator)
-
-        cls._nameToStrategyStringMap = {}
-
-        for styleName in styleNameList:
-            capitalizationProc = (lambda x: x.capitalize())
-            namePartList = map(capitalizationProc, styleName.split("_"))
-            adaptedStyleName = "style" + "".join(namePartList)
-            Logging.trace("--: looking for %s for %s",
-                          adaptedStyleName, styleName)
-            strategyAsString = getValueProc(adaptedStyleName, True)
-            cls._nameToStrategyStringMap[styleName] = strategyAsString
-
-        variationFactors = getValueProc("variationFactors")
-        variationFactorRegExp = re.compile(r"([a-z]+:[0-9]+/[0-9]+ ?)+")
-        Assertion.check(variationFactorRegExp.match(variationFactors),
-                        ("wrong format for variationFactors: %s"
-                         % variationFactors))
-        
-        variationFactorList = map(lambda x: x.strip(),
-                                  variationFactors.split(" "))
-        cls._instrumentToScalingFactorPairMap = {}
-
-        for variationTuple in variationFactorList:
-            Logging.trace("--: processing variation %s", variationTuple)
-
-            if variationTuple == "":
-                # skip over empty entries
-                pass
-            else:
-                instrumentName, factors = variationTuple.split(":")
-                scalingFactors = map(lambda x: float(x) / 100,
-                                     factors.split("/"))
-                cls._instrumentToScalingFactorPairMap[instrumentName] = \
-                         scalingFactors
-
-        Logging.trace("--: scaling factors = %s",
-                      str(cls._instrumentToScalingFactorPairMap))
-
-        Logging.trace("<<")
+    _defaultStyleName = "humanizationStyleDefault"
+    _defaultStyleAsString = \
+        ("{  countin: 2,"
+         + " timing:   { 1:0, 2:0.25, 3:0.1, 4:0.25,  S:0.05, OTHER:0.35 },"
+         + " velocity: { 1:1.15, 2:1.0, 3:1.1, 4:1.0, S:1.05, OTHER:0.85,"
+         + "             SLACK:0.1 } }")
 
     #--------------------
     # EXPORTED FEATURES
@@ -442,87 +380,86 @@ class _HumanizationStrategy:
 
     @classmethod
     def initialize (cls):
-        """Fills mapping from strategy name to associated strategy
+        """Fills mapping from style name to associated style
            string from configuration file"""
 
         Logging.trace(">>")
 
         scriptFilePath = OperatingSystem.scriptFilePath()
         scriptFileDirectoryPath = OperatingSystem.dirname(scriptFilePath)
-        cls._parseConfigurationFile(humanizerConfigurationFileName)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def __init__ (self, strategyName):
-        """Finds strategy for given <strategyName> and returns it as a
+    def __init__ (self, styleName):
+        """Finds style for given <styleName> and returns it as a
            structure; if name is unknown, returns None"""
 
-        Logging.trace(">>: %s", strategyName)
+        Logging.trace(">>: %s", styleName)
 
         cls = self.__class__
+        humanizationStyleNameList = humanizationStyleNameToTextMap.keys()
 
-        if cls._nameToStrategyStringMap is None:
-            cls.initialize()
-
-        if strategyName not in cls._nameToStrategyStringMap:
-            Logging.trace("--: could not find strategy name %s", strategyName)
-
-        strategyAsString = \
-            cls._nameToStrategyStringMap.get(strategyName,
-                                             cls._defaultStrategyAsString)
-        partList = strategyAsString.split(cls._partSeparator)
-
-        if len(partList) != 3:
-            Logging.trace("--: ERROR: bad strategy string - %s",
-                          strategyAsString)
+        if styleName in humanizationStyleNameList:
+            styleAsString = humanizationStyleNameToTextMap[styleName]
         else:
-            self._name                       = strategyName
+            Logging.trace("--: could not find style name %s", styleName)
+
+            if cls._defaultStyleName in humanizationStyleNameList:
+                styleAsString = \
+                    humanizationStyleNameToTextMap[cls._defaultStyleName]
+            else:
+                styleAsString = cls._defaultStyleAsString
+
+        style = convertStringToMap(styleAsString)
+        Logging.trace("--: style = %s", style)
+                
+        if len(style.keys()) != 3:
+            Logging.trace("--: ERROR: bad humanization style string - %s",
+                          style)
+        else:
+            self._name                       = styleName
             self._introMeasureCount          = None
-            self._draggedBeatSet             = set()
+            self._beatToDirectionMap         = {}
             self._beatToTimeVariationMap     = {}
             self._beatToVelocityVariationMap = {}
             
-            for i in range(1, 4):
-                part = partList[i - 1]
-                tagName, tagValue = part.split(cls._tagSeparator, 1)
-                Logging.trace("--: i = %d, tagName = %s, tagValue = %s",
-                              i, tagName, tagValue)
+            for tagName, tagValue in style.items():
+                Logging.trace("--: tagName = %s, tagValue = %s",
+                              tagName, tagValue)
 
-                if i == 1:
+                if tagName == "countIn":
                     # count-in definition
                     measureCount = int(tagValue)
                     self._introMeasureCount = measureCount
                     Logging.trace("--: count in = %d", measureCount)
                 else:
                     # timing or velocity definition
-                    entryList = tagValue.split(cls._entrySeparator)
+                    entryMap = tagValue
 
-                    for entry in entryList:
-                        key, value = entry.split(cls._keyValueSeparator)
-                        key   = key.strip()
-                        value = value.strip()
+                    for key, value in entryMap.items():
                         Logging.trace("--: %s -> %s", key, value)
+                        direction = ""
 
-                        if i == 3:
-                            isDragged = False
-                            value = float(value) / 100
+                        if tagName == "velocity":
+                            value = float(value)
                             self._beatToVelocityVariationMap[key] = value
                         else:
-                            # timing may contain a dragging indicator
-                            isDragged = (value[0] == "D")
-                            value = value[1:] if isDragged else value
-                            value = float(value) / 100
+                            # timing may contain a direction indicator
+                            direction = value[0]
 
-                            if isDragged:
-                                self._draggedBeatSet.add(key)
+                            if direction not in "AB":
+                                direction = ""
+                            else:
+                                value = value[1:]
 
+                            value = float(value)
+                            self._beatToDirectionMap[key] = direction
                             self._beatToTimeVariationMap[key] = value
 
-                        Logging.trace("--: %s|%s -> %s%d",
-                                      tagName, key, iif(isDragged, "D", ""),
-                                      value)
+                        Logging.trace("--: %s|%s -> %s%4.2f",
+                                      tagName, key, direction, value)
 
         Logging.trace("<<")
 
@@ -531,22 +468,22 @@ class _HumanizationStrategy:
     def __repr__ (self):
         """Returns the string representation of <self>"""
 
-        st = ("_HumanizationStrategy(%s, COUNTIN = %s,"
-              + " VELOCITY = %s, DRAGGING = %s, TIMING = %s)")
+        st = ("_HumanizationStyle(%s, COUNTIN = %s,"
+              + " VELOCITY = %s, DIRECTIONS = %s, TIMING = %s)")
         result = st % (self._name, self._introMeasureCount,
                        repr(self._beatToVelocityVariationMap),
-                       repr(self._draggedBeatSet),
+                       repr(self._beatToDirectionMap),
                        repr(self._beatToTimeVariationMap))
         return result
     
     #--------------------
 
-    def isDraggedAt (self, eventPositionKind):
-        """Returns the associated factor (in percent) for the
-           <eventPositionKind>"""
+    def hasDirectionalShiftAt (self, eventPositionKind):
+        """Tells whether there is a directional timing shift at
+           <eventPositionKind> and returns it"""
 
         Logging.trace(">>: %s", eventPositionKind)
-        result = (eventPositionKind in self._draggedBeatSet)
+        result = self._beatToDirectionMap[eventPositionKind]
         Logging.trace("<<: %s", result)
         return result
 
@@ -558,8 +495,8 @@ class _HumanizationStrategy:
            for <instrumentName>"""
 
         Logging.trace(">>: %s", instrumentName)
-        result = cls._instrumentToScalingFactorPairMap.get(instrumentName,
-                                                           [1,1])
+        result = voiceNameToVariationFactorMap.get(instrumentName,
+                                                   [1,1])
         Logging.trace("<<: [%4.3f, %4.3f]", result[0], result[1])
         return result
 
@@ -600,7 +537,7 @@ class _HumanizationStrategy:
 
 class _Humanizer:
     """This class encapsulates the service for humanization of one or
-       more MIDI event lists based on a humanization strategy.  It
+       more MIDI event lists based on a humanization style.  It
        uses an internal event list and processes each single
        note-on/note-off event as well as the timing of other events."""
 
@@ -636,9 +573,9 @@ class _Humanizer:
     def _adjustTiming (self, eventIndex, time, eventPositionKind,
                        instrumentTimingVariationFactor):
         """Adjusts timing of note event given at <eventIndex> with
-          parameters <time> and <noteKind>;
-          <instrumentTimingVariationFactor> gives an instrument specific
-          factor"""
+           parameters <time> and <noteKind>;
+           <instrumentTimingVariationFactor> gives an instrument
+           specific factor"""
 
         Logging.trace(">>: index = %d, time = %s, positionKind = %s,"
                       + " instrumentTimingVariation = %4.3f",
@@ -647,26 +584,29 @@ class _Humanizer:
 
         cls = self.__class__
         result = None
-        strategy = self._strategy
+        style = self._style
         timeAsString = str(time) 
 
-        if time.measure() <= strategy._introMeasureCount:
+        if time.measure() <= style._introMeasureCount:
             # leave as is, because those measures are count-ins
             result = time
         elif timeAsString in self._timeToAdjustedTimeMap:
             result = self._timeToAdjustedTimeMap[timeAsString]
         else:
-            isDragged = strategy.isDraggedAt(eventPositionKind)
+            direction = style.hasDirectionalShiftAt(eventPositionKind)
             variationFactor = \
-                strategy.timingVariationFactor(eventPositionKind)
+                style.timingVariationFactor(eventPositionKind)
             variationDuration = \
                 _MusicTime.thirtysecondDuration.scalarMultiply(variationFactor)
 
             # do a random variation with a square distribution
             randomFactor = cls._squaredrand() * 2 - 1
 
-            # if dragged, only a delay is possible
-            randomFactor = iif(isDragged, abs(randomFactor), randomFactor)
+            # if ahead or behind, adapt the random factor
+            randomFactor = iif2(direction == "A", -abs(randomFactor),
+                                direction == "B",  abs(randomFactor),
+                                randomFactor)
+
             # adjust by instrument
             randomFactor *= instrumentTimingVariationFactor
             variationDuration = variationDuration.scalarMultiply(randomFactor)
@@ -693,14 +633,14 @@ class _Humanizer:
 
         cls = self.__class__
         result = None
-        strategy = self._strategy
+        style = self._style
 
-        if time.measure() <= strategy._introMeasureCount:
+        if time.measure() <= style._introMeasureCount:
             # leave as is, because those measures are count-ins
             result = velocity
         else:
-            factor = strategy.velocityFactor(eventPositionKind)
-            slack  = strategy.velocitySlack()
+            factor = style.velocityFactor(eventPositionKind)
+            slack  = style.velocitySlack()
 
             # randomFactor shall be between -1 and 1
             randomFactor = cls._squaredrand() * 2 - 1
@@ -835,7 +775,7 @@ class _Humanizer:
         # check for match
         for i in xrange(1, cls._quartersPerMeasure + 1):
             if result is None:
-                for j in xrange(1, 5):
+                for j in xrange(1, 9):
                     referenceTime = _MusicTime("%d:%d:1" % (i, j), False)
 
                     if time.isAt(referenceTime):
@@ -856,7 +796,7 @@ class _Humanizer:
 
         instrumentVelocityVariationFactor, \
         instrumentTimingVariationFactor = \
-            _HumanizationStrategy.instrumentVariationFactors(trackName)
+            _HumanizationStyle.instrumentVariationFactors(trackName)
         eventCount = len(self._eventList)
         noteToStartIndexMap = {}
 
@@ -989,7 +929,7 @@ class _Humanizer:
 
         Logging.trace(">>")
 
-        self._strategy  = None
+        self._style  = None
         self._eventList = None
 
         # the following map takes a simplified track name (like
@@ -1006,15 +946,15 @@ class _Humanizer:
 
     #--------------------
 
-    def process (self, trackName, lineList, humanizationStrategy):
-        """Humanizes MIDI event <lineList> with <humanizationStrategy>
+    def process (self, trackName, lineList, humanizationStyle):
+        """Humanizes MIDI event <lineList> with <humanizationStyle>
            and returns resulting event line list."""
 
         Logging.trace(">>: trackName = %s", trackName)
 
         cls = self.__class__
         canonicalTrackName = cls._findCanonicalTrackName(trackName)
-        self._strategy = humanizationStrategy
+        self._style = humanizationStyle
         self._eventList = []
         self._timeToAdjustedTimeMap = \
             self._canonicalTrackNameToTimingMap.get(canonicalTrackName, {})
@@ -1104,14 +1044,14 @@ class MidiTransformer:
 
     #--------------------
 
-    def _humanizeTrack (self, humanizer, trackName, strategy,
+    def _humanizeTrack (self, humanizer, trackName, style,
                         trackLineList, lineList):
-        """Humanizes entries in <trackLineList> by <strategy> and
+        """Humanizes entries in <trackLineList> by <style> and
            appends them to <lineList>"""
 
-        Logging.trace(">>: strategy = %s", str(strategy))
+        Logging.trace(">>: style = %s", str(style))
         processedLineList = humanizer.process(trackName, trackLineList,
-                                              strategy)
+                                              style)
         lineList.extend(processedLineList)
         Logging.trace("<<")
         
@@ -1228,6 +1168,7 @@ class MidiTransformer:
                 st = "%d PrCh ch=%d p=%d" % (midiTime,
                                              activeSettings.midiChannel,
                                              activeSettings.midiInstrument)
+                lineGeneratorProc(0, activeSettings.midiInstrumentBank)
                 lineBuffer.writeLine(st)
                 lineGeneratorProc(7, activeSettings.midiVolume)
                 lineGeneratorProc(10, activeSettings.panPosition)
@@ -1251,26 +1192,31 @@ class MidiTransformer:
     #--------------------
 
     @classmethod
-    def initialize (cls, configurationFileName, trackNameSet):
+    def initialize (cls, voiceNameMap, styleNameToTextMap, trackNameSet):
         """Sets global variables for this module"""
 
         global humanizerConfigurationFileName, humanizedTrackNameSet
+        global humanizationStyleNameToTextMap
 
-        Logging.trace(">>: configurationFileName = '%s', trackList = %s",
-                      configurationFileName, trackNameSet)
-        humanizerConfigurationFileName = configurationFileName
+        Logging.trace(">>: voiceNameMap = %s, styleNameToTextMap = %s,"
+                      + " trackList = %s",
+                      voiceNameMap, styleNameToTextMap, trackNameSet)
+
+        voiceToVariationFactorMap      = voiceNameMap
+        humanizationStyleNameToTextMap = styleNameToTextMap
         humanizedTrackNameSet          = trackNameSet
+
         Logging.trace("<<")
 
     #--------------------
 
-    def __init__ (self, midiFileName, debuggingIsActive=False):
+    def __init__ (self, midiFileName, intermediateFilesAreKept=False):
         """Reads data from <midiFileName> and stores it internally in
            a text representation."""
 
         Logging.trace(">>: %s", midiFileName)
 
-        self._debuggingIsActive = debuggingIsActive
+        self._intermediateFilesAreKept = intermediateFilesAreKept
 
         midiFile = MidiFileHandler()
         self._lineList = midiFile.readFile(midiFileName)
@@ -1450,16 +1396,16 @@ class MidiTransformer:
 
     #--------------------
 
-    def humanizeTracks (self, strategyName):
+    def humanizeTracks (self, styleName):
         """Adapts instrument tracks in <self> to emulate a human
-           player based on strategy given by <strategyName>"""
+           player based on style given by <styleName>"""
 
-        Logging.trace(">>: strategy = %s", strategyName)
+        Logging.trace(">>: style = %s", styleName)
 
         cls = self.__class__
-        humanizationStrategy = _HumanizationStrategy(strategyName)
+        humanizationStyle = _HumanizationStyle(styleName)
 
-        if humanizationStrategy is not None:
+        if humanizationStyle is not None:
             # enumeration for kind of some track
             TrackKind_unknown    = 0
             TrackKind_instrument = 1
@@ -1507,7 +1453,7 @@ class MidiTransformer:
                             trackLineList = lineBuffer.lineList()
                             lineBuffer.clear()
                             self._humanizeTrack(humanizer, trackName,
-                                                humanizationStrategy,
+                                                humanizationStyle,
                                                 trackLineList, lineList)
                     elif cls._trackNameRegExp.search(currentLine):
                         matchResult = cls._trackNameRegExp.search(currentLine)
@@ -1524,9 +1470,9 @@ class MidiTransformer:
 
     def positionInstruments (self, trackToSettingsMap):
         """Scans instrument tracks in <self> and changes channel,
-           player based on strategy given by <strategyName>"""
+           player based on <trackToSettingsMap>"""
 
-        Logging.trace(">>: %s", str(trackToSettingsMap))
+        Logging.trace(">>: %s", trackToSettingsMap)
 
         cls = self.__class__
  

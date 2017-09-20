@@ -182,6 +182,8 @@ class ValidityChecker:
         template = "File '%s'%s cannot be written."
         message = cls._constructErrorMessage(template, pathName, valueName)
         directoryName = os.path.dirname(pathName)
+        directoryName = iif(directoryName == "", ".", directoryName)
+        Logging.trace("--: dir = %s", directoryName)
         cls.isValid(os.path.isdir(directoryName), message)
 
     #--------------------

@@ -98,7 +98,6 @@ class VideoAudioCombiner:
        files generated from lilypond scores with sound audio tracks
        and measure counting subtitles."""
 
-    _mp4boxCommandIsUsed = True
     _ffmpegCommand = None
     _mp4boxCommand = None
 
@@ -224,22 +223,15 @@ class VideoAudioCombiner:
         st = "== combining audio and video for " + targetVideoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
-        languageList = [ "nor", "fra", "eng", "deu" ]
         audioTrackDataList = []
 
         for i, audioTrackData in enumerate(trackDataList):
-            currentVoiceNameList, _, _, audioFilePath = audioTrackData
-            removedVoiceList = list(set(voiceNameList) -
-                                    set(currentVoiceNameList))
-            trackDescription = ", ".join(map(lambda x: "-" + x,
-                                             removedVoiceList))
-            trackDescription = iif(trackDescription == "",
-                                   "ALL", trackDescription)
-            Logging.trace("--: trackDescription = %s", trackDescription)
-            element = (audioFilePath, languageList[i], trackDescription)
+            _, _, _, audioFilePath, description,\
+                languageCode = audioTrackData
+            element = (audioFilePath, languageCode, description)
             audioTrackDataList.append(element)
 
-        if cls._mp4boxCommandIsUsed:
+        if cls._mp4boxCommand != "":
             command = cls._combineWithMp4box(sourceVideoFilePath,
                                              audioTrackDataList,
                                              subtitleFilePath,
@@ -288,6 +280,8 @@ class VideoAudioCombiner:
                    "-itsoffset", str(shiftOffset),
                    "-i", sourceVideoFilePath,
                    "-vf", subtitleOption,
+                   "-pix_fmt", "yuv420p",
+                   "-profile:v", "baseline", "-level", "3.0",
                    "-y", targetVideoFilePath)
         OperatingSystem.executeCommand(command, False)
 

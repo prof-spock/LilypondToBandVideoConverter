@@ -2,37 +2,6 @@
 # lilypondFileGenerator -- generates a lilypond main file for several
 #                          parameters by inclusion of a structured lilypond
 #                          file with tracks
-#
-#   includeFileName:              name of include file with music
-#   phase:                        tells whether a voice extract, a full score
-#                                 a video or a midi should be produced
-#   title:                        song full title (only required for score and
-#                                 voice output)
-#   year:                         year of arrangement (only required for score
-#                                 and voice output)
-#   voice:                        voice name (for generating an extract file)
-#   voices:                       slash separated list of voice names in
-#                                 arrangement (for midi, score or video,
-#                                 optional)
-#   voiceNameToChordsMap:         map from voice name to chord target
-#   voiceNameToLyricsMap:         map from voice name to lyrics target
-#                                 and count of lyrics lines
-#   orientation:                  information for video whether it should be
-#                                 in landscape (h) or portrait (v) format 
-#   deviceId:                     information for video whether it should be
-#                                 for iPad (i), lumia (l) or internet (n)
-#                                 target device
-#
-# It is assumed that the include file has the following names defined:
-#    voices:        "bass", "myDrums" (as "drums" is a reserved identifier),
-#                   "guitar", "keyboardTop", "keyboardBottom", "vocals"
-#                   (unless the voices parameter is set)
-#    chord list:    "chordsXXX" where XXX is the capitalised
-#                   voice name (chords are defined for voice names in
-#                   voiceNameToChordsMap)
-#    tempo list:    "tempoTrack" (only necessary when phase = "midi")
-#    lyrics lines:  they are labelled "vocLyricsA", "vocLyricsB", ...
-#                   or "bgVocLyricsA", "bgVocLyricsB", ...
 #-----------------------
 
 ###########
@@ -43,7 +12,7 @@ import argparse
 import re
 import sys
 
-from ltbvc_businesstypes import canonicalVoiceName
+from ltbvc_businesstypes import humanReadableVoiceName
 from simplelogging import Logging
 from ttbase import iif, iif2, iif3
 from utf8file import UTF8File
@@ -60,6 +29,15 @@ songMeasureToTempoMap = None
 
 tabulatureTag = "tabulature"
 lilypondArticulationIsUsed = False
+
+indentationPerLevel = (" " * 2)
+
+#-------------------------
+
+def INDENT (x):
+    """indents by <x> levels using <indentationPerLevel>"""
+
+    return (indentationPerLevel * x)
 
 #-------------------------
 # mappings for instruments
@@ -114,6 +92,7 @@ class LilypondFile:
 
     _ProcessingState_beforeInclusion = 0
     _ProcessingState_afterInclusion  = 1
+    _indentationLevel = 0
 
     #--------------------
     # LOCAL FEATURES
@@ -146,15 +125,16 @@ class LilypondFile:
                                           alternativeMacroNameList)
             label = self._voiceToLabelMap[voiceName]
             Logging.trace("--: lyricsto %s -> %s", label, lyricsMacroName)
-            self._printLine("    \\new Lyrics \\lyricsto"
-                            + " \"" + label + "\""
-                            + " { \\" + lyricsMacroName + " }")
+            st = ("\\new Lyrics \\lyricsto"
+                  + " \"" + label + "\""
+                  + " { \\" + lyricsMacroName + " }")
+            self._printLine(0, st)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def _addLyricsVoiceIntro (self, voiceName, indentationPrefix):
+    def _addLyricsVoiceIntro (self, voiceName):
         """adds a named voice definition line for a voice with lyrics
            (which can later be referenced by a lyrics line)"""
 
@@ -163,38 +143,9 @@ class LilypondFile:
         voiceLabelCount = len(self._voiceToLabelMap) + 1
         currentVoiceLabel = "song" + "ABCDEFGHIJKLMNOPQR"[voiceLabelCount - 1]
         self._voiceToLabelMap[voiceName] = currentVoiceLabel
-        self._print(indentationPrefix + "\\new Voice = "
-                    + "\"" + currentVoiceLabel + "\" ")
+        self._print(0, "\\new Voice = " + "\"" + currentVoiceLabel + "\" ")
 
         Logging.trace("<<: label = %s", currentVoiceLabel)
-
-    #--------------------
-
-    def _canonicalVoiceName (self, voiceName):
-        """returns name of voice to be used within lilypond"""
-
-        Logging.trace(">>: '%s'", voiceName)
-
-        result = iif2(voiceName == "keyboardSimple", "keyboard",
-                      voiceName == "drums", "myDrums", voiceName)
-
-        Logging.trace("<<: '%s'", result)
-        return result
-
-    #--------------------
-
-    def _classifyVoice (self, voiceName):
-        """returns <isLyricsVoice> and <isFullKeyboardVoice>
-           depending on <voiceName>"""
-
-        Logging.trace(">>: '%s'", voiceName)
-
-        isFullKeyboardVoice = (voiceName == "keyboard")
-        isLyricsVoice       = (self._lyricsCount(voiceName) > 0)
-
-        Logging.trace("<<: isLyricsVoice = %d, isFullKeyboardVoice = %d",
-                      isLyricsVoice, isFullKeyboardVoice)
-        return isLyricsVoice, isFullKeyboardVoice
 
     #--------------------
 
@@ -212,7 +163,7 @@ class LilypondFile:
             for otherMacroName in iter(alternativeMacroNameList):
                 if otherMacroName in self._includeFileMacroNameSet:
                     st = "%s = { \\%s }" % (macroName, otherMacroName)
-                    self._printLine(st, False)
+                    self._printLine(0, st, False)
                     hasAncestor = True
                     break
 
@@ -239,8 +190,8 @@ class LilypondFile:
 
         Logging.trace(">>: '%s'", voiceName)
 
-        result = iif2(voiceName == "drums", "myDrums",
-                      voiceName.endswith("Simple"), voiceName[:-6], voiceName)
+        result = iif(voiceName == "drums", "myDrums", voiceName)
+        result = result.replace("Simple", "").replace("Extended", "")
 
         Logging.trace("<<: '%s'", result)
         return result
@@ -264,75 +215,131 @@ class LilypondFile:
         
     #--------------------
 
-    def _makeVoiceText (self, voiceName):
-        """generates the lilypond commands for single <voice>;
-           <self._phase> tells whether this voice is part of a single
-           voice, a video or a full score"""
+    def _makeVoiceText (self, voiceName, voiceStaff):
+        """generates the string with lilypond commands for single
+           <voice> with <voiceStaff>"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: name = '%s', staff = %s", voiceName, voiceStaff)
 
-        isLyricsVoice, isFullKeyboardVoice = self._classifyVoice(voiceName)
-        isPartOfFullScore = (self._phase != "extract")
-        clefString = self._getPVEntry(self._phaseAndVoiceNameToClefMap,
-                                      self._phase, voiceName, "G")
-        st = iif(clefString == "", "", "\\clef \"%s\"" % clefString)
+        isDrumVoice       = (voiceStaff == "DrumStaff")
+        isTabulatureVoice = (voiceStaff == "TabStaff")
+
         lilypondVoiceName = self._lilypondVoiceName(voiceName)
         voiceMacroName = lilypondVoiceName + self._phase.capitalize()
         alternativeMacroNameList = [ lilypondVoiceName ]
         self._ensureMacroAvailability(voiceMacroName,
                                       alternativeMacroNameList)
 
-        st = (st
-              + "\\keyAndTime "
-              + iif(isPartOfFullScore, "",
-                    "\\initialTempo \\compressFullBarRests ")
-              + "\\" + voiceMacroName)
+        voiceText = (iif(not self._isExtractScore, "",
+                         "\\initialTempo \\compressFullBarRests ")
+                     + "\\" + voiceMacroName)
 
-        Logging.trace("<<: '%s'", st)
-        return st
+        if self._isVideoScore:
+            voiceText = "\\unfoldRepeats { \\keyAndTime %s }" % voiceText
+        elif not self._isMidiScore:
+            voiceText = "\\keyAndTime " + voiceText
+        else:
+            # for MIDI we add an empty count in for the normal tracks
+            # and a drum count in to the drum track; also a suffix of
+            # two measures is used for having a trailing reverb
+            prefix = "\\unfoldRepeats { \\keyAndTime "
+            suffix = "\\ppppp }}"
+
+            if isDrumVoice:
+                drumsPrefix  = prefix + "\\drumsCountIn "
+                drumsSuffix = " R1 \\drummode { ss64" + suffix
+                voiceText = drumsPrefix + voiceText + drumsSuffix
+            else:
+                normalPrefix = prefix + "\\countIn "
+                normalSuffix = " R1 { c64" + suffix
+                voiceText = normalPrefix + voiceText + normalSuffix
+        
+        clefString = self._getPVEntry(self._phaseAndVoiceNameToClefMap,
+                                      self._phase, voiceName, "G")
+        clefString = iif(isTabulatureVoice, "", clefString)
+
+        voiceText = (iif(clefString == "", "", "\\clef \"%s\"" % clefString)
+                     + voiceText)
+
+        Logging.trace("<<: '%s'", voiceText)
+        return voiceText
 
     #--------------------
 
-    def _print (self, st, isBuffered=True):
+    def _print (self, relativeIndentationLevel, st, isBuffered=True):
         """writes <st> to current lilypond file <self>; if
            <isBuffered> is set, the line is not directly written, but
            buffered"""
 
         cls = self.__class__
-        template = iif(isBuffered, "--: /%d/ =>'%s'", "--: /%d/ <='%s'")
-        effectiveProcessingState = \
-          iif(self._processingState != cls._ProcessingState_afterInclusion
-              or isBuffered, self._processingState,
-              cls._ProcessingState_beforeInclusion)
+
+        if relativeIndentationLevel < 0:
+            cls._indentationLevel += relativeIndentationLevel
+
+        if isBuffered:
+            indentation = indentationPerLevel * cls._indentationLevel
+            effectiveProcessingState = self._processingState
+            template = "--: /%d/ =>'%s'"
+        else:
+            indentation = ""
+            effectiveProcessingState = cls._ProcessingState_beforeInclusion
+            template = "--: /%d/ <='%s'"
 
         Logging.trace(template, effectiveProcessingState, st.strip("\n"))
+        st = indentation + st
         self._processedTextBuffer[effectiveProcessingState].append(st)
+
+        if relativeIndentationLevel > 0:
+            cls._indentationLevel += relativeIndentationLevel
 
     #--------------------
 
-    def _printLine (self, st, isBuffered=True):
+    def _printEmptyLine (self):
+        """prints an empty line"""
+
+        self._processedTextBuffer[self._processingState].append("\n")
+        
+    #--------------------
+
+    def _printLine (self, relativeIndentationLevel, st, isBuffered=True):
         """writes <st> to current lilypond file <self> terminated by a
            newline; if <isBuffered> is set, the line is not
            directly written, but buffered"""
 
-        self._print(st + "\n", isBuffered)
+        self._print(relativeIndentationLevel, st + "\n", isBuffered)
 
     #--------------------
 
-    def _writeFullScore (self):
-        """writes a complete score for all voices to <self>"""
+    def _resetPrintIndentation (self):
+        """resets indentation for printing to 0"""
 
-        Logging.trace(">>: %s", self)
+        cls = self.__class__
+        cls._indentationLevel = 0
 
-        self._printLine("\\score {")
-        self._printLine("  <<")
+    #--------------------
 
-        for voiceName in self._voiceNameList:
-            self._writeVoice(voiceName)
+    def _writeChords (self, voiceName):
+        """writes chords for voice with <voiceName> (if applicable)"""
 
-        self._printLine("  >>")
-        self._printLine("  \\layout {}")
-        self._printLine("}")
+        Logging.trace(">>: '%s'", voiceName)
+
+        target = self._phase
+
+        if voiceName in self._voiceNameToChordsMap:
+           if target in self._voiceNameToChordsMap[voiceName]:
+               chordsName = "chords" + (voiceName[0].upper() + voiceName[1:])
+               chordsMacroName = chordsName + target.capitalize()
+               alternativeMacroNameList = [ chordsName,
+                                            "chords" + target.capitalize(),
+                                            "allChords" ]
+               self._ensureMacroAvailability(chordsMacroName,
+                                             alternativeMacroNameList)
+               st = ("\\new ChordNames {"
+                     + iif(self._isExtractScore,
+                           " \\compressFullBarRests", "")
+                     + " \\" + chordsMacroName + " }")
+
+               self._printLine(0, st)
 
         Logging.trace("<<")
 
@@ -347,236 +354,75 @@ class LilypondFile:
         cls = self.__class__
 
         # provide phase name as a lilypond macro
-        self._printLine("ltbvcProcessingPhase = \"%s\"" % self._phase)
+        self._printLine(0, "ltbvcProcessingPhase = \"%s\"" % self._phase)
 
         if self._isVideoScore:
             # provide video device name as a lilypond macro
-            self._printLine("ltbvcVideoDeviceName = \"%s\""
+            self._printLine(0, "ltbvcVideoDeviceName = \"%s\""
                             % self._videoDeviceName)
 
         # print initial tempo for all target files
         initialTempo = songMeasureToTempoMap[1][0]
-        self._printLine("initialTempo = { \\tempo 4 = %d }" % initialTempo)
+        self._printLine(0, "initialTempo = { \\tempo 4 = %d }" % initialTempo)
 
         if not self._targetIsPdf:
             self._writeNonPdfHeader()
-            self._printLine("")
-            
+            self._printEmptyLine()
+
         if not self._targetIsPdf and self._lilypondArticulationIsUsed:
             # add reference to articulation file
-            self._printLine("\\include \"articulate.ly\"")
-            self._printLine("")
+            self._printLine(0, "\\include \"articulate.ly\"")
+            self._printEmptyLine()
 
         if self._targetIsPdf:
             self._writePdfLayoutHeader()
-            self._printLine("")
+            self._printEmptyLine()
 
         # include the specific note stuff
-        self._printLine("% include note stuff")
-        self._printLine("\\include \"" + self._includeFileName + "\"")
-        self._printLine("")
+        self._printLine(0, "% include note stuff")
+        self._printLine(0, "\\include \"" + self._includeFileName + "\"")
+        self._printEmptyLine()
 
         self._processingState = cls._ProcessingState_afterInclusion
 
         if self._isVideoScore:
             self._writeVideoSettings()
-            self._printLine("")
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    def _writeKeyboardVoice (self, indentation, isPartOfFullScore,
-                             staffInstrumentSettingA, staffInstrumentSettingB):
-        """writes voice data for keyboard voice with <voiceStaff> and
-           information whether this is part of a score by
-           <isPartOfFullScore>"""
-
-        Logging.trace(">>: file = %s, isPartOfFullScore = %d,"
-                      + " staffInstrSettingA = '%s',"
-                      + " staffInstrSettingB = '%s'",
-                      self, isPartOfFullScore,
-                      staffInstrumentSettingA, staffInstrumentSettingB)
-
-        self._printLine("    \\new PianoStaff <<")
-
-        if isPartOfFullScore and not self._isVideoScore:
-            self._printLine(indentation + staffInstrumentSettingA)
-            self._printLine(indentation + staffInstrumentSettingB)
-
-        self._printLine(indentation + "\\new Staff {")
-        self._printLine(indentation + "  "
-                        + self._makeVoiceText("keyboardTop"))
-        self._printLine(indentation + "}")
-        self._printLine(indentation + "\\new Staff {")
-        self._printLine(indentation + "  "
-                        + self._makeVoiceText("keyboardBottom"))
-        self._printLine(indentation + "}")
-        self._printLine("    >>")
+            self._printEmptyLine()
 
         Logging.trace("<<")
 
     #--------------------
 
     def _writeNonPdfHeader (self):
-        """writes the header of a lilypond file based on <self> targetting for
-           a MIDI file or a video"""
+        """writes the header of a lilypond file based on <self>
+           targetting for a MIDI file or a video"""
 
         Logging.trace(">>: %s", self)
 
-        # print count-in definition
-        self._printLine("countIn = { R1*2\\mf }")
-        self._printLine("drumsCountIn = \\drummode"
-                        + " { ss2\\mf ss | ss4 ss ss ss | }")
+        # print default count-in definition (two measures, four beats)
+        self._printLine(0, "countIn = { R1*2\\mf }")
+        self._printLine(0, ("drumsCountIn = \\drummode"
+                            + " { ss2\\mf ss | ss4 ss ss ss | }"))
        
         # print tempo track
-        self._printLine("tempoTrack = {")
+        self._printLine(+1, "tempoTrack = {")
         measureList = songMeasureToTempoMap.keys()
         measureList.sort()
         previousMeasure = 0
-        indentation = "    "
 
         for measure in measureList:
             if measure == 1:
-                st = indentation + "\\initialTempo"
+                self._printLine(0, "\\initialTempo")
             else:
                 tempo = songMeasureToTempoMap[measure][0]
                 skipCount = measure - previousMeasure
-                st = ("%s\\skip 1*%d\n%s%%%d\n%s\\tempo 4 =%d"
-                      % (indentation, skipCount,
-                         indentation, measure,
-                         indentation, tempo))
+                self._printLine(0, "\\skip 1*%d" % skipCount)
+                self._printLine(0, "%%%d\n" % measure)
+                self._printLine(0, "\\tempo 4 =%d" % tempo)
 
             previousMeasure = measure
-            self._printLine(st)
                 
-        self._printLine("}")
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    def _writeMidiScore (self):
-        """sets up a complete score for MIDI output for all voices"""
-
-        Logging.trace(">>: %s", self)
-
-        self._printLine("\\score {")
-        self._printLine("  <<")
-        self._printLine("    { \\initialTempo \\countIn \\tempoTrack }")
-
-        prefix = ("\\unfoldRepeats"
-                  + iif(self._lilypondArticulationIsUsed, " \\articulate", ""))
-
-        # we add an empty count in for the normal tracks and a drum count
-        # in to the drum track
-        normalPrefix = prefix + " { \\keyAndTime \\countIn "
-        drumsPrefix  = prefix + " { \\keyAndTime \\drumsCountIn "
-
-        # also a suffix of 2 measures is used for having a trailing reverb
-        drumsSuffix = " R1 \\drummode { ss64\\ppppp }"
-        otherSuffix = " R1 { c64\\ppppp }"
-
-        indentation = "      "
-
-        for voiceName in self._voiceNameList:
-            isLyricsVoice, isFullKeyboardVoice = self._classifyVoice(voiceName)
-            lilypondVoiceName = self._lilypondVoiceName(voiceName)
-            voiceStaff = self._getPVEntry(self._phaseAndVoiceNameToStaffMap,
-                                          self._phase, voiceName, "Staff")
-            isDrumVoice = (voiceStaff == "DrumStaff")
-            voiceInstrument = voiceNameToMidiNameMap.get(voiceName, "clav")
-            self._printLine("    \\new " + voiceStaff + " ="
-                            + " \"" + voiceName + "\""
-                            + " \\with { midiInstrument ="
-                            " \"" + voiceInstrument + "\" } { ")
-
-            if isDrumVoice:
-                  self._printLine(indentation + drumsPrefix
-                                  + "\\" + lilypondVoiceName
-                                  + drumsSuffix + " }")
-            elif isLyricsVoice:
-                self._addLyricsVoiceIntro(voiceName, indentation)
-                self._printLine(" { " + normalPrefix
-                                + "\\" + lilypondVoiceName
-                                + otherSuffix + " } }")
-            elif not isFullKeyboardVoice:
-                self._printLine(indentation + normalPrefix
-                                + "\\" + lilypondVoiceName
-                                + otherSuffix + " }")
-            else:
-                # a complex keyboard staff
-                self._printLine(indentation + "<<")
-                self._printLine(indentation + "  \\new Staff { "
-                                + normalPrefix + "\\keyboardTop"
-                                + otherSuffix + " } }")
-                self._printLine(indentation + "  \\new Staff { "
-                                + normalPrefix + "\\keyboardBottom"
-                                + otherSuffix + " } }")
-                self._printLine(indentation + ">>")
-
-            self._printLine("    }")
-
-            if isLyricsVoice:
-                self._addLyrics(voiceName)
-
-        self._printLine("  >>")
-        self._printLine("  \\midi {}")
-        self._printLine("}")
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    def _writeNonKeyboardVoice (self, indentation, voiceName,
-                                voiceStaff, isLyricsVoice,
-                                isPartOfFullScore,
-                                staffInstrumentSettingA,
-                                staffInstrumentSettingB):
-        """writes voice data for keyboard voice with <voiceStaff> and
-           information whether this is part of a score by
-           <isPartOfFullScore>"""
-
-        Logging.trace(">>: file = %s, voiceName = '%s', voiceStaff = '%s',"
-                      + " isLyricsVoice = %d, isPartOfFullScore = %d,"
-                      + " staffInstrSettingA = '%s',"
-                      + " staffInstrSettingB = '%s'",
-                      self, voiceName, voiceStaff, isLyricsVoice,
-                      isPartOfFullScore,
-                      staffInstrumentSettingA, staffInstrumentSettingB)
-
-        isDrumVoice = (voiceStaff == "DrumStaff")
-        
-        if isDrumVoice:
-            self._printLine("    \\new " + voiceStaff + " {")
-        else:
-            self._printLine("    \\new " + voiceStaff + " \\with { ")
-            self._printLine("      \\consists \"Instrument_name_engraver\"")
-            self._printLine("    }{")
-
-        if isPartOfFullScore and not self._isVideoScore:
-            self._printLine(indentation + staffInstrumentSettingA)
-            self._printLine(indentation + staffInstrumentSettingB)
-
-        if not isDrumVoice:
-            if isLyricsVoice:
-                self._addLyricsVoiceIntro(voiceName, indentation)
-            else:
-                self._print(indentation + "\\new Voice")
-
-            self._printLine(" \\with {")
-            self._printLine(indentation
-                            + "  \\consists \"Pitch_squash_engraver\" }{")
-
-        self._printLine(indentation + "  " + self._makeVoiceText(voiceName))
-
-        if not isDrumVoice:
-            self._printLine(indentation + "}")
-
-        self._printLine("    }")
-
-        if isLyricsVoice:
-            self._addLyrics(voiceName)
+        self._printLine(-1, "}")
 
         Logging.trace("<<")
 
@@ -587,17 +433,109 @@ class LilypondFile:
 
         Logging.trace(">>: %s", self)
 
-        self._printLine("%===================")
-        self._printLine("%= GLOBAL SETTINGS =")
-        self._printLine("%===================")
-        self._printLine("")
-        self._printLine("\\header {")
-        self._printLine("    title = \"" + self._title + "\"")
-        st = ("    composer = \"%s\"" % self._composerText)
-        self._printLine(st)
-        self._printLine("    tagline = ##f")
-        self._printLine("}")
-        self._printLine("")
+        self._printLine(0, "%===================")
+        self._printLine(0, "%= GLOBAL SETTINGS =")
+        self._printLine(0, "%===================")
+        self._printEmptyLine()
+        self._printLine(+1, "\\header {")
+        self._printLine(0, "title = \"" + self._title + "\"")
+        self._printLine(0, "composer = \"%s\"" % self._composerText)
+        self._printLine(0, "tagline = ##f")
+        self._printLine(-1, "}")
+        self._printEmptyLine()
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def _writeSingleVoiceStaff (self, voiceName, extension, voiceStaff,
+                                isSimpleStaff):
+        """writes voice data for voice with <voiceName> and <extension> with
+           <voiceStaff>; <isSimpleStaff> tells whether this is the
+           only staff for the instrument"""
+
+        Logging.trace(">>: file = %s, voiceName = %s, extension = %s,"
+                      + " voiceStaff = %s, isSimpleStaff = %s",
+                      self, voiceName, extension, voiceStaff, isSimpleStaff)
+
+        isLyricsVoice     = (self._lyricsCount(voiceName) > 0)
+        isDrumVoice       = (voiceStaff == "DrumStaff")
+        isTabulatureVoice = (voiceStaff == "TabStaff")
+
+        effectiveVoiceName = voiceName + extension
+        voiceInstrument = voiceNameToMidiNameMap.get(voiceName, "clav")
+
+        introText = ("\\new " + voiceStaff
+                     + iif(not self._isMidiScore, "",
+                           " = %s" % effectiveVoiceName))
+        withPart = (iif(isDrumVoice, "",
+                        "\\consists \"Instrument_name_engraver\"")
+                    + " "
+                    + iif(not self._isMidiScore, "",
+                          "midiInstrument = \"%s\"" % voiceInstrument))
+        withPart = withPart.strip()
+        withPart = iif(withPart == "", "", " \\with { " + withPart + " }")
+
+        self._printLine(+1, introText + withPart + " {")
+
+        if isSimpleStaff and not (self._isExtractScore or self._isVideoScore):
+            self._writeVoiceStaffInstrumentSettings(voiceName, voiceStaff)
+
+        voiceText = self._makeVoiceText(effectiveVoiceName, voiceStaff)
+
+        if isDrumVoice or isTabulatureVoice:
+            self._printLine(0, voiceText)
+        else:
+            if isLyricsVoice:
+                self._addLyricsVoiceIntro(effectiveVoiceName)
+            else:
+                self._print(0, "\\new Voice")
+
+            self._printLine(+1, " \\with {")
+            self._printLine(0, "\\consists \"Pitch_squash_engraver\" }{")
+            self._printLine(0, voiceText)
+            self._printLine(-1, "}")
+
+        self._printLine(-1, "}")
+
+        if isLyricsVoice:
+            self._addLyrics(effectiveVoiceName)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def _writeScore (self):
+        """puts out score depending on <self._phase>"""
+
+        Logging.trace(">>: self = %s", self)
+
+        voiceName = self._voiceNameList[0]
+        relevantVoiceNameList = iif(self._isExtractScore, [ voiceName ],
+                                    self._voiceNameList)
+        self._printEmptyLine()
+
+        if self._isExtractScore:
+            # make heading
+            self._printLine(0, "\\header { subtitle = \"("
+                            + humanReadableVoiceName(voiceName) + ")\" }")
+            self._printEmptyLine()
+
+        self._printLine(+1,  "\\score {")
+        self._printLine(+1, "<<")
+
+        if self._isMidiScore:
+            self._printLine(0, "{ \\initialTempo \\countIn \\tempoTrack }")
+
+        for voiceName in relevantVoiceNameList:
+            self._writeVoice(voiceName)
+
+        # make score footing
+        self._printLine(-1, ">>")
+
+        st = iif(self._isMidiScore, "midi", "layout")
+        self._printLine(0,  "\\%s {}" % st)
+        self._printLine(-1, "}")
 
         Logging.trace("<<")
 
@@ -609,14 +547,15 @@ class LilypondFile:
 
         Logging.trace(">>")
 
-        self._printLine("% -- use high resolution and scale it down later")
-        self._printLine("#(ly:set-option 'resolution %d)"
+        self._printLine(0, "% -- use high resolution and scale it down later")
+        self._printLine(0, "#(ly:set-option 'resolution %d)"
                         % self._videoEffectiveResolution)
-        self._printLine("")
-        self._printLine("#(set-global-staff-size %d)" % self._videoSystemSize)
-        self._printLine("\paper {")
+        self._printEmptyLine()
+        self._printLine(0,
+                        "#(set-global-staff-size %d)" % self._videoSystemSize)
+        self._printLine(+1, "\paper {")
+        self._printLine(0, "% -- remove all markup --")
 
-        self._printLine("    % -- remove all markup --")
         lilypondParameterList = \
             ("print-page-number", "print-first-page-number",
              "evenFooterMarkup", "oddFooterMarkup",
@@ -624,81 +563,71 @@ class LilypondFile:
              "scoreTitleMarkup", "ragged-last-bottom")
 
         for parameter in lilypondParameterList:
-            self._printLine("    %s=##f" % parameter)
+            self._printLine(0, "%s=##f" % parameter)
 
-        self._printLine("    % define the page sizes")
+        self._printLine(0, "% define the page sizes")
         margin = "%6.3f" % self._videoTopBottomMargin
-        self._printLine("    top-margin    = %s" % margin)
-        self._printLine("    bottom-margin = %s" % margin)
-        self._printLine("    paper-width   = %6.2f" % self._videoPaperWidth)
-        self._printLine("    paper-height  = %6.2f" % self._videoPaperHeight)
-        self._printLine("    line-width    = %6.2f" % self._videoLineWidth)
-        self._printLine("}")
+        self._printLine(0, "top-margin    = %s" % margin)
+        self._printLine(0, "bottom-margin = %s" % margin)
+        self._printLine(0, "paper-width   = %6.2f" % self._videoPaperWidth)
+        self._printLine(0, "paper-height  = %6.2f" % self._videoPaperHeight)
+        self._printLine(0, "line-width    = %6.2f" % self._videoLineWidth)
+        self._printLine(-1, "}")
         
         Logging.trace("<<")
 
     #--------------------
 
     def _writeVoice (self, voiceName):
-        """puts out the score for <voiceName> either as a standalone
-           score or a part of a larger score"""
+        """puts out the score part for <voiceName>"""
 
         Logging.trace(">>: '%s'", voiceName)
 
-        isPartOfFullScore = (self._phase != "extract")
-        indentation = "      "
+        voiceStaffList = self._getPVEntry(self._phaseAndVoiceNameToStaffListMap,
+                                          self._phase, voiceName, [ "Staff" ])
+        voiceStaffCount = len(voiceStaffList) 
 
-        if not isPartOfFullScore:
-            # make heading and score frame
-            self._printLine("\\header { subtitle = \"("
-                            + canonicalVoiceName(voiceName) + ")\" }")
-            self._printLine("")
-            self._printLine("\\score {")
-            self._printLine("  <<")
+        if not self._isMidiScore:
+            self._writeChords(voiceName)
 
-        isLyricsVoice, isFullKeyboardVoice = self._classifyVoice(voiceName)
-        voiceStaff = self._getPVEntry(self._phaseAndVoiceNameToStaffMap,
-                                      self._phase, voiceName, "Staff")
-        voiceStaffInstrument = \
-            self._voiceNameToScoreNameMap.get(voiceName, voiceName)
-        staffInstrumentSetting = " = #\"" + voiceStaffInstrument + "\""
-        staffInstrumentSettingA = ("\\set " + voiceStaff + ".instrumentName"
-                                   + staffInstrumentSetting)
-        staffInstrumentSettingB = ("\\set " + voiceStaff
-                                   + ".shortInstrumentName"
-                                   + staffInstrumentSetting)
+        extensionList = iif2(voiceStaffCount == 1, [ "" ],
+                             voiceStaffCount == 2, [ "Top", "Bottom" ],
+                             [ "Top", "Middle", "Bottom" ])
+        
+        if voiceStaffCount > 1:
+            voiceStaff = "GrandStaff"
+            self._printLine(+1, "\\new %s <<" % voiceStaff)
+            self._writeVoiceStaffInstrumentSettings(voiceName, voiceStaff)
 
-        target = self._phase
+        for i, voiceStaff in enumerate(voiceStaffList):
+            extension = extensionList[i]
+            self._writeSingleVoiceStaff(voiceName, extension, voiceStaff,
+                                        voiceStaffCount == 1)
 
-        if voiceName in self._voiceNameToChordsMap:
-           if target in self._voiceNameToChordsMap[voiceName]:
-            chordsName = "chords" + (voiceName[0].upper() + voiceName[1:])
-            chordsMacroName = chordsName + target.capitalize()
-            alternativeMacroNameList = [ chordsName,
-                                         "chords" + target.capitalize(),
-                                         "allChords" ]
-            self._ensureMacroAvailability(chordsMacroName,
-                                          alternativeMacroNameList)
-            self._printLine("    \\new ChordNames {"
-                            + iif(isPartOfFullScore, "",
-                                  " \\compressFullBarRests")
-                            + " \\" + chordsMacroName + " }")
+        if voiceStaffCount > 1:
+            self._printLine(-1, ">>")
 
-        if isFullKeyboardVoice:
-            self._writeKeyboardVoice(indentation, isPartOfFullScore,
-                                     staffInstrumentSettingA,
-                                     staffInstrumentSettingB)
-        else:
-            self._writeNonKeyboardVoice(indentation, voiceName, voiceStaff,
-                                        isLyricsVoice, isPartOfFullScore,
-                                        staffInstrumentSettingA,
-                                        staffInstrumentSettingB)
+        Logging.trace("<<")
 
-        if not isPartOfFullScore:
-            # make score footing
-            self._printLine("  >>")
-            self._printLine("  \\layout {}")
-            self._printLine("}")
+    #--------------------
+
+    def _writeVoiceStaffInstrumentSettings (self, voiceName, voiceStaff):
+        """writes the instrument name setting commands for given
+           <voiceName> with staff <voiceStaff>"""
+
+        Logging.trace(">>: name = %s, staff = %s", voiceName, voiceStaff)
+
+        if not self._isExtractScore:
+            voiceStaffInstrument = \
+                self._voiceNameToScoreNameMap.get(voiceName, voiceName)
+            staffInstrumentSetting = " = #\"" + voiceStaffInstrument + "\""
+            prefix = "\\set " + voiceStaff + "."
+            suffix = "nstrumentName" + staffInstrumentSetting
+            staffInstrumentSettingA = prefix + "i" + suffix
+            staffInstrumentSettingB = prefix + "shortI" + suffix
+
+            self._printLine(0, staffInstrumentSettingA)
+            self._printLine(0, staffInstrumentSettingB)
 
         Logging.trace("<<")
 
@@ -751,6 +680,8 @@ class LilypondFile:
 
         # derived data
         self._targetIsPdf                 = False
+        self._isExtractScore              = False
+        self._isMidiScore                 = False
         self._isVideoScore                = False
 
         Logging.trace("<<: %s", self)
@@ -797,7 +728,7 @@ class LilypondFile:
                   voiceNameList, title, composerText,
                   voiceNameToChordsMap, voiceNameToLyricsMap,
                   voiceNameToScoreNameMap, phaseAndVoiceNameToClefMap,
-                  phaseAndVoiceNameToStaffMap):
+                  phaseAndVoiceNameToStaffListMap):
         """Sets parameters for generation and starts generation based
            on phase."""
 
@@ -808,46 +739,42 @@ class LilypondFile:
                       + " voiceNameToLyricsMap = %s,"
                       + " voiceNameToScoreNameMap = %s,"
                       + " phaseAndVoiceNameToClefMap = %s,"
-                      + " phaseAndVoiceNameToStaffMap = %s",
+                      + " phaseAndVoiceNameToStaffListMap = %s",
                       includeFileName, phase, voiceNameList,
                       title, composerText, voiceNameToChordsMap,
                       voiceNameToLyricsMap, voiceNameToScoreNameMap,
                       phaseAndVoiceNameToClefMap,
-                      phaseAndVoiceNameToStaffMap)
+                      phaseAndVoiceNameToStaffListMap)
 
-        self._phase                       = phase
-        self._includeFileName             = includeFileName
-        self._title                       = title
-        self._composerText                = composerText
-        self._voiceNameList               = voiceNameList
-        self._voiceNameToChordsMap        = voiceNameToChordsMap
-        self._voiceNameToLyricsMap        = voiceNameToLyricsMap
-        self._voiceNameToScoreNameMap     = voiceNameToScoreNameMap
-        self._phaseAndVoiceNameToClefMap  = phaseAndVoiceNameToClefMap
-        self._phaseAndVoiceNameToStaffMap = phaseAndVoiceNameToStaffMap
+        self._phase                           = phase
+        self._includeFileName                 = includeFileName
+        self._title                           = title
+        self._composerText                    = composerText
+        self._voiceNameList                   = voiceNameList
+        self._voiceNameToChordsMap            = voiceNameToChordsMap
+        self._voiceNameToLyricsMap            = voiceNameToLyricsMap
+        self._voiceNameToScoreNameMap         = voiceNameToScoreNameMap
+        self._phaseAndVoiceNameToClefMap      = phaseAndVoiceNameToClefMap
+        self._phaseAndVoiceNameToStaffListMap = \
+            phaseAndVoiceNameToStaffListMap
 
-        self._voiceToLabelMap             = {}
-        self._isFirstChordedSystem        = True
+        self._voiceToLabelMap                 = {}
+        self._isFirstChordedSystem            = True
         
         # derived data
-        self._targetIsPdf                 = (phase in ["extract", "score"])
-        self._isVideoScore                = (phase == "video")
+        self._targetIsPdf    = (phase in ["extract", "score"])
+        self._isExtractScore = (phase == "extract")
+        self._isMidiScore    = (phase == "midi")
+        self._isVideoScore   = (phase == "video")
 
         self._includeFileMacroNameSet = \
             _LilypondIncludeFile.definedMacroNameSet(includeFileName)
 
         Logging.trace("--: %s", self)
 
+        self._resetPrintIndentation()
         self._writeHeader()
-
-        if phase == "extract":
-            voiceName = self._voiceNameList[0]
-            self._writeVoice(voiceName)
-        elif phase == "midi":
-            self._writeMidiScore()
-        else:
-            self._writeFullScore()
-
+        self._writeScore()
         self.close()
 
         Logging.trace("<<")

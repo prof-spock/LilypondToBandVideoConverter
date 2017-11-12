@@ -1,6 +1,6 @@
 # -*- coding: utf-8-unix -*-
-# mla_overallsettings -- services for access to the global configuration file
-#                        of makeLilypondAll
+# mla_overallsettings -- services for access to the global configuration
+#                        file of ltbvc
 
 #====================
 
@@ -10,8 +10,9 @@ import re
 from configurationfile import ConfigurationFile
 from operatingsystem import OperatingSystem
 from ltbvc_businesstypes import generateObjectListFromString, \
+                                generateObjectMapFromString, \
                                 AudioTrack, TempoTrack, \
-                                VideoTarget, VoiceDescriptor
+                                VideoFileKind, VideoTarget, VoiceDescriptor
 from regexppattern import RegExpPattern
 from simplelogging import Logging
 from ttbase import convertStringToList, convertStringToMap, iif, isInRange
@@ -92,7 +93,8 @@ class _ConfigDataGlobal:
         configData.targetDirectoryPath     = "generated"
         configData.tempAudioDirectoryPath  = "/temp"
         configData.tempLilypondFilePath    = "temp.ly"
-        configData.videoTargetList         = []
+        configData.videoTargetMap          = {}
+        configData.videoFileKindMap        = {}
 
     #--------------------
 
@@ -111,7 +113,8 @@ class _ConfigDataGlobal:
                + " soundStyleNameToTextMap = %s,"
                + " soxCommandLinePrefix = '%s',"
                + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
-               + " tempLilypondFilePath = '%s', videoTargetList = %s)")
+               + " tempLilypondFilePath = '%s', videoTargetMap = %s,"
+               + " videoFileKindMap = %s)")
               % (className,
                  configData.aacCommandLine, configData.ffmpegCommand,
                  configData.fluidsynthCommand,
@@ -124,7 +127,7 @@ class _ConfigDataGlobal:
                  configData.targetDirectoryPath,
                  configData.tempAudioDirectoryPath,
                  configData.tempLilypondFilePath,
-                 configData.videoTargetList))
+                 configData.videoTargetMap, configData.videoFileKindMap))
         return st
 
     #--------------------
@@ -149,7 +152,8 @@ class _ConfigDataGlobal:
               "lilypondCommand", "loggingFilePath", "mp4boxCommand",
               "soundFontDirectoryPath", "soxCommandLinePrefix",
               "targetDirectoryPath", "tempAudioDirectoryPath",
-              "tempLilypondFilePath", "videoTargetList" ]
+              "tempLilypondFilePath", "videoTargetMap",
+              "videoFileKindMap" ]
         _checkVariableList(variableNameList, configurationFile)
 
         # additional checks
@@ -191,9 +195,12 @@ class _ConfigDataGlobal:
             getValueProc("tempLilypondFilePath")
         configData.tempAudioDirectoryPath = \
             getValueProc("tempAudioDirectoryPath")
-        videoTargetList = getValueProc("videoTargetList")
-        configData.videoTargetList = \
-            generateObjectListFromString(videoTargetList, VideoTarget())
+        videoTargetMap = getValueProc("videoTargetMap")
+        configData.videoTargetMap = \
+            generateObjectMapFromString(videoTargetMap, VideoTarget())
+        videoFileKindMap = getValueProc("videoFileKindMap")
+        configData.videoFileKindMap = \
+            generateObjectMapFromString(videoFileKindMap, VideoFileKind())
 
         configData.soundStyleNameToTextMap = \
             _readStylesWithPrefix(cls._soundStyleNamePrefix,
@@ -308,9 +315,9 @@ class _ConfigDataNotation:
     def initialize (cls, configData):
         """Initializes notation attributes of <configData>"""
 
-        configData.voiceNameToScoreNameMap     = {}
-        configData.phaseAndVoiceNameToClefMap  = {}
-        configData.phaseAndVoiceNameToStaffMap = {}
+        configData.voiceNameToScoreNameMap         = {}
+        configData.phaseAndVoiceNameToClefMap      = {}
+        configData.phaseAndVoiceNameToStaffListMap = {}
 
     #--------------------
 
@@ -323,11 +330,11 @@ class _ConfigDataNotation:
         st = (("%s("
                + "voiceNameToScoreNameMap = %s,"
                + " phaseAndVoiceNameToClefMap = %s,"
-               + " phaseAndVoiceNameToStaffMap = %s)")
+               + " phaseAndVoiceNameToStaffListMap = %s)")
               % (className,
                  configData.voiceNameToScoreNameMap,
                  configData.phaseAndVoiceNameToClefMap,
-                 configData.phaseAndVoiceNameToStaffMap))
+                 configData.phaseAndVoiceNameToStaffListMap))
         return st
 
     #--------------------
@@ -341,7 +348,7 @@ class _ConfigDataNotation:
 
         variableNameList = \
           [ "voiceNameToScoreNameMap", "phaseAndVoiceNameToClefMap",
-            "phaseAndVoiceNameToStaffMap" ]
+            "phaseAndVoiceNameToStaffListMap" ]
 
         _checkVariableList(variableNameList, configurationFile)
 
@@ -364,8 +371,19 @@ class _ConfigDataNotation:
             convertStringToMap(getValueProc("voiceNameToScoreNameMap"))
         configData.phaseAndVoiceNameToClefMap = \
             convertStringToMap(getValueProc("phaseAndVoiceNameToClefMap"))
-        configData.phaseAndVoiceNameToStaffMap = \
-            convertStringToMap(getValueProc("phaseAndVoiceNameToStaffMap"))
+        pAVnToStaffListMap = \
+            convertStringToMap(getValueProc("phaseAndVoiceNameToStaffListMap"))
+
+        for phase, voiceNameToStaffListMap in pAVnToStaffListMap.items():
+            updatedMap = {}
+
+            for voiceName, staffListString in voiceNameToStaffListMap.items():
+                staffList = convertStringToList(staffListString, "/")
+                updatedMap[voiceName] = staffList
+
+            pAVnToStaffListMap[phase] = updatedMap
+                
+        configData.phaseAndVoiceNameToStaffListMap = pAVnToStaffListMap
 
         Logging.trace("<<")
 
@@ -501,30 +519,30 @@ class _ConfigDataSong:
     def initialize (cls, configData):
         """Initializes song related attributes of <configData>"""
 
-        configData.intermediateFilesAreKept       = False
-        configData.optionalVoiceNameToSuffixMap   = {}
-        configData.title                          = "%title%"
-        configData.songComposerText               = None
-        configData.songYear                       = None
-        configData.trackNumber                    = 0
-        configData.fileNamePrefix                 = "XXXX"
-        configData.includeFilePath                = "%includeFilePath%"
-        configData.voiceNameToLyricsMap           = {}
-        configData.voiceNameToChordsMap           = {}
-        configData.styleHumanizationKind          = None
-        configData.voiceNameList                  = ""
-        configData.extractVoiceNameSet            = set()
-        configData.scoreVoiceNameList             = ""
-        configData.midiVoiceNameList              = ""
-        configData.audioVoiceNameSet              = set()
-        configData.videoVoiceNameList             = ""
-        configData.voiceNameToVoiceDataMap        = {}
-        configData.voiceNameToOverrideFileNameMap = {}
-        configData.parallelTrackFilePath          = ""
-        configData.parallelTrackVolume            = 1.0
-        configData.shiftOffset                    = None
-        configData.measureToTempoMap              = None
-        configData.attenuationLevel               = 0
+        configData.intermediateFilesAreKept          = False
+        configData.optionalVoiceNameToSuffixMap      = {}
+        configData.title                             = "%title%"
+        configData.songComposerText                  = None
+        configData.songYear                          = None
+        configData.trackNumber                       = 0
+        configData.countInMeasureCount               = 0
+        configData.fileNamePrefix                    = "XXXX"
+        configData.includeFilePath                   = "%includeFilePath%"
+        configData.voiceNameToLyricsMap              = {}
+        configData.voiceNameToChordsMap              = {}
+        configData.measureToHumanizationStyleNameMap = None
+        configData.voiceNameList                     = ""
+        configData.extractVoiceNameSet               = set()
+        configData.scoreVoiceNameList                = ""
+        configData.midiVoiceNameList                 = ""
+        configData.audioVoiceNameSet                 = set()
+        configData.voiceNameToVoiceDataMap           = {}
+        configData.voiceNameToOverrideFileNameMap    = {}
+        configData.parallelTrackFilePath             = ""
+        configData.parallelTrackVolume               = 1.0
+        configData.shiftOffset                       = None
+        configData.measureToTempoMap                 = None
+        configData.attenuationLevel                  = 0
 
     #--------------------
 
@@ -538,13 +556,14 @@ class _ConfigDataSong:
 	       + " fileNamePrefix = %s, songComposerText = '%s',"
                + " songYear = %d, includeFilePath = '%s',"
                + " optionalVoiceNameToSuffixMap = %s, trackNumber = %d,"
+               + " countInMeasureCount = %d,"
                + " voiceNameToChordsMap = %s, voiceNameToLyricsMap = %s,"
                + " voiceNameList = %s, extractVoiceNameSet = %s,"
                + " midiVoiceNameList = %s,  scoreVoiceNameList = %s,"
-               + " audioVoiceNameSet = %s, videoVoiceNameList = %s,"
+               + " audioVoiceNameSet = %s,"
                + " voiceNameToVoiceDataMap = %s,"
                + " voiceNameToOverrideFileNameMap = %s,"
-               + " styleHumanizationKind = %s,"
+               + " measureToHumanizationStyleNameMap = %s,"
                + " measureToTempoMap = %s, parallelTrackFilePath = '%s',"
                + " parallelTrackVolume = %4.3f, shiftOffset = %5.3f,"
                + " attenuationLevel = %5.3f)")
@@ -553,14 +572,15 @@ class _ConfigDataSong:
                   configData.fileNamePrefix, configData.songComposerText,
                   configData.songYear, configData.includeFilePath,
                   configData.optionalVoiceNameToSuffixMap,
-                  configData.trackNumber, configData.voiceNameToChordsMap,
+                  configData.trackNumber, configData.countInMeasureCount,
+                  configData.voiceNameToChordsMap,
                   configData.voiceNameToLyricsMap,
                   configData.voiceNameList, configData.extractVoiceNameSet,
                   configData.midiVoiceNameList, configData.scoreVoiceNameList,
-                  configData.audioVoiceNameSet, configData.videoVoiceNameList,
+                  configData.audioVoiceNameSet,
                   configData.voiceNameToVoiceDataMap,
                   configData.voiceNameToOverrideFileNameMap,
-                  configData.styleHumanizationKind,
+                  configData.measureToHumanizationStyleNameMap,
                   configData.measureToTempoMap,
                   configData.parallelTrackFilePath,
                   configData.parallelTrackVolume, configData.shiftOffset,
@@ -582,9 +602,9 @@ class _ConfigDataSong:
                                               configurationFile.getValue)
 
         variableNameList = \
-          [ "title", "trackNumber", "fileNamePrefix",
-            "intermediateFilesAreKept", "styleHumanizationKind",
-            "composerText", "year", "videoVoiceNameList", "voiceNameList",
+          [ "title", "trackNumber", "countInMeasureCount", "fileNamePrefix",
+            "intermediateFilesAreKept", "measureToHumanizationStyleNameMap",
+            "composerText", "year", "voiceNameList",
             "midiChannelList", "midiInstrumentList", "midiVolumeList",
             "panPositionList", "audioLevelList", "reverbLevelList",
             "soundVariantList", "attenuationLevel" ]
@@ -624,13 +644,13 @@ class _ConfigDataSong:
 
         configData.title = getValueProc("title")
         configData.trackNumber = getValueProc("trackNumber")
+        configData.countInMeasureCount = getValueProc("countInMeasureCount")
         configData.fileNamePrefix = getValueProc("fileNamePrefix")
         configData.includeFilePath = configData.fileNamePrefix + "-music.ly"
         configData.songComposerText = getValueProc("composerText")
         configData.songYear = getValueProc("year")
-        configData.intermediateFilesAreKept = getValueProc("intermediateFilesAreKept")
-        configData.styleHumanizationKind = \
-          getValueProc("styleHumanizationKind")
+        configData.intermediateFilesAreKept = \
+                              getValueProc("intermediateFilesAreKept")
         configData.attenuationLevel = getValueProc("attenuationLevel")
 
         tempoTrack          = getValueProc("measureToTempoMap")
@@ -648,7 +668,6 @@ class _ConfigDataSong:
         extractVoiceNames = getValueProc("extractVoiceNameSet")
         midiVoiceNames    = getValueProc("midiVoiceNameList")
         scoreVoiceNames   = getValueProc("scoreVoiceNameList")
-        videoVoiceNames   = getValueProc("videoVoiceNameList")
 
         voiceNameToLyricsMap = getValueProc("voiceNameToLyricsMap")
         voiceNameToChordsMap = getValueProc("voiceNameToChordsMap")
@@ -673,11 +692,13 @@ class _ConfigDataSong:
           set(convertStringToList(extractVoiceNames))
         configData.midiVoiceNameList  = convertStringToList(midiVoiceNames)
         configData.scoreVoiceNameList = convertStringToList(scoreVoiceNames)
-        configData.videoVoiceNameList = convertStringToList(videoVoiceNames)
 
         tempoTrackMap = convertStringToMap(tempoTrack)
         configData.measureToTempoMap = \
                  TempoTrack.measureToTempoMap(tempoTrackMap)
+        measureToStyleMap = getValueProc("measureToHumanizationStyleNameMap")
+        configData.measureToHumanizationStyleNameMap = \
+            convertStringToMap(measureToStyleMap)
 
         cls._convertToVoiceMap(configData, voiceNames, midiChannels,
                                midiInstruments, midiVolumes, panPositions,
@@ -868,15 +889,16 @@ class _LocalValidator:
         cls._setMap("tempLilypondFilePath", "temp.ly", "WFILE")
 
         # song group properties
-        cls._setMap("artistName", None, "STRING")
-        cls._setMap("albumName", None, "STRING")
+        cls._setMap("artistName", u"[ARTIST]", "STRING")
+        cls._setMap("albumName", u"[ALBUM]", "STRING")
 
         # general song properties
         cls._setMap("title", None, "STRING")
         cls._setMap("fileNamePrefix", None, "STRING")
         cls._setMap("year", datetime.date.today().year, "NATURAL")
-        cls._setMap("composerText", "[COMPOSERTEXT]", "STRING")
+        cls._setMap("composerText", u"[COMPOSERTEXT]", "STRING")
         cls._setMap("trackNumber", 1, "NATURAL")
+        cls._setMap("countInMeasureCount", 0, "NATURAL")
         cls._setMap("intermediateFilesAreKept", False, "BOOLEAN")
         cls._setMap("voiceNameList", None, "REGEXP", identifierListRegExp)
 
@@ -887,7 +909,7 @@ class _LocalValidator:
                     makeRegExp(makeMapPat(prephasePattern,
                                           makeMapPat(identifierPattern,
                                                      clefPattern))))
-        cls._setMap("phaseAndVoiceNameToStaffMap", "{}", "REGEXP",
+        cls._setMap("phaseAndVoiceNameToStaffListMap", "{}", "REGEXP",
                     makeRegExp(makeMapPat(prephasePattern,
                                           makeMapPat(identifierPattern,
                                                      staffListPattern))))
@@ -899,7 +921,7 @@ class _LocalValidator:
                                           makeCompactListPat(r"[esv]\d*"))))
 
         cls._setMap("scoreVoiceNameList", "", "REGEXP", identifierListRegExp)
-        cls._setMap("voiceNameToScoreNameMap", "{}", "REGEXP",
+        cls._setMap("voiceNameToScoreNameMap", "", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           identifierPattern)))
 
@@ -907,23 +929,22 @@ class _LocalValidator:
         cls._setMap("humanizedVoiceNameSet", "", "REGEXP",
                     identifierListRegExp)
         cls._setMap("humanizationStyle*", None, "REGEXP",
-                    makeRegExp(makeMapPat(r"(?:countIn|timing|velocity)",
-                                          "(?:\d+|"
+                    makeRegExp(makeMapPat(r"(?:timing|velocity)",
+                                          "(?:"
                                           + makeMapPat(beatPattern,
                                                        humanizationPattern,
                                                        False)
                                           + ")", False)))
         cls._setMap("measureToHumanizationStyleNameMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          makeMapPat(floatPattern,
-                                                     identifierPattern))))
+                    makeRegExp(makeMapPat(integerPattern,
+                                          identifierPattern)))
         cls._setMap("midiChannelList", "", "REGEXP", integerListRegExp)
         cls._setMap("midiInstrumentList", "", "REGEXP", instrumentListRegExp)
         cls._setMap("midiPanList", "", "REGEXP",
                     makeRegExp(makeListPat(r"C|\d+(\.\d+)[RL]", False)))
         cls._setMap("midiVoiceNameList", "", "REGEXP", identifierListRegExp)
         cls._setMap("midiVolumeList", "", "REGEXP", integerListRegExp)
-        cls._setMap("voiceNameToVariationFactorMap", "{}", "REGEXP",
+        cls._setMap("voiceNameToVariationFactorMap", "", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           floatPattern + "/" + floatPattern)))
 
@@ -952,11 +973,14 @@ class _LocalValidator:
                     makeRegExp(idToTextMapPattern))
 
         # video file generation
-        cls._setMap("videoTargetList", None, "REGEXP",
+        cls._setMap("videoTargetMap", None, "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           VideoTarget.regexpPattern(),
                                           False)))
-        cls._setMap("videoVoiceNameList", "", "REGEXP", identifierListRegExp)
+        cls._setMap("videoFileKindMap", None, "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          VideoFileKind.regexpPattern(),
+                                          False)))
 
     #--------------------
 
@@ -1145,11 +1169,12 @@ class MLA_ConfigurationData:
         if len(self.scoreVoiceNameList) == 0:
             self.scoreVoiceNameList = list(self.voiceNameList)
 
-        if len(self.videoVoiceNameList) == 0:
-            self.videoVoiceNameList = list(self.voiceNameList)
-
         if len(self.audioVoiceNameSet) == 0:
             self.audioVoiceNameSet.update(self.midiVoiceNameList)
+
+        for videoFileKindName, videoFileKind in self.videoFileKindMap.items():
+            if len(videoFileKind.voiceNameList) == 0:
+                videoFileKind.voiceNameList = list(self.voiceNameList)
 
         if len(selectedVoiceNameSet) == 0:
             # when no voices are selected so far, all voices will be

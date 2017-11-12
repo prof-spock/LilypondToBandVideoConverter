@@ -10,7 +10,7 @@
 from configurationfile import ConfigurationFile
 from miditransformer import MidiTransformer
 from mp4tagmanager import MP4TagManager
-from ltbvc_businesstypes import canonicalVoiceName
+from ltbvc_businesstypes import humanReadableVoiceName
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, iif, isInRange, MyRandom
@@ -130,6 +130,7 @@ class AudioTrackManager:
         midiTransformer = MidiTransformer(midiFilePath,
                                           cls._intermediateFilesAreKept)
         midiTransformer.filterByTrackNamePrefix(voiceName)
+        midiTransformer.removeVolumeChanges()
         midiTransformer.save(voiceMidiFilePath)
 
         Logging.trace("<<")
@@ -474,7 +475,7 @@ class AudioTrackManager:
         if isCopyVariant:
             soundStyleName = "COPY"
         else:
-            simpleVoiceName = canonicalVoiceName(voiceName)
+            simpleVoiceName = humanReadableVoiceName(voiceName)
             capitalizedVoiceName = simpleVoiceName.capitalize()
             isSimpleKeyboard = (capitalizedVoiceName == "Keyboardsimple")
             capitalizedVoiceName = iif(isSimpleKeyboard, "Keyboard",
@@ -488,7 +489,7 @@ class AudioTrackManager:
 
         # prepare list of sox argument lists for processing
         reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
-        reverbCommands = "norm -3 reverb %d" % reverbLevel
+        reverbCommands = iif(reverbLevel > 0, " reverb %d" % reverbLevel, "")
 
         if isCopyVariant:
             params = ""
@@ -501,7 +502,7 @@ class AudioTrackManager:
             Logging.trace(message)
             OperatingSystem.showMessageOnConsole(message)
         
-        params += " " + reverbCommands
+        params += " norm -3" + reverbCommands
         parameterSequenceList = params.split("tee ")
 
         if not cls._intermediateFilesAreKept:

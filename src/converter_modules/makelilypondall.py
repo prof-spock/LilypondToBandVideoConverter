@@ -1,22 +1,8 @@
 # -*- coding: utf-8-unix -*-
 # makeLilypondAll -- script that produces lilypond files and target files
-#                    for single voices, a complete score, a midi file and
-#                    videos based on a configuration file
-#
-
-#
-
-
-# It is assumed that the include file has the following names defined:
-#    voices:        "bass", "myDrums" (as "drums" is a reserved identifier),
-#                   "guitar", "keyboardTop", "keyboardBottom", "vocals"
-#                   (unless the voices parameter is set)
-#    chord list:    "allChordsXXX" where XXX is the capitalised
-#                   voice name (chords are only added for voices that do
-#                   neither match "vocals" nor "drums")
-#    tempo list:    "tempoTrack" (only necessary when mode = "MIDI")
-#    lyrics lines:  they are labelled "vocLyricsA", "vocLyricsB", ...
-#                   or "bgVocLyricsA", "bgVocLyricsB", ...
+#                    for single voices, a complete score, a midi file,
+#                    audio and video files based on a configuration file
+#                    from a lilypond music fragment file
 
 #--------------------
 
@@ -259,7 +245,7 @@ class _LilypondProcessor:
                               configData.voiceNameToLyricsMap,
                               configData.voiceNameToScoreNameMap,
                               configData.phaseAndVoiceNameToClefMap,
-                              configData.phaseAndVoiceNameToStaffMap)
+                              configData.phaseAndVoiceNameToStaffListMap)
         cls._processLilypond(tempLilypondFilePath, targetFileNamePrefix)
         OperatingSystem.moveFile(targetFileNamePrefix + ".pdf",
                                  configData.targetDirectoryPath)
@@ -330,50 +316,57 @@ class _LilypondProcessor:
                                              tempSubtitleFilePath,
                                              configData.shiftOffset)
 
-        for videoTarget in configData.videoTargetList:
+        for name, videoFileKind in configData.videoFileKindMap.items():
             silentMp4FilePath = (("%s/" + silentVideoFileNameTemplate)
                                  % (configData.targetDirectoryPath,
                                     configData.fileNamePrefix,
-                                    videoTarget.fileNameSuffix))
+                                    videoFileKind.fileNameSuffix))
+            videoTargetName = videoFileKind.target
 
-            if not videoTarget.subtitlesAreHardcoded:
-                videoFilePath = silentMp4FilePath
-                effectiveSubtitleFilePath = tempSubtitleFilePath
+            if videoTargetName not in configData.videoTargetMap:
+                Logging.trace("--: unknown video target %s for file kind %s",
+                              videoTargetName, videoFileKind.name)
             else:
-                videoFilePath = tempMp4FilePath
-                effectiveSubtitleFilePath = ""
-                VideoAudioCombiner.insertHardSubtitles( \
-                                        silentMp4FilePath,
-                                        tempSubtitleFilePath,
-                                        videoFilePath,
-                                        configData.shiftOffset,
-                                        videoTarget.subtitleColor,
-                                        videoTarget.subtitleFontSize)
+                videoTarget = configData.videoTargetMap[videoTargetName]
 
-            targetDirectoryPath = videoTarget.targetVideoDirectoryPath
-            ValidityChecker.isDirectory(targetDirectoryPath,
-                                        "video target directory")
-            targetVideoFilePath = ("%s/%s%s-%s.mp4"
-                                   % (targetDirectoryPath,
-                                      configData.targetFileNamePrefix,
-                                      configData.fileNamePrefix,
-                                      videoTarget.name))
-            trackDataList = \
-                AudioTrackManager.constructSettingsForAudioTracks(configData)
+                if not videoTarget.subtitlesAreHardcoded:
+                    videoFilePath = silentMp4FilePath
+                    effectiveSubtitleFilePath = tempSubtitleFilePath
+                else:
+                    videoFilePath = tempMp4FilePath
+                    effectiveSubtitleFilePath = ""
+                    VideoAudioCombiner.insertHardSubtitles( \
+                                            silentMp4FilePath,
+                                            tempSubtitleFilePath,
+                                            videoFilePath,
+                                            configData.shiftOffset,
+                                            videoTarget.subtitleColor,
+                                            videoTarget.subtitleFontSize)
 
-            VideoAudioCombiner.combine(configData.voiceNameList,
-                                       trackDataList, videoFilePath,
-                                       targetVideoFilePath,
-                                       effectiveSubtitleFilePath)
+                targetDirectoryPath = videoFileKind.directoryPath
+                ValidityChecker.isDirectory(targetDirectoryPath,
+                                            "video target directory")
+                targetVideoFilePath = ("%s/%s%s-%s.mp4"
+                                       % (targetDirectoryPath,
+                                          configData.targetFileNamePrefix,
+                                          configData.fileNamePrefix,
+                                          videoTarget.name))
+                trackDataList = \
+                   AudioTrackManager.constructSettingsForAudioTracks(configData)
 
-            mediaType = "TV Show"
-            VideoAudioCombiner.tagVideoFile(targetVideoFilePath,
-                                            configData.albumName,
-                                            configData.artistName,
-                                            configData.albumArtFilePath,
-                                            configData.title,
-                                            mediaType,
-                                            configData.songYear)
+                VideoAudioCombiner.combine(videoFileKind.voiceNameList,
+                                           trackDataList, videoFilePath,
+                                           targetVideoFilePath,
+                                           effectiveSubtitleFilePath)
+
+                mediaType = "TV Show"
+                VideoAudioCombiner.tagVideoFile(targetVideoFilePath,
+                                                configData.albumName,
+                                                configData.artistName,
+                                                configData.albumArtFilePath,
+                                                configData.title,
+                                                mediaType,
+                                                configData.songYear)
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         OperatingSystem.removeFile(tempSubtitleFilePath,
@@ -401,7 +394,7 @@ class _LilypondProcessor:
                               configData.voiceNameToLyricsMap,
                               configData.voiceNameToScoreNameMap,
                               configData.phaseAndVoiceNameToClefMap,
-                              configData.phaseAndVoiceNameToStaffMap)
+                              configData.phaseAndVoiceNameToStaffListMap)
 
         tempMidiFileNamePrefix = configData.fileNamePrefix + "-temp"
         tempMidiFileName = tempMidiFileNamePrefix + ".mid"
@@ -418,7 +411,8 @@ class _LilypondProcessor:
         midiTransformer = MidiTransformer(tempMidiFileName,
 	                                  intermediateFilesAreKept)
         midiTransformer.addMissingTrackNames()
-        midiTransformer.humanizeTracks(configData.styleHumanizationKind)
+        midiTransformer.humanizeTracks(configData.countInMeasureCount,
+                            configData.measureToHumanizationStyleNameMap)
         midiTransformer.positionInstruments(trackToSettingsMap)
         midiTransformer.addProcessingDateToTracks(trackToSettingsMap.keys())
         midiTransformer.save(targetMidiFileName)
@@ -535,50 +529,58 @@ class _LilypondProcessor:
                                   % configData.fileNamePrefix)
         tempLilypondFilePath = configData.tempLilypondFilePath
 
-        for videoTarget in configData.videoTargetList:
-            message = ("== generating silent video for %s" % videoTarget.name)
+        for name, videoFileKind in configData.videoFileKindMap.items():
+            message = ("== generating silent video for %s"
+                       % videoFileKind.name)
             OperatingSystem.showMessageOnConsole(message)
+            videoTargetName = videoFileKind.target
 
-            effectiveVideoResolution = (videoTarget.resolution
-                                        * videoTarget.scalingFactor)
-            factor = mmPerInch / videoTarget.resolution
-            videoWidth  = videoTarget.width  * factor
-            videoHeight = videoTarget.height * factor
-            videoLineWidth = videoWidth - 2 * videoTarget.leftRightMargin
-            lilypondFile = LilypondFile(tempLilypondFilePath)
-            lilypondFile.setVideoParameters(videoTarget.name,
-                                            effectiveVideoResolution,
-                                            videoTarget.systemSize,
-                                            videoTarget.topBottomMargin,
-                                            videoWidth, videoHeight,
-                                            videoLineWidth)
-            lilypondFile.generate(configData.includeFilePath, "video",
-                                  configData.videoVoiceNameList,
-                                  configData.title, configData.songComposerText,
-                                  configData.voiceNameToChordsMap,
-                                  configData.voiceNameToLyricsMap,
-                                  configData.voiceNameToScoreNameMap,
-                                  configData.phaseAndVoiceNameToClefMap,
-                                  configData.phaseAndVoiceNameToStaffMap)
-            targetMp4FileName = (silentVideoFileNameTemplate
-                                 % (configData.fileNamePrefix,
-                                    videoTarget.fileNameSuffix))
-            videoGenerator = \
-                LilypondPngVideoGenerator(tempLilypondFilePath,
-                                          targetMp4FileName,
-                                          targetSubtitleFileName,
-                                          configData.measureToTempoMap,
-                                          countInMeasures,
-                                          videoTarget.frameRate,
-                                          videoTarget.scalingFactor,
-                                          intermediateFilesAreKept)
-            videoGenerator.process()
-            videoGenerator.cleanup()
+            if videoTargetName not in configData.videoTargetMap:
+                Logging.trace("--: unknown video target %s for file kind %s",
+                              videoTargetName, videoFileKind.name)
+            else:
+                videoTarget = configData.videoTargetMap[videoTargetName]
+                effectiveVideoResolution = (videoTarget.resolution
+                                            * videoTarget.scalingFactor)
+                factor = mmPerInch / videoTarget.resolution
+                videoWidth  = videoTarget.width  * factor
+                videoHeight = videoTarget.height * factor
+                videoLineWidth = videoWidth - 2 * videoTarget.leftRightMargin
+                lilypondFile = LilypondFile(tempLilypondFilePath)
+                lilypondFile.setVideoParameters(videoTarget.name,
+                                                effectiveVideoResolution,
+                                                videoTarget.systemSize,
+                                                videoTarget.topBottomMargin,
+                                                videoWidth, videoHeight,
+                                                videoLineWidth)
+                lilypondFile.generate(configData.includeFilePath, "video",
+                                    videoFileKind.voiceNameList,
+                                    configData.title,
+                                    configData.songComposerText,
+                                    configData.voiceNameToChordsMap,
+                                    configData.voiceNameToLyricsMap,
+                                    configData.voiceNameToScoreNameMap,
+                                    configData.phaseAndVoiceNameToClefMap,
+                                    configData.phaseAndVoiceNameToStaffListMap)
+                targetMp4FileName = (silentVideoFileNameTemplate
+                                     % (configData.fileNamePrefix,
+                                        videoFileKind.fileNameSuffix))
+                videoGenerator = \
+                    LilypondPngVideoGenerator(tempLilypondFilePath,
+                                              targetMp4FileName,
+                                              targetSubtitleFileName,
+                                              configData.measureToTempoMap,
+                                              countInMeasures,
+                                              videoTarget.frameRate,
+                                              videoTarget.scalingFactor,
+                                              intermediateFilesAreKept)
+                videoGenerator.process()
+                videoGenerator.cleanup()
 
-            OperatingSystem.moveFile(targetMp4FileName,
-                                     configData.targetDirectoryPath)
-            OperatingSystem.moveFile(targetSubtitleFileName,
-                                     configData.targetDirectoryPath)
+                OperatingSystem.moveFile(targetMp4FileName,
+                                         configData.targetDirectoryPath)
+                OperatingSystem.moveFile(targetSubtitleFileName,
+                                         configData.targetDirectoryPath)
 
         OperatingSystem.removeFile(tempLilypondFilePath,
 	                           intermediateFilesAreKept)

@@ -6,6 +6,7 @@
 #                          - AudioTrack
 #                          - TempoTrack
 #                          - TrackSettings
+#                          - VideoFileKind
 #                          - VideoTarget
 #                          - VoiceDescriptor
 
@@ -58,18 +59,21 @@ def _checkForTypesAndCompleteness (objectName, objectKind,
 
     Logging.trace("<<")
 
-       
-#====================
-
-def canonicalVoiceName (voiceName):
-    """Returns human readable version of given <voiceName>"""
-
-    result = iif2(voiceName.endswith("Simple"), voiceName[:-6],
-                  voiceName.endswith("Enhanced"), voiceName[:-8],
-                  voiceName)
-    return result
-
 #--------------------
+
+def _setToDefault (currentMap, key, defaultValue):
+    """sets entry <key> in <map> to <defaultValue> if undefined"""
+
+    originalValue = currentMap.get(key, None)
+    Logging.trace(">>: key = %s, originalValue = %s, default = %s",
+                  key, originalValue, defaultValue)
+
+    if key not in currentMap:
+        currentMap[key] = defaultValue
+
+    Logging.trace("<<")
+    
+#====================
 
 def generateObjectListFromString (st, prototypeObject):
     """Generates list of objects as copies of <prototypeObject> from
@@ -91,6 +95,39 @@ def generateObjectListFromString (st, prototypeObject):
         result.append(currentObject)
 
     Logging.trace("<<: %s", result)
+    return result
+
+#--------------------
+
+def generateObjectMapFromString (st, prototypeObject):
+    """Generates map of objects as copies of <prototypeObject> from
+       external representation <st> describing a mapping from
+       object name to object value"""
+
+    Logging.trace(">>: %s", st)
+
+    result = {}
+    table = convertStringToMap(st)
+
+    for name, attributeNameToValueMap in table.items():
+        attributeNameToValueMap["name"] = name
+        Logging.trace("--: converting %s = %s",
+                      name, attributeNameToValueMap)
+        currentObject = deepcopy(prototypeObject)
+        currentObject.checkAndSetFromMap(attributeNameToValueMap)
+        result[name] = currentObject
+
+    Logging.trace("<<: %s", result)
+    return result
+
+#--------------------
+
+def humanReadableVoiceName (voiceName):
+    """Returns human readable version of given <voiceName>"""
+
+    result = iif2(voiceName.endswith("Simple"), voiceName[:-6],
+                  voiceName.endswith("Extended"), voiceName[:-8],
+                  voiceName)
     return result
 
 #====================
@@ -149,6 +186,11 @@ class AudioTrack:
            audio track descriptor"""
 
         cls = self.__class__
+
+        # set optional attributes to default values
+        _setToDefault(attributeNameToValueMap, "description", "")
+
+        # check and set object values
         name = attributeNameToValueMap["name"]
         _checkForTypesAndCompleteness(name, "audio track",
                                       attributeNameToValueMap,
@@ -181,6 +223,7 @@ class AudioGroup:
     """Represents information about the audio groups
        combining voices."""
 
+    pass
 
 #====================
 
@@ -254,20 +297,94 @@ class TrackSettings:
 
 #====================
 
+class VideoFileKind:
+    """This class encapsulates the settings for a video file kind used
+       for video generation."""
+
+    _attributeNameToTypeMap = {
+        "name"           : "S",
+        "target"         : "S",
+        "fileNameSuffix" : "S",
+        "directoryPath"  : "S",
+        "voiceNameList"  : "S"
+    }
+
+    #--------------------
+    # EXPORTED FEATURES
+    #--------------------
+
+    def __init__ (self):
+        self.name           = None
+        self.target         = None
+        self.fileNameSuffix = None
+        self.directoryPath  = None
+        self.voiceNameList  = None
+
+    #--------------------
+
+    def __repr__ (self):
+        return str(self)
+
+    #--------------------
+
+    def __str__ (self):
+        clsName = self.__class__.__name__
+        st = (("%s(name = %s, target = %s, fileNameSuffix = %s,"
+               + " directory = %s, voiceNameList = %s")
+               % (clsName,
+                  self.name, self.target, self.fileNameSuffix,
+                  self.directoryPath, self.voiceNameList))
+        return st
+
+    #--------------------
+
+    def checkAndSetFromMap (self, attributeNameToValueMap):
+        """Checks validity of variables in
+           <attributeNameToValueMap> and assigns them to
+           current video target"""
+
+        cls = self.__class__
+
+        # check and set object values
+        targetName = attributeNameToValueMap["name"]
+        _checkForTypesAndCompleteness(targetName, "video file kind",
+                                      attributeNameToValueMap,
+                                      cls._attributeNameToTypeMap)
+
+        self.name             = targetName
+        self.target           = attributeNameToValueMap["target"]
+        self.fileNameSuffix   = attributeNameToValueMap["fileNameSuffix"]
+        self.directoryPath    = attributeNameToValueMap["directoryPath"]
+        self.voiceNameList    = \
+            convertStringToList(attributeNameToValueMap["voiceNameList"])
+
+    #--------------------
+
+    @classmethod
+    def regexpPattern (cls):
+        """Returns regexp pattern for checking a video file kind string"""
+
+        attributeNamePattern = \
+            "(?:%s)" % ("|".join(cls._attributeNameToTypeMap.keys()))
+        result = RegExpPattern.makeMapPattern(attributeNamePattern,
+                                              _noCommaPattern, False)
+        return result
+
+#====================
+
 class VideoTarget:
     """This class encapsulates the settings for a video target used
        for video generation."""
 
     _attributeNameToTypeMap = {
         "name"                     : "S",
-        "fileNameSuffix"           : "S",
-        "targetVideoDirectoryPath" : "S",
         "resolution"               : "I",
         "height"                   : "I",
         "width"                    : "I",
         "topBottomMargin"          : "F",
         "leftRightMargin"          : "F",
         "systemSize"               : "F",
+        "mediaType"                : "S",
         "subtitleColor"            : "I",
         "subtitleFontSize"         : "F",
         "scalingFactor"            : "I",
@@ -281,8 +398,6 @@ class VideoTarget:
 
     def __init__ (self):
         self.name                     = None
-        self.fileNameSuffix           = None
-        self.targetVideoDirectoryPath = None
         self.resolution               = None
         self.height                   = None
         self.width                    = None
@@ -291,6 +406,7 @@ class VideoTarget:
         self.scalingFactor            = None
         self.frameRate                = None
         self.systemSize               = None
+        self.mediaType                = None
         self.subtitleColor            = None
         self.subtitleFontSize         = None
         self.subtitlesAreHardcoded    = None
@@ -304,18 +420,19 @@ class VideoTarget:
 
     def __str__ (self):
         clsName = self.__class__.__name__
-        st = (("%s(name = %s, fileNameSuffix = %s, targetVideoDirectory = %s,"
+        st = (("%s(name = %s,"
                + " resolution = %s, height = %s, width = %s,"
                + " topBottomMargin = %s, leftRightMargin = %s,"
-               + " systemSize = %s, scalingFactor = %s, frameRate = %s,"
+               + " systemSize = %s, scalingFactor = %s,"
+               + " mediaType = '%s', frameRate = %s,"
                + " subtitleColor = %s, subtitleFontSize = %s,"
                + " subtitlesAreHardcoded = %s")
                % (clsName,
-                  self.name, self.fileNameSuffix,
-                  self.targetVideoDirectoryPath, self.resolution,
-                  self.height, self.width,
+                  self.name,
+                  self.resolution, self.height, self.width,
                   self.topBottomMargin, self.leftRightMargin,
-                  self.systemSize, self.scalingFactor, self.frameRate,
+                  self.systemSize, self.scalingFactor,
+                  self.mediaType, self.frameRate,
                   self.subtitleColor, self.subtitleFontSize,
                   self.subtitlesAreHardcoded))
         return st
@@ -328,15 +445,21 @@ class VideoTarget:
            current video target"""
 
         cls = self.__class__
+
+        # set optional attributes to default values
+        _setToDefault(attributeNameToValueMap, "systemSize", 20)
+        _setToDefault(attributeNameToValueMap, "scalingFactor", 1)
+        _setToDefault(attributeNameToValueMap, "mediaType", "Normal")
+        _setToDefault(attributeNameToValueMap, "subtitlesAreHardcoded",
+                      "true")
+
+        # check and set object values
         targetName = attributeNameToValueMap["name"]
         _checkForTypesAndCompleteness(targetName, "video target",
                                       attributeNameToValueMap,
                                       cls._attributeNameToTypeMap)
 
         self.name             = targetName
-        self.fileNameSuffix   = attributeNameToValueMap["fileNameSuffix"]
-        self.targetVideoDirectoryPath = \
-            attributeNameToValueMap["targetVideoDirectoryPath"]
         self.resolution       = int(attributeNameToValueMap["resolution"])
         self.height           = int(attributeNameToValueMap["height"])
         self.width            = int(attributeNameToValueMap["width"])
@@ -345,6 +468,7 @@ class VideoTarget:
         self.systemSize       = int(attributeNameToValueMap["systemSize"])
         self.scalingFactor    = int(attributeNameToValueMap["scalingFactor"])
         self.frameRate        = float(attributeNameToValueMap["frameRate"])
+        self.mediaType        = attributeNameToValueMap["mediaType"]
         self.subtitleColor    = int(attributeNameToValueMap["subtitleColor"])
         self.subtitleFontSize = int(attributeNameToValueMap["subtitleFontSize"])
         self.subtitlesAreHardcoded = \

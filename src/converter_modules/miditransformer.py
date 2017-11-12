@@ -367,10 +367,9 @@ class _HumanizationStyle:
        are skipped, how the timing and the velocity may be changed
        depending on the position of a hit within a measure."""
 
-    _defaultStyleName = "humanizationStyleDefault"
+    defaultStyleName = "humanizationStyleDefault"
     _defaultStyleAsString = \
-        ("{  countin: 2,"
-         + " timing:   { 1:0, 2:0.25, 3:0.1, 4:0.25,  S:0.05, OTHER:0.35 },"
+        ("{  timing:   { 1:0, 2:0.25, 3:0.1, 4:0.25,  S:0.05, OTHER:0.35 },"
          + " velocity: { 1:1.15, 2:1.0, 3:1.1, 4:1.0, S:1.05, OTHER:0.85,"
          + "             SLACK:0.1 } }")
 
@@ -406,21 +405,20 @@ class _HumanizationStyle:
         else:
             Logging.trace("--: could not find style name %s", styleName)
 
-            if cls._defaultStyleName in humanizationStyleNameList:
+            if cls.defaultStyleName in humanizationStyleNameList:
                 styleAsString = \
-                    humanizationStyleNameToTextMap[cls._defaultStyleName]
+                    humanizationStyleNameToTextMap[cls.defaultStyleName]
             else:
                 styleAsString = cls._defaultStyleAsString
 
         style = convertStringToMap(styleAsString)
         Logging.trace("--: style = %s", style)
                 
-        if len(style.keys()) != 3:
+        if len(style.keys()) != 2:
             Logging.trace("--: ERROR: bad humanization style string - %s",
                           style)
         else:
             self._name                       = styleName
-            self._introMeasureCount          = None
             self._beatToDirectionMap         = {}
             self._beatToTimeVariationMap     = {}
             self._beatToVelocityVariationMap = {}
@@ -429,37 +427,31 @@ class _HumanizationStyle:
                 Logging.trace("--: tagName = %s, tagValue = %s",
                               tagName, tagValue)
 
-                if tagName == "countIn":
-                    # count-in definition
-                    measureCount = int(tagValue)
-                    self._introMeasureCount = measureCount
-                    Logging.trace("--: count in = %d", measureCount)
-                else:
-                    # timing or velocity definition
-                    entryMap = tagValue
+                # timing or velocity definition
+                entryMap = tagValue
 
-                    for key, value in entryMap.items():
-                        Logging.trace("--: %s -> %s", key, value)
-                        direction = ""
+                for key, value in entryMap.items():
+                    Logging.trace("--: %s -> %s", key, value)
+                    direction = ""
 
-                        if tagName == "velocity":
-                            value = float(value)
-                            self._beatToVelocityVariationMap[key] = value
+                    if tagName == "velocity":
+                        value = float(value)
+                        self._beatToVelocityVariationMap[key] = value
+                    else:
+                        # timing may contain a direction indicator
+                        direction = value[0]
+
+                        if direction not in "AB":
+                            direction = ""
                         else:
-                            # timing may contain a direction indicator
-                            direction = value[0]
+                            value = value[1:]
 
-                            if direction not in "AB":
-                                direction = ""
-                            else:
-                                value = value[1:]
+                        value = float(value)
+                        self._beatToDirectionMap[key] = direction
+                        self._beatToTimeVariationMap[key] = value
 
-                            value = float(value)
-                            self._beatToDirectionMap[key] = direction
-                            self._beatToTimeVariationMap[key] = value
-
-                        Logging.trace("--: %s|%s -> %s%4.2f",
-                                      tagName, key, direction, value)
+                    Logging.trace("--: %s|%s -> %s%4.2f",
+                                  tagName, key, direction, value)
 
         Logging.trace("<<")
 
@@ -468,9 +460,9 @@ class _HumanizationStyle:
     def __repr__ (self):
         """Returns the string representation of <self>"""
 
-        st = ("_HumanizationStyle(%s, COUNTIN = %s,"
+        st = ("_HumanizationStyle(%s,"
               + " VELOCITY = %s, DIRECTIONS = %s, TIMING = %s)")
-        result = st % (self._name, self._introMeasureCount,
+        result = st % (self._name,
                        repr(self._beatToVelocityVariationMap),
                        repr(self._beatToDirectionMap),
                        repr(self._beatToTimeVariationMap))
@@ -542,6 +534,7 @@ class _Humanizer:
        note-on/note-off event as well as the timing of other events."""
 
     _quartersPerMeasure = None
+    _countInMeasureCount = 0
     
     #--------------------
 
@@ -584,10 +577,11 @@ class _Humanizer:
 
         cls = self.__class__
         result = None
-        style = self._style
-        timeAsString = str(time) 
+        timeAsString = str(time)
+        effectiveMeasureIndex = time.measure() - cls._countInMeasureCount
+        style = self._styleForMeasure(effectiveMeasureIndex)
 
-        if time.measure() <= style._introMeasureCount:
+        if effectiveMeasureIndex <= 0:
             # leave as is, because those measures are count-ins
             result = time
         elif timeAsString in self._timeToAdjustedTimeMap:
@@ -633,9 +627,10 @@ class _Humanizer:
 
         cls = self.__class__
         result = None
-        style = self._style
+        effectiveMeasureIndex = time.measure() - cls._countInMeasureCount
+        style = self._styleForMeasure(effectiveMeasureIndex)
 
-        if time.measure() <= style._introMeasureCount:
+        if effectiveMeasureIndex <= 0:
             # leave as is, because those measures are count-ins
             result = velocity
         else:
@@ -900,15 +895,34 @@ class _Humanizer:
         return result
 
     #--------------------
+
+    def _styleForMeasure (self, measureIndex):
+        """Returns style that is valid at given <measureIndex>"""
+
+        if measureIndex in self._measureToHumanizationStyleMap:
+            result = self._measureToHumanizationStyleMap[measureIndex]
+        else:
+            if measureIndex > 1:
+                result = self._styleForMeasure(measureIndex - 1)
+            else:
+                styleName = _HumanizationStyle.defaultStyleName
+                result = _HumanizationStyle(styleName)
+
+            self._measureToHumanizationStyleMap[measureIndex] = result
+
+        return result
+
+    #--------------------
     # EXPORTED FEATURES
     #--------------------
 
     @classmethod
-    def initialize (cls, quartersPerMeasure):
-        """Sets value for <quartersPerMeasure>"""
+    def initialize (cls, quartersPerMeasure, countInMeasureCount):
+        """Sets value for <quartersPerMeasure> and <countInMeasureCount>"""
 
         Logging.trace(">>: qpm = %d", quartersPerMeasure)
-        cls._quartersPerMeasure = quartersPerMeasure
+        cls._quartersPerMeasure  = quartersPerMeasure
+        cls._countInMeasureCount = countInMeasureCount
         MyRandom.initialize()
         Logging.trace("<<")
     
@@ -929,8 +943,8 @@ class _Humanizer:
 
         Logging.trace(">>")
 
-        self._style  = None
-        self._eventList = None
+        self._measureToHumanizationStyleMap = {}
+        self._eventList                     = []
 
         # the following map takes a simplified track name (like
         # keyboard) and associates a midi time to shifted time map to
@@ -946,19 +960,21 @@ class _Humanizer:
 
     #--------------------
 
-    def process (self, trackName, lineList, humanizationStyle):
-        """Humanizes MIDI event <lineList> with <humanizationStyle>
-           and returns resulting event line list."""
+    def process (self, trackName, lineList, measureToHumanizationStyleMap):
+        """Humanizes MIDI event <lineList> based on map
+           <measureToHumanizationStyleMap> from measure to style
+           name and returns resulting event line list"""
 
-        Logging.trace(">>: trackName = %s", trackName)
+        Logging.trace(">>: trackName = %s, measureToStyleMap = %s",
+                      trackName, measureToHumanizationStyleMap)
 
         cls = self.__class__
         canonicalTrackName = cls._findCanonicalTrackName(trackName)
-        self._style = humanizationStyle
+
         self._eventList = []
+        self._measureToHumanizationStyleMap = measureToHumanizationStyleMap
         self._timeToAdjustedTimeMap = \
             self._canonicalTrackNameToTimingMap.get(canonicalTrackName, {})
-        
         self._convertToEventList(lineList)
         self._processEventList(trackName)
         self._canonicalTrackNameToTimingMap[canonicalTrackName] = \
@@ -993,6 +1009,7 @@ class MidiTransformer:
 
     _channelReferenceRegExp = re.compile(r" ch=(\d+)")
     _parameterChangeRegExp  = re.compile(r" Par ")
+    _volumeChangeRegExp     = re.compile(r" Par .* c=7 ")
     _programChangeRegExp    = re.compile(r" PrCh ")
     _trackBeginRegExp       = re.compile(r"MTrk")
     _trackEndRegExp         = re.compile(r"TrkEnd")
@@ -1044,14 +1061,17 @@ class MidiTransformer:
 
     #--------------------
 
-    def _humanizeTrack (self, humanizer, trackName, style,
+    def _humanizeTrack (self, humanizer, trackName,
+                        measureToHumanizationStyleMap,
                         trackLineList, lineList):
-        """Humanizes entries in <trackLineList> by <style> and
-           appends them to <lineList>"""
+        """Humanizes entries in <trackLineList> by
+           <measureToHumanizationStyleMap> and appends them to
+           <lineList>"""
 
-        Logging.trace(">>: style = %s", str(style))
+        Logging.trace(">>: measureToStyleMap = %s",
+                      measureToHumanizationStyleMap)
         processedLineList = humanizer.process(trackName, trackLineList,
-                                              style)
+                                              measureToHumanizationStyleMap)
         lineList.extend(processedLineList)
         Logging.trace("<<")
         
@@ -1396,16 +1416,23 @@ class MidiTransformer:
 
     #--------------------
 
-    def humanizeTracks (self, styleName):
-        """Adapts instrument tracks in <self> to emulate a human
-           player based on style given by <styleName>"""
+    def humanizeTracks (self, countInMeasureCount,
+                        measureToHumanizationStyleNameMap):
+        """Adapts instrument tracks in <self> to emulate a human player based
+           on style given by <measureToHumanizationStyleNameMap>"""
 
-        Logging.trace(">>: style = %s", styleName)
+        Logging.trace(">>: countIn = %s, styleMap = %s",
+                      countInMeasureCount, measureToHumanizationStyleNameMap)
 
         cls = self.__class__
-        humanizationStyle = _HumanizationStyle(styleName)
 
-        if humanizationStyle is not None:
+        if len(measureToHumanizationStyleNameMap) > 0:
+            measureToHumanizationStyleMap = {}
+
+            for measure, styleName in measureToHumanizationStyleNameMap.items():
+                style = _HumanizationStyle(styleName)
+                measureToHumanizationStyleMap[measure] = style
+
             # enumeration for kind of some track
             TrackKind_unknown    = 0
             TrackKind_instrument = 1
@@ -1442,7 +1469,8 @@ class MidiTransformer:
                         Logging.trace("--: qpm = %d", quartersPerMeasure)
                         _MusicTime.initialize(ticksPerQuarterNote,
                                               quartersPerMeasure)
-                        _Humanizer.initialize(quartersPerMeasure)
+                        _Humanizer.initialize(quartersPerMeasure,
+                                              countInMeasureCount)
                     elif cls._trackEndRegExp.match(currentLine):
                         if trackKind != TrackKind_instrument:
                             Logging.trace("--: other track end")
@@ -1453,7 +1481,7 @@ class MidiTransformer:
                             trackLineList = lineBuffer.lineList()
                             lineBuffer.clear()
                             self._humanizeTrack(humanizer, trackName,
-                                                humanizationStyle,
+                                                measureToHumanizationStyleMap,
                                                 trackLineList, lineList)
                     elif cls._trackNameRegExp.search(currentLine):
                         matchResult = cls._trackNameRegExp.search(currentLine)
@@ -1492,3 +1520,27 @@ class MidiTransformer:
 
         Logging.trace("<<")
         
+    #--------------------
+
+    def removeVolumeChanges (self):
+        """Analyzes tracks and kicks out midi volume changes"""
+
+        Logging.trace(">>")
+
+        cls = self.__class__
+        lineList = []
+        lineBuffer = _LineBuffer(lineList)
+        
+        for currentLine in self._lineList:
+            Logging.trace("--: #%s", currentLine)
+
+            if cls._volumeChangeRegExp.search(currentLine):
+                Logging.trace("--: skipped volume change")
+            else:
+                lineBuffer.writeLine(currentLine)
+
+        lineBuffer.flush()
+        self._lineList = lineList
+
+        Logging.trace("<<")
+

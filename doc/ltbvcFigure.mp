@@ -22,7 +22,7 @@ def arrowPath (suffix a, b)(expr linePath)(expr lineColor)(expr isDotted) =
 
   if isDotted:
     drawarrow currentPath dashed withdots withcolor lineColor
-        withpen pencircle scaled 1pt;
+        withpen pencircle scaled 1.5pt;
   else:
     drawarrow currentPath dashed evenly withcolor lineColor
         withpen pencircle scaled 1pt;
@@ -67,14 +67,88 @@ def addSupport (suffix a, b) =
   intermediatePointB = (xpart b.c, ypart a.n);
   currentPath := a.c .. intermediatePointA .. intermediatePointB
                  .. tension 4 .. {up}b.c;
-  arrowPath(a, b, currentPath, 0.7white, true);
+  arrowPath(a, b, currentPath, 0.5red, true);
+enddef;
+
+%========================================
+
+def drawDottedLine (expr startPosition)(expr lineVector) =
+  % draws a dotted line from <startPosition> with direction <lineVector>
+
+  pair endPosition;
+
+  endPosition := startPosition + lineVector;
+  draw startPosition -- endPosition dashed withdots
+    withpen pencircle scaled 1.5pt;
+enddef;
+
+%========================================
+
+def drawLabel (expr position)(expr alignment)(expr size)(text st) =
+  % draws text <st> at <position> with <alignment>
+
+  if alignment = "center":
+    label(st infont defaultfont scaled size, position);
+  elseif alignment = "left":
+    label.lft(st infont defaultfont scaled size, position);
+  elseif alignment = "right":
+    label.rt(st infont defaultfont scaled size, position);
+  fi
+enddef;
+
+%========================================
+
+def drawMarker (expr startPosition)(expr markerLength)
+               (expr arrowLength)(text direction) =
+  % draws a marker line at <startPosition> with <markerLength> and an
+  % arrow in <direction> with length <arrowLength>
+
+  pair arrowStartPosition, arrowEndPosition;
+  pair markerOffset, arrowOffset;
+  pair markerEndPosition;
+  
+  if direction = "H":
+    arrowOffset  := (arrowLength, 0);
+    markerOffset := (0, markerLength);
+  else:
+    arrowOffset  := (0, arrowLength);
+    markerOffset := (markerLength, 0);
+  fi
+
+  markerEndPosition := startPosition + markerOffset;
+  draw startPosition -- markerEndPosition dashed evenly;
+
+  arrowEndPosition   := 1/2[startPosition, markerEndPosition];
+  arrowStartPosition := arrowEndPosition + arrowOffset;
+  drawarrow arrowStartPosition -- arrowEndPosition;
+enddef;
+
+%========================================
+
+def drawMarkerPair (expr startPosition)(expr vector)(expr markerLength)
+                   (expr arrowLength)(text direction) =
+  % draws two markers at <startPosition> and <endPosition> with
+  % <markerLength> and an arrow in <direction> with length
+  % <arrowLength>
+
+  pair endPosition, positionOffset;
+
+  if direction = "H":
+    positionOffset := (xpart vector, 0);
+  else:
+    positionOffset := (0, ypart vector);
+  fi
+
+  endPosition := startPosition + positionOffset;
+  drawMarker(startPosition, markerLength, arrowLength,  direction);
+  drawMarker(endPosition,   markerLength, -arrowLength, direction);
 enddef;
 
 %========================================
 % Phase Or File Boxes
 %========================================
 
-def POFBox_make (suffix shape)(expr kind)(expr text) =
+def Box_make (suffix shape)(expr kind)(expr text) =
   % makes a box for phases or files called <shape> with background
   % filled with <text>
 
@@ -89,7 +163,7 @@ enddef;
 
 %========================================
 
-def POFBox_setSizeAndColor (suffix shape)(expr size)(expr fillColor) =
+def Box_setSizeAndColor (suffix shape)(expr size)(expr fillColor) =
   % defines size of <shape> to be <size> and fill color to be
   % <fillColor>
 
@@ -99,39 +173,39 @@ enddef;
 
 %========================================
 
-def POFBox_makeAll =
+def Box_makeAll =
   % makes all processing box for phases and files
 
-  POFBox_make(fileLilypond, "F", btex \stkB{lilypond}{file} etex);
-  POFBox_make(fileConfig, "F", btex \stkB{configuration}{file} etex);
+  Box_make(fileLilypond, "F", btex \stkB{lilypond}{file} etex);
+  Box_make(fileConfig, "F", btex \stkB{configuration}{file} etex);
 
   % preprocessing phases
-  POFBox_make(phaseExtract, "P", btex extract etex);
-  POFBox_make(phaseScore, "P", btex score etex);
-  POFBox_make(phaseMidi, "P", btex midi etex);
-  POFBox_make(phaseSilentVideo, "P", btex silentvideo etex);
+  Box_make(phaseExtract, "P", btex extract etex);
+  Box_make(phaseScore, "P", btex score etex);
+  Box_make(phaseMidi, "P", btex midi etex);
+  Box_make(phaseSilentVideo, "P", btex silentvideo etex);
 
-  POFBox_make(fileExtract, "FM", btex \stkC{voice}{extract}{files} etex);
-  POFBox_make(fileScore, "F", btex \stkB{score}{file} etex);
-  POFBox_make(fileMidi, "F", btex \stkB{midi}{file} etex);
-  POFBox_make(fileSilentVideo, "FM", btex \stkC{silent}{video}{files} etex);
-  POFBox_make(fileSubtitleText, "F", btex \stkC{subtitle}{text}{file} etex);
+  Box_make(fileExtract, "FM", btex \stkC{voice}{extract}{files} etex);
+  Box_make(fileScore, "F", btex \stkB{score}{file} etex);
+  Box_make(fileMidi, "F", btex \stkB{midi}{file} etex);
+  Box_make(fileSilentVideo, "FM", btex \stkC{silent}{video}{files} etex);
+  Box_make(fileSubtitleText, "F", btex \stkC{subtitle}{text}{file} etex);
 
   % postprocessing phases
-  POFBox_make(phaseRawAudio, "P", btex rawaudio etex);
-  POFBox_make(phaseRefinedAudio, "P", btex refinedaudio etex);
-  POFBox_make(phaseMixdown, "P", btex mixdown etex);
-  POFBox_make(phaseFinalVideo, "P", btex finalvideo etex);
+  Box_make(phaseRawAudio, "P", btex rawaudio etex);
+  Box_make(phaseRefinedAudio, "P", btex refinedaudio etex);
+  Box_make(phaseMixdown, "P", btex mixdown etex);
+  Box_make(phaseFinalVideo, "P", btex finalvideo etex);
 
-  POFBox_make(fileRawAudio, "FM", btex \stkC{raw}{audio}{files} etex);
-  POFBox_make(fileRefinedAudio, "FM", btex \stkC{refined}{audio}{files} etex);
-  POFBox_make(fileAudio, "FM", btex \stkC{mix}{audio}{files} etex);
-  POFBox_make(fileVideo, "FM", btex \stkB{video}{files} etex);
+  Box_make(fileRawAudio, "FM", btex \stkC{raw}{audio}{files} etex);
+  Box_make(fileRefinedAudio, "FM", btex \stkC{refined}{audio}{files} etex);
+  Box_make(fileAudio, "FM", btex \stkC{mix}{audio}{files} etex);
+  Box_make(fileVideo, "FM", btex \stkB{video}{files} etex);
 enddef;
 
 %========================================
 
-def POFBox_setBoxPositions (text shapeList)(expr startPosition)(expr offset) =
+def Box_setBoxPositions (text shapeList)(expr startPosition)(expr offset) =
   % sets positions for shapes in <shapeList> starting at
   % <startPosition> with <offset>
 
@@ -147,21 +221,21 @@ enddef;
 
 %========================================
 
-def POFBox_setPostprocessingBoxes (expr startPosition) =
+def Box_setPostprocessingBoxes (expr startPosition) =
   % sets up the position and size of postprocessing phases and extracts
 
-  POFBox_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+  Box_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMixdown,
                          phaseFinalVideo)
-                        (startPosition, POFBox_phaseOffsetVector);
+                        (startPosition, Box_phaseOffsetVector);
 
-  POFBox_setBoxPositions(fileRawAudio, fileRefinedAudio, fileAudio, fileVideo)
-                        (phaseRawAudio.c + POFBox_resultOffsetVector,
-                         POFBox_phaseOffsetVector)
+  Box_setBoxPositions(fileRawAudio, fileRefinedAudio, fileAudio, fileVideo)
+                        (phaseRawAudio.c + Box_resultOffsetVector,
+                         Box_phaseOffsetVector)
 enddef;
 
 %========================================
 
-def POFBox_setPostprocessingEdges =
+def Box_setPostprocessingEdges =
   % sets up the edges of postprocessing phases and extracts
 
   addForwardFlow(fileMidi,          phaseRawAudio);
@@ -178,22 +252,22 @@ enddef;
 
 %========================================
 
-def POFBox_setPreprocessingBoxes (expr startPosition) =
+def Box_setPreprocessingBoxes (expr startPosition) =
   % sets up the position and size of preprocessing phases and extracts
 
-  POFBox_setBoxPositions(phaseExtract, phaseScore, phaseMidi, phaseSilentVideo)
-                        (startPosition, POFBox_phaseOffsetVector);
+  Box_setBoxPositions(phaseExtract, phaseScore, phaseMidi, phaseSilentVideo)
+                        (startPosition, Box_phaseOffsetVector);
   
-  POFBox_setBoxPositions(fileExtract, fileScore, fileMidi, fileSilentVideo)
-                        (phaseExtract.c + POFBox_resultOffsetVector,
-                         POFBox_phaseOffsetVector);
+  Box_setBoxPositions(fileExtract, fileScore, fileMidi, fileSilentVideo)
+                        (phaseExtract.c + Box_resultOffsetVector,
+                         Box_phaseOffsetVector);
 
-  fileSubtitleText.c = fileSilentVideo.c + (0, ypart POFBox_phaseOffsetVector);
+  fileSubtitleText.c = fileSilentVideo.c + (0, ypart Box_phaseOffsetVector);
 enddef;
 
 %========================================
 
-def POFBox_setPreprocessingEdges =
+def Box_setPreprocessingEdges =
   % sets up the edges of preprocessing phases and extracts
 
   forsuffixes shape = phaseExtract, phaseScore, phaseMidi, phaseSilentVideo:
@@ -211,20 +285,20 @@ enddef;
 % Configuration
 %========================================
 
-pair POFBox_fileBoxSize, POFBox_phaseBoxSize;
-pair POFBox_phaseOffsetVector, POFBox_resultOffsetVector;
-color POFBox_fileFillColor, POFBox_configFileFillColor;
-color POFBox_lilypondFileFillColor;
-color POFBox_phaseFillColor;
+pair Box_fileBoxSize, Box_phaseBoxSize;
+pair Box_phaseOffsetVector, Box_resultOffsetVector;
+color Box_fileFillColor, Box_configFileFillColor;
+color Box_lilypondFileFillColor;
+color Box_phaseFillColor;
 
-POFBox_configFileFillColor   := (0.8,  0.85, 0.8 );
-POFBox_lilypondFileFillColor := (0.8,  0.8,  0.85);
-POFBox_fileFillColor      := (1.0, 1.0, 0.75);
-POFBox_fileBoxSize        := (20mm, 15mm);
-POFBox_phaseFillColor     := (0.9, 0.8, 0.9);
-POFBox_phaseBoxSize       := (20mm, 15mm);
-POFBox_phaseOffsetVector  := (12mm, -20mm);
-POFBox_resultOffsetVector := (30mm,   0mm);
+Box_configFileFillColor   := (0.8,  0.85, 0.8 );
+Box_lilypondFileFillColor := (0.8,  0.8,  0.85);
+Box_fileFillColor      := (1.0, 1.0, 0.75);
+Box_fileBoxSize        := (20mm, 15mm);
+Box_phaseFillColor     := (0.9, 0.8, 0.9);
+Box_phaseBoxSize       := (20mm, 15mm);
+Box_phaseOffsetVector  := (12mm, -20mm);
+Box_resultOffsetVector := (30mm,   0mm);
 
 %========================================
 %========================================
@@ -232,34 +306,34 @@ beginfig(1);
   color fillColor;
   pair configBoxSize;
 
-  POFBox_makeAll;
+  Box_makeAll;
 
   fileLilypond.w = (0mm, 80mm);
   fileConfig.w   = (40mm,  15mm);
   configBoxSize := (135mm, 15mm);
-  POFBox_setSizeAndColor(fileLilypond, POFBox_fileBoxSize,
-                         POFBox_lilypondFileFillColor);
-  POFBox_setSizeAndColor(fileConfig, configBoxSize,
-                         POFBox_configFileFillColor);
+  Box_setSizeAndColor(fileLilypond, Box_fileBoxSize,
+                         Box_lilypondFileFillColor);
+  Box_setSizeAndColor(fileConfig, configBoxSize,
+                         Box_configFileFillColor);
 
-  POFBox_setPreprocessingBoxes((45mm, 120mm));
-  POFBox_setPostprocessingBoxes(phaseExtract.c + (90mm, 0mm));
+  Box_setPreprocessingBoxes((45mm, 120mm));
+  Box_setPostprocessingBoxes(phaseExtract.c + (90mm, 0mm));
 
   forsuffixes shape = fileExtract, fileScore, fileMidi, fileSilentVideo,
                       fileSubtitleText,
                       fileRawAudio, fileRefinedAudio, fileAudio, fileVideo:
-    POFBox_setSizeAndColor(shape, POFBox_fileBoxSize, POFBox_fileFillColor);
+    Box_setSizeAndColor(shape, Box_fileBoxSize, Box_fileFillColor);
   endfor
 
   forsuffixes shape = phaseExtract, phaseScore, phaseMidi, phaseSilentVideo,
                       phaseRawAudio, phaseRefinedAudio, phaseMixdown,
                       phaseFinalVideo:
-    POFBox_setSizeAndColor(shape, POFBox_phaseBoxSize, POFBox_phaseFillColor);
+    Box_setSizeAndColor(shape, Box_phaseBoxSize, Box_phaseFillColor);
   endfor
 
   % --- add all edges ---
-  POFBox_setPreprocessingEdges;
-  POFBox_setPostprocessingEdges;
+  Box_setPreprocessingEdges;
+  Box_setPostprocessingEdges;
   
   forsuffixes shape = phaseExtract, phaseScore, phaseMidi, phaseSilentVideo,
                       phaseRawAudio, phaseRefinedAudio, phaseMixdown,
@@ -281,28 +355,28 @@ beginfig(2);
   color fillColor;
   pair configBoxSize;
 
-  POFBox_makeAll;
+  Box_makeAll;
 
   fileLilypond.w = (0mm, 80mm);
   fileConfig.w   = (40mm,  15mm);
   configBoxSize := (50mm, 15mm);
-  POFBox_setSizeAndColor(fileLilypond, POFBox_fileBoxSize,
-                         POFBox_lilypondFileFillColor);
-  POFBox_setSizeAndColor(fileConfig, configBoxSize, POFBox_configFileFillColor);
+  Box_setSizeAndColor(fileLilypond, Box_fileBoxSize,
+                         Box_lilypondFileFillColor);
+  Box_setSizeAndColor(fileConfig, configBoxSize, Box_configFileFillColor);
 
-  POFBox_setPreprocessingBoxes((45mm, 120mm));
+  Box_setPreprocessingBoxes((45mm, 120mm));
 
   forsuffixes shape = fileExtract, fileScore, fileMidi, fileSilentVideo,
                       fileSubtitleText:
-    POFBox_setSizeAndColor(shape, POFBox_fileBoxSize, POFBox_fileFillColor);
+    Box_setSizeAndColor(shape, Box_fileBoxSize, Box_fileFillColor);
   endfor
 
   forsuffixes shape = phaseExtract, phaseScore, phaseMidi, phaseSilentVideo:
-    POFBox_setSizeAndColor(shape, POFBox_phaseBoxSize, POFBox_phaseFillColor);
+    Box_setSizeAndColor(shape, Box_phaseBoxSize, Box_phaseFillColor);
   endfor
 
   % --- add all edges ---
-  POFBox_setPreprocessingEdges;
+  Box_setPreprocessingEdges;
   
   forsuffixes shape = phaseExtract, phaseScore, phaseMidi, phaseSilentVideo:
     addSupport(fileConfig, shape);
@@ -319,31 +393,31 @@ beginfig(3);
   color fillColor;
   pair configBoxSize;
 
-  POFBox_makeAll;
+  Box_makeAll;
 
   fileConfig.w  = (40mm,  15mm);
   configBoxSize := (60mm, 15mm);
-  POFBox_setSizeAndColor(fileConfig, configBoxSize,
-                         POFBox_configFileFillColor);
+  Box_setSizeAndColor(fileConfig, configBoxSize,
+                         Box_configFileFillColor);
 
-  POFBox_setBoxPositions(fileMidi, fileSilentVideo)
-                         ((20mm, 90mm), POFBox_phaseOffsetVector);
-  fileSubtitleText.c = fileSilentVideo.c + (0, ypart POFBox_phaseOffsetVector);
+  Box_setBoxPositions(fileMidi, fileSilentVideo)
+                         ((20mm, 90mm), Box_phaseOffsetVector);
+  fileSubtitleText.c = fileSilentVideo.c + (0, ypart Box_phaseOffsetVector);
   
-  POFBox_setPostprocessingBoxes(fileMidi.c + (40mm, 20mm));
+  Box_setPostprocessingBoxes(fileMidi.c + (40mm, 20mm));
 
   forsuffixes shape = fileMidi, fileSilentVideo, fileSubtitleText,
                       fileRawAudio, fileRefinedAudio, fileAudio, fileVideo:
-    POFBox_setSizeAndColor(shape, POFBox_fileBoxSize, POFBox_fileFillColor);
+    Box_setSizeAndColor(shape, Box_fileBoxSize, Box_fileFillColor);
   endfor
 
   forsuffixes shape = phaseRawAudio, phaseRefinedAudio, phaseMixdown,
                       phaseFinalVideo:
-    POFBox_setSizeAndColor(shape, POFBox_phaseBoxSize, POFBox_phaseFillColor);
+    Box_setSizeAndColor(shape, Box_phaseBoxSize, Box_phaseFillColor);
   endfor
 
   % --- add all edges ---
-  POFBox_setPostprocessingEdges;
+  Box_setPostprocessingEdges;
   
   forsuffixes shape = phaseRawAudio, phaseRefinedAudio, phaseMixdown,
                       phaseFinalVideo:
@@ -355,6 +429,72 @@ beginfig(3);
             phaseRawAudio, phaseRefinedAudio, phaseMixdown,
             phaseFinalVideo, fileRawAudio, fileRefinedAudio,
             fileAudio, fileVideo);
+endfig;
+
+%========================================
+beginfig(4);
+  pair lineOffset, lineVector;
+  pair marginOffset, markerLengthVector, markerPosition;
+  pair videoTargetSize;
+  numeric markerLength, arrowLength;
+  numeric labelScaleFactor;
+
+  videoTargetSize    := (50mm, 28mm);
+  marginOffset       := (5mm, 4mm);
+  markerLengthVector := (10mm, 5mm);
+  labelScaleFactor   := 0.75;
+
+  Box_make(videoTarget, "F", "");
+  Box_setSizeAndColor(videoTarget, videoTargetSize, white);
+  drawboxed(videoTarget);
+  drawLabel(1/2[videoTarget.c, videoTarget.s], "center", 1.25,
+            "VIDEO TARGET");
+
+  lineOffset := (xpart marginOffset, 0);
+  lineVector := (0, ypart videoTargetSize);
+  drawDottedLine(videoTarget.sw + lineOffset, lineVector);
+  drawDottedLine(videoTarget.se - lineOffset, lineVector);
+  lineOffset := (0, ypart marginOffset);
+  lineVector := (xpart videoTargetSize, 0);
+  drawDottedLine(videoTarget.sw + lineOffset, lineVector);
+  drawDottedLine(videoTarget.nw - lineOffset, lineVector);
+
+  arrowLength := xpart videoTargetSize / 4;
+  markerLength := -ypart markerLengthVector;
+  drawMarkerPair(videoTarget.sw, videoTargetSize, markerLength,
+                 arrowLength, "H");
+  drawLabel(videoTarget.s + (0, markerLength)/2, "center", labelScaleFactor,
+            "width");
+
+  markerLength := ypart markerLengthVector;
+  arrowLength  := xpart marginOffset / 2;
+  markerPosition := videoTarget.nw + (xpart marginOffset, 0);
+  drawMarkerPair(markerPosition, -marginOffset, markerLength, arrowLength, "H");
+  drawMarkerPair(videoTarget.ne, -marginOffset, markerLength, arrowLength, "H");
+  drawLabel(videoTarget.n + (0, markerLength)/2, "center", labelScaleFactor,
+            "leftRightMargin");
+
+  arrowLength := ypart videoTargetSize / 4;
+  markerLength := xpart markerLengthVector;
+  drawMarkerPair(videoTarget.se, videoTargetSize, markerLength,
+                 arrowLength,  "V");
+  drawLabel(videoTarget.e + (markerLength, 0)/2, "center", labelScaleFactor,
+            "height");
+
+  markerLength := -xpart markerLengthVector;
+  arrowLength  := ypart marginOffset / 2;
+  markerPosition := videoTarget.sw + (0, ypart marginOffset);
+  drawMarkerPair(markerPosition, -marginOffset, markerLength, arrowLength, "V");
+  drawMarkerPair(videoTarget.nw, -marginOffset, markerLength, arrowLength, "V");
+  drawLabel(videoTarget.w, "left", labelScaleFactor, "topBottomMargin");
+
+  markerLength := 1mm;
+  arrowLength  := 2mm;
+  markerPosition := 1/2[videoTarget.c, videoTarget.n];
+  drawMarkerPair(markerPosition, -(1mm, 0), markerLength, arrowLength, "H");
+  drawLabel(markerPosition - (0, 2markerLength), "center", labelScaleFactor,
+            "resolution")
+  
 endfig;
 
 end

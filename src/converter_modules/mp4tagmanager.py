@@ -1,6 +1,10 @@
 # -*- coding: utf-8-unix -*-
 # mp4tagger -- services for tagging aac audio and mp4 video files
+#
+# author: Dr. Thomas Tensi, 2006 - 2017
 
+#====================
+# IMPORTS
 #====================
 
 from mutagen.mp4 import MP4, MP4Cover

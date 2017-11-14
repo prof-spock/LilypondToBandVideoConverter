@@ -2,11 +2,12 @@
 # lilypondFileGenerator -- generates a lilypond main file for several
 #                          parameters by inclusion of a structured lilypond
 #                          file with tracks
-#-----------------------
+#
+# author: Dr. Thomas Tensi, 2006 - 2017
 
-###########
-# IMPORTS #
-###########
+#====================
+# IMPORTS
+#====================
 
 import argparse
 import re

@@ -1,10 +1,14 @@
 # -*- coding: utf-8-unix -*-
-# makeLilypondAll -- script that produces lilypond files and target files
-#                    for single voices, a complete score, a midi file,
-#                    audio and video files based on a configuration file
-#                    from a lilypond music fragment file
+# ltbvc -- script that produces lilypond files and target files
+#          for single voices, a complete score, a midi file, audio and
+#          video files based on a configuration file from a lilypond
+#          music fragment file
 
-#--------------------
+# author: Dr. Thomas Tensi, 2006 - 2017
+
+#====================
+# IMPORTS
+#====================
 
 import argparse
 
@@ -12,8 +16,8 @@ from audiotrackmanager import AudioTrackManager
 from lilypondfilegenerator import LilypondFile
 from lilypondpngvideogenerator import LilypondPngVideoGenerator
 from ltbvc_businesstypes import TrackSettings
+from ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from miditransformer import MidiTransformer
-from mla_configurationdatahandler import MLA_ConfigurationData
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, convertStringToList, iif
@@ -619,7 +623,7 @@ def initialize ():
     argumentList = _CommandLineOptions.read()
     _CommandLineOptions.check(argumentList)
 
-    configData = MLA_ConfigurationData()
+    configData = LTBVC_ConfigurationData()
     configData.readFile(argumentList.configurationFilePath)
     loggingFilePath = configData.get("loggingFilePath")
     Logging.setFileName(loggingFilePath)

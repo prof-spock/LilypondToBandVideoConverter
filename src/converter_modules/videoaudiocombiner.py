@@ -1,7 +1,11 @@
 # -*- coding: utf-8-unix -*-
 # videoaudiocombiner -- services for combining silent video files with
 #                       audio tracks and measure counting subtitles
+#
+# author: Dr. Thomas Tensi, 2006 - 2017
 
+#====================
+# IMPORTS
 #====================
 
 import sys

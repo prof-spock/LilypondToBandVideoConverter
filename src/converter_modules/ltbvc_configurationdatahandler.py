@@ -1,7 +1,11 @@
 # -*- coding: utf-8-unix -*-
-# mla_overallsettings -- services for access to the global configuration
-#                        file of ltbvc
+# ltbvc_configurationdatahandler -- services for access to the global
+#                                   configuration file of ltbvc
+#
+# author: Dr. Thomas Tensi, 2006 - 2017
 
+#====================
+# IMPORTS
 #====================
 
 import datetime
@@ -1051,7 +1055,7 @@ class _LocalValidator:
 
 #====================
 
-class MLA_ConfigurationData:
+class LTBVC_ConfigurationData:
     """This class encapsulates the settings read from a configuration
        file like e.g. the global commands for ffmpeg, sox, etc. as
        well as file name templates and specifically the song

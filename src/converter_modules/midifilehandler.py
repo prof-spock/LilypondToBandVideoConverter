@@ -5,9 +5,12 @@
 # author: Dr. Thomas Tensi, 2017
 
 #====================
+# IMPORTS
+#====================
 
 from binascii import hexlify
 import math
+
 from operatingsystem import OperatingSystem
 from simpleassertion import Assertion
 from simplelogging import Logging

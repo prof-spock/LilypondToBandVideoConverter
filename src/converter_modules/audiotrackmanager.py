@@ -6,6 +6,8 @@
 # author: Dr. Thomas Tensi, 2006 - 2017
 
 #====================
+# IMPORTS
+#====================
 
 from configurationfile import ConfigurationFile
 from miditransformer import MidiTransformer

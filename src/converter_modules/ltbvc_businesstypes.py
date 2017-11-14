@@ -9,6 +9,8 @@
 #                          - VideoFileKind
 #                          - VideoTarget
 #                          - VoiceDescriptor
+#
+# author: Dr. Thomas Tensi, 2006 - 2017
 
 #====================
 # IMPORTS
@@ -18,8 +20,8 @@ from copy import deepcopy
 
 from regexppattern import RegExpPattern
 from simplelogging import Logging
-from ttbase import adaptToRange, convertStringToList, convertStringToMap, \
-                   iif2
+from ttbase import adaptToRange, convertStringToList, \
+                   convertStringToMap, iif2
 from validitychecker import ValidityChecker
 
 #====================

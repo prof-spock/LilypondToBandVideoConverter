@@ -4,8 +4,10 @@
 #                              track and generates MP4 video and
 #                              subtitle file
 #
-# author: Dr. Thomas Tensi, 2006 - 2016
+# author: Dr. Thomas Tensi, 2006 - 2017
 
+#====================
+# IMPORTS
 #====================
 
 import re

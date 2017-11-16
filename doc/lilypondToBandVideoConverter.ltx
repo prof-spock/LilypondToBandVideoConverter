@@ -360,6 +360,11 @@
   composer text to be shown in voice extracts and score
 }
 
+\newcommand{\DESCintermediateFileDirectoryPath}{%
+  path of directory where intermediate files go that are either used
+  for processing within a phase or as information between phases
+}
+
 \newcommand{\DESCkeepIntermediateFiles}{%
   boolean telling whether temporary files are kept
 }
@@ -427,8 +432,8 @@
 
 \newcommand{\DESCmidiPanList}{%
   list of pan positions per voice as a decimal value between 0 and 1
-  with suffix ``R'' (for right) or ``L'' (for left) or simply the
-  character ``C'' (for center)
+  with suffix ``R'' or ``L'' (for right/left) or the character ``C''
+  (for center)
 }
 
 \newcommand{\DESCmidiVoiceNameList}{%
@@ -908,7 +913,7 @@ incrementally.  Those phases have the following meanings:
 \end{ttDescription}
 
 \begin{centeredFigure}
-  \centeredExternalPicture{0.6}{dependencyDiagram.mps}
+  \centeredExternalPicture{0.55}{dependencyDiagram.mps}
   \caption{Dependencies between Generation Phases}
   \label{figure:phaseDependencies}
 \end{centeredFigure}
@@ -1437,10 +1442,19 @@ define file and path locations.  Very important is the path where the
 logging file \embeddedCode{ltvbc.log} is located: sometimes it is the
 only way to find out what went wrong.
 
+Temporary files go to \embeddedCode{intermediateFileDirectoryPath}.
+By default, all temp files go to the current directory and the
+phase-internal files are deleted at the end of a phase (but you can
+prevent that, see~\ref{section:debugging}).
+
 \begin{centeredFigure}
   \begin{variableDescriptionTableLong}
 
     \varDescriptionHeaderLong
+
+    \varDescriptionLong{intermediateFile\-DirectoryPath}
+               {\DESCintermediateFileDirectoryPath}
+               {"temp"}
 
     \varDescriptionLong{loggingFilePath}
                {\DESCloggingFilePath}
@@ -1475,6 +1489,7 @@ An example setting in the configuration file for file path
 configuration variables could look like that:
 
 \begin{configurationFileCode}
+  intermediateFileDirectoryPath = "temp"
   loggingFilePath = "/var/logs/ltbvc.log"
   soundFontDirectoryPath = "/usr/lib/soundfonts"
   soundFontNames = "FluidR3_GM.SF2, Ultimate_Drums.sf2"
@@ -1584,7 +1599,7 @@ generated that encapsulated the include lilypond file with the music
 and puts it through the notation typesetter \embeddedCode{lilypond}.
 
 \begin{centeredFigure}
-  \centeredExternalPicture{0.6}{preprocessingPhaseDependencies.mps}
+  \centeredExternalPicture{0.55}{preprocessingPhaseDependencies.mps}
   \caption{Information Flow for the Preprocessing Phases}
   \label{figure:preprecessingPhases}
 \end{centeredFigure}
@@ -1609,13 +1624,12 @@ but the ``midi'' and ``silentvideo'' phases do further processing:
 
 If you \emph{really} want to fiddle with lilypond, the processing
 phase is provided as the lilypond macro
-\embeddedCode{ltbvcProcessingPhase} and has values ``extract'',
-``score'', ``midi'' or ``silentvideo''.  You can use this for
-conditional processing, layout changes etc., because the file
-inclusion into the boilerplate file is done at a very late position.
-Be warned that the whole generation might fail, because the generator
-assumes that it has to handle a simple-structured lilypond include
-file.
+\embeddedCode{ltbvcProcessingPhase} with values ``extract'',
+``score'', ``midi'' or ``silentvideo''.  You can use that for
+conditional processing, layout changes etc., because the fragment file
+is included into the boilerplate file at a very late position.  Be
+warned that the whole generation might fail, because the generator
+assumes a simple-structured lilypond include file.
 
 %...................................................................
 \subsubsection{Notation Generation: ``extract'' and ``score'' Phase}
@@ -1641,8 +1655,8 @@ the audio volumes for phase ``mixdown'' in variable
 \end{configurationFileCode}
 
 associate ``vocals'' with volume 0.9, ``guitar'' with volume 0.7 etc.
-This is a poor man's table logic, but it works.  So it is fine to
-align the data in different entries with blanks.
+A simple table logic: and it is fine to align the data in different
+entries with blanks.
 
 The staff layout is specified by several variables that map voice
 names into several kinds of staff-related layout information.  Because
@@ -1675,9 +1689,9 @@ that are reused in the mapping from phase name
        " video   : " _voiceNameToStaffListMap "}"
 \end{configurationFileCode}
 
-Very often the different phases use exactly the identical definitions,
-hence the technique shown above is almost always fine, but you can
-have individual definitions per phase if necessary.  Note that only
+Very often the different phases use exactly identical definitions, so
+the technique shown above is often fine (with individual definitions
+per phase if necessary).  Note that only
 \embeddedCode{phaseAndVoiceNameToStaffListMap} is used by the
 generator, \embeddedCode{\_voiceNameToStaffListMap} is just an
 auxiliary variable.
@@ -1696,7 +1710,7 @@ Some replacement is done: if, for example, \meta{voice}MiddleExtract
 does not exist, \meta{voice}Middle and finally \meta{voice} are taken
 instead.
 
-So for a guitar with a tabulature the following definition in the
+So for a guitar with a tab the following definition in the
 configuration file is fine and it either reuses the
 \embeddedCode{guitar} macro in the lilypond file for both staffs or
 you can define special guitarTop/guitarBottom macros to differentiate:
@@ -2386,13 +2400,7 @@ targets that are used in the generation.
 
 All postprocessing phases rely on the configuration file, the
 generated midi file and the silent videos; the lilypond file is not
-used anymore.
-
-\begin{centeredFigure}
-  \centeredExternalPicture{0.6}{postprocessingPhaseDependencies.mps}
-  \caption{Information Flow for the Postprocessing Phases}
-  \label{figure:postprecessingPhases}
-\end{centeredFigure}
+used any longer.
 
 Figure~\ref{figure:postprecessingPhases} shows the connection between
 the inputs and the outputs for the phases.  Only the configuration
@@ -2424,6 +2432,12 @@ The following processing is done:
         video files with selectable audio tracks and either selectable
         or burnt in
 \end{ttDescription}
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.55}{postprocessingPhaseDependencies.mps}
+  \caption{Information Flow for the Postprocessing Phases}
+  \label{figure:postprecessingPhases}
+\end{centeredFigure}
 
 %........................................................................
 \subsubsection{Audio Generation: ``rawaudio'' and ``refinedaudio'' Phase}
@@ -3741,6 +3755,11 @@ been mentioned first in the current document.
                         {\DESChumanizedVoiceNameSet}
                         {empty}
                         {Humanization}
+
+    \varDescriptionFinal{intermediateFileDirectoryPath}
+                        {\DESCintermediateFileDirectoryPath}
+                        {"temp"}
+                        {Path}
 
     \varDescriptionFinal{keepIntermediateFiles}
                         {\DESCkeepIntermediateFiles}

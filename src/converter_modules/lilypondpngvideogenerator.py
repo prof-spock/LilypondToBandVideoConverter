@@ -33,6 +33,21 @@ displayTimePercentage = 0.95
 ffmpegLogLevel = "error"
 
 # ==== end of configuration settings ====
+#============================================================
+
+def _moveOrRemoveFile (fileName, fileIsKept, targetPath):
+    """removes file with <fileName> if <fileIsKept> is unset, otherwise
+       moves it to directory given by <targetPath>"""
+
+    Logging.trace(">>: fileName = '%s', isKept = %s, targetPath = '%s'",
+                  fileName, fileIsKept, targetPath)
+
+    if fileIsKept:
+        OperatingSystem.moveFile(fileName, targetPath)
+    else:
+        OperatingSystem.removeFile(fileName)
+
+    Logging.trace("<<")
 
 #============================================================
 
@@ -358,21 +373,25 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def cleanup (cls):
-        """Deletes all intermediate files."""
+    def cleanupOrMove (cls, filesAreKept, targetPath):
+        """Deletes all intermediate files if <filesAreKept> is unset,
+           otherwise moves them to directory given by <targetPath>"""
 
-        Logging.trace(">>")
+        Logging.trace(">>: filesAreKept = %s, targetPath = '%s'",
+                      filesAreKept, targetPath)
 
         for page in range(1, cls._pageCount + 1):
             Logging.trace("--: %d", page)
-            OperatingSystem.removeFile(cls._intermediateFileNameTemplate
-                                       % page)
-            OperatingSystem.removeFile(cls._pageFileNameTemplate % page)
+            fileName = cls._intermediateFileNameTemplate % page
+            _moveOrRemoveFile(fileName, filesAreKept, targetPath)
+            fileName = cls._pageFileNameTemplate % page
+            _moveOrRemoveFile(fileName, filesAreKept, targetPath)
 
-        OperatingSystem.removeFile(cls._concatSpecificationFileName)
+        _moveOrRemoveFile(cls._concatSpecificationFileName,
+                          filesAreKept, targetPath)
 
         if cls.fileName and cls.fileName == cls._tempFileName:
-            OperatingSystem.removeFile(cls.fileName)
+            _moveOrRemoveFile(cls.fileName, filesAreKept, targetPath)
 
         Logging.trace("<<")
 
@@ -519,13 +538,14 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def cleanup (cls):
-        """Cleans up subtitle data."""
+    def cleanupOrMove (cls, filesAreKept, targetPath):
+        """Cleans up subtitle file if <filesAreKept> is unset,
+           otherwise moves it to directory given by <targetPath>"""
 
         Logging.trace(">>")
 
         if cls.fileName == cls._tempFileName:
-            OperatingSystem.removeFile(cls.fileName)
+            _moveOrRemoveFile(cls.fileName, filesAreKept, targetPath)
 
         Logging.trace("<<")
 
@@ -631,36 +651,40 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self, lilypondFileName, targetMp4FileName,
                   targetSubtitleFileName, measureToTempoMap, countInMeasures,
-                  frameRate, scalingFactor, intermediateFilesAreKept=False):
+                  frameRate, scalingFactor, intermediateFileDirectoryPath,
+                  intermediateFilesAreKept=False):
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = '%s', targetMp4FileName = '%s',"
                       + " targetSubtitleFileName = '%s',"
                       + " measureToTempoMap = %s, countInMeasures = %s,"
                       + " frameRate = %s, scalingFactor = %d,"
+                      + " intermediateFileDirectoryPath = %s,"
                       + " intermediateFilesAreKept = %s",
                       lilypondFileName, targetMp4FileName,
                       targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
+                      intermediateFileDirectoryPath,
                       intermediateFilesAreKept)
 
-        self._ffmpegCommand            = ffmpegCommand
-        self._lilypondCommand          = lilypondCommand
+        self._ffmpegCommand                  = ffmpegCommand
+        self._lilypondCommand                = lilypondCommand
 
         # files
-        self._lilypondFileName         = lilypondFileName
-        self._pictureFileStem          = "temp_frame"
-        self._postscriptFileName       = self._pictureFileStem + ".ps"
-        self._targetMp4FileName        = targetMp4FileName
-        self._targetSubtitleFileName   = targetSubtitleFileName
-        self._measureToTempoMap        = measureToTempoMap
+        self._lilypondFileName               = lilypondFileName
+        self._pictureFileStem                = "temp_frame"
+        self._postscriptFileName             = self._pictureFileStem + ".ps"
+        self._targetMp4FileName              = targetMp4FileName
+        self._targetSubtitleFileName         = targetSubtitleFileName
+        self._measureToTempoMap              = measureToTempoMap
 
         # video parameters
-        self._countInMeasures          = countInMeasures
-        self._frameRate                = frameRate
-        self._scaleFactor              = scalingFactor
+        self._countInMeasures                = countInMeasures
+        self._frameRate                      = frameRate
+        self._scaleFactor                    = scalingFactor
 
-        self._intermediateFilesAreKept = intermediateFilesAreKept
+        self._intermediateFilesAreKept      = intermediateFilesAreKept
+        self._intermediateFileDirectoryPath = intermediateFileDirectoryPath
 
         # -- initialize other modules
         self._initializeOtherModuleData()
@@ -681,26 +705,30 @@ class LilypondPngVideoGenerator:
                    + " postscriptFileName = '%s', targetMp4FileName = '%s',"
                    + " targetSubtitleFileName = '%s',"
                    + " measureToTempoMap = %s, countInMeasures = %s,"
-                   + " frameRate = %s, intermediateFilesAreKept = %s)") %
+                   + " frameRate = %s, intermediateFileDirectoryPath = %s,"
+                   + " intermediateFilesAreKept = %s)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
                    self._postscriptFileName, self._targetMp4FileName,
                    self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
+                   self._intermediateFileDirectoryPath,
                    self._intermediateFilesAreKept))
         return result
 
     #--------------------
 
-    def cleanup (self):
+    def cleanupOrMove (self):
         """Deletes all intermediate files."""
 
         Logging.trace(">>")
 
-        if not self._intermediateFilesAreKept:
-            OperatingSystem.removeFile(self._postscriptFileName)
-            MP4Video.cleanup()
-            SubtitleFile.cleanup()
+        filesAreKept = self._intermediateFilesAreKept
+        targetPath   = self._intermediateFileDirectoryPath
+
+        _moveOrRemoveFile(self._postscriptFileName, filesAreKept, targetPath)
+        MP4Video.cleanupOrMove(filesAreKept, targetPath)
+        SubtitleFile.cleanupOrMove(filesAreKept, targetPath)
         
         Logging.trace("<<")
 

@@ -153,6 +153,7 @@ class _LilypondProcessor:
 
     _lilypondCommand = None
     _midiFileNameTemplate = "%s-std.mid"
+    _pathSeparator = OperatingSystem.pathSeparator
 
     #--------------------
     # LOCAL FEATURES
@@ -389,7 +390,9 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
-        tempLilypondFilePath = configData.tempLilypondFilePath
+        tempLilypondFilePath = (configData.intermediateFileDirectoryPath
+                                + cls._pathSeparator
+                                + configData.tempLilypondFilePath)
         lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(configData.includeFilePath, "midi",
                               configData.midiVoiceNameList, configData.title,
@@ -400,7 +403,9 @@ class _LilypondProcessor:
                               configData.phaseAndVoiceNameToClefMap,
                               configData.phaseAndVoiceNameToStaffListMap)
 
-        tempMidiFileNamePrefix = configData.fileNamePrefix + "-temp"
+        tempMidiFileNamePrefix = (configData.intermediateFileDirectoryPath
+                                  + cls._pathSeparator
+                                  + configData.fileNamePrefix + "-temp")
         tempMidiFileName = tempMidiFileNamePrefix + ".mid"
         targetMidiFileName = (cls._midiFileNameTemplate
                               % configData.fileNamePrefix)
@@ -529,6 +534,8 @@ class _LilypondProcessor:
 
         mmPerInch = 25.4
         intermediateFilesAreKept = configData.intermediateFilesAreKept
+        intermediateFileDirectoryPath = \
+            configData.intermediateFileDirectoryPath
         targetSubtitleFileName = (subtitleFileNameTemplate
                                   % configData.fileNamePrefix)
         tempLilypondFilePath = configData.tempLilypondFilePath
@@ -577,9 +584,10 @@ class _LilypondProcessor:
                                               countInMeasures,
                                               videoTarget.frameRate,
                                               videoTarget.scalingFactor,
+                                              intermediateFileDirectoryPath,
                                               intermediateFilesAreKept)
                 videoGenerator.process()
-                videoGenerator.cleanup()
+                videoGenerator.cleanupOrMove()
 
                 OperatingSystem.moveFile(targetMp4FileName,
                                          configData.targetDirectoryPath)

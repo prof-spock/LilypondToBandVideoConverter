@@ -83,22 +83,23 @@ class _ConfigDataGlobal:
     def initialize (cls, configData):
         """Initializes global attributes of <configData>"""
 
-        configData.aacCommandLine          = "aac"
-        configData.ffmpegCommand           = "ffmpeg"
-        configData.fluidsynthCommand       = "fluidsynth"
-        configData.lilypondCommand         = "lilypond"
-        configData.loggingFilePath         = ("C:/temp/logs"
-                                             + "/makeLilypondAll.log")
-        configData.mp4boxCommand           = "mp4box"
-        configData.soundFontDirectoryPath  = "C:/temp/soundfonts"
-        configData.soundFontNameList       = ""
-        configData.soundStyleNameToTextMap = {}
-        configData.soxCommandLinePrefix    = "sox"
-        configData.targetDirectoryPath     = "generated"
-        configData.tempAudioDirectoryPath  = "/temp"
-        configData.tempLilypondFilePath    = "temp.ly"
-        configData.videoTargetMap          = {}
-        configData.videoFileKindMap        = {}
+        configData.aacCommandLine                = "aac"
+        configData.ffmpegCommand                 = "ffmpeg"
+        configData.fluidsynthCommand             = "fluidsynth"
+        configData.intermediateFileDirectoryPath = "."
+        configData.lilypondCommand               = "lilypond"
+        configData.loggingFilePath               = ("C:/temp/logs"
+                                                   + "/makeLilypondAll.log")
+        configData.mp4boxCommand                 = "mp4box"
+        configData.soundFontDirectoryPath        = "C:/temp/soundfonts"
+        configData.soundFontNameList             = ""
+        configData.soundStyleNameToTextMap       = {}
+        configData.soxCommandLinePrefix          = "sox"
+        configData.targetDirectoryPath           = "generated"
+        configData.tempAudioDirectoryPath        = "/temp"
+        configData.tempLilypondFilePath          = "temp.ly"
+        configData.videoTargetMap                = {}
+        configData.videoFileKindMap              = {}
 
     #--------------------
 
@@ -111,6 +112,7 @@ class _ConfigDataGlobal:
         st = (("%s("
                + "aacCommandLine = '%s', ffmpegCommand = '%s',"
                + " fluidsynthCommand = '%s',"
+               + " intermediateFileDirectoryPath = %s,"
                + " lilypondCommand = '%s', mp4boxCommand = '%s',"
                + " loggingFilePath = '%s',"
                + " soundFontDirectoryPath = '%s', soundFontNameList = %s,"
@@ -122,6 +124,7 @@ class _ConfigDataGlobal:
               % (className,
                  configData.aacCommandLine, configData.ffmpegCommand,
                  configData.fluidsynthCommand,
+                 configData.intermediateFileDirectoryPath,
                  configData.lilypondCommand, configData.mp4boxCommand,
                  configData.loggingFilePath,
                  configData.soundFontDirectoryPath,
@@ -153,7 +156,8 @@ class _ConfigDataGlobal:
 
         variableNameList = \
             [ "aacCommandLine", "ffmpegCommand", "fluidsynthCommand",
-              "lilypondCommand", "loggingFilePath", "mp4boxCommand",
+              "intermediateFileDirectoryPath", "lilypondCommand",
+              "loggingFilePath", "mp4boxCommand",
               "soundFontDirectoryPath", "soxCommandLinePrefix",
               "targetDirectoryPath", "tempAudioDirectoryPath",
               "tempLilypondFilePath", "videoTargetMap",
@@ -185,6 +189,8 @@ class _ConfigDataGlobal:
         configData.aacCommandLine = getValueProc("aacCommandLine")
         configData.ffmpegCommand = getValueProc("ffmpegCommand")
         configData.fluidsynthCommand = getValueProc("fluidsynthCommand")
+        configData.intermediateFileDirectoryPath = \
+            getValueProc("intermediateFileDirectoryPath")
         configData.lilypondCommand = getValueProc("lilypondCommand")
         configData.loggingFilePath = getValueProc("loggingFilePath")
         configData.mp4boxCommand = getValueProc("mp4boxCommand")
@@ -888,6 +894,7 @@ class _LocalValidator:
         cls._setMap("soxCommandLinePrefix", None, "STRING")
 
         # file paths
+        cls._setMap("intermediateFileDirectoryPath", ".", "WDIRECTORY")
         cls._setMap("loggingFilePath", None, "WFILE")
         cls._setMap("targetDirectoryPath", None, "WDIRECTORY")
         cls._setMap("tempLilypondFilePath", "temp.ly", "WFILE")

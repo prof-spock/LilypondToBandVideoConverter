@@ -1,0 +1,4225 @@
+\documentclass[titlepage,twoside,12pt,a4paper]{report}
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+
+  \usepackage{chngcntr}        % ==> counterwithout
+  \usepackage[usenames]{color} % ==> color
+  \usepackage{colortbl}        % ==> cellcolor
+  \usepackage{enumitem}        % ==> ttdescription
+  \usepackage{etoolbox}        % ==> patchcmd
+  \usepackage{fancyhdr}        % ==> fancyhead
+  \usepackage{graphicx}        % ==> includegraphics
+  \usepackage{listings}        % ==> listings
+  \usepackage{longtable}       % ==> longtable
+  \usepackage{titlesec}        % ==> titleformat
+
+%====================
+% LOCAL DEFINITIONS
+%====================
+
+  \overfullrule=10pt
+
+  %-- TYPEWRITER HYPHENATION --
+  \DeclareFontFamily{\encodingdefault}{\ttdefault}{\hyphenchar\font=`\-}
+
+  \renewcommand*\ttdefault{pcr}
+  
+  %------------
+  %-- TITLES --
+  %------------
+
+  % chapter
+  \titleformat{\chapter}
+              {\normalfont \LARGE \bfseries}
+              {\thechapter.~}
+              {0pt}
+              {\LARGE}
+
+  % this alters "before" spacing (the second length argument) to 0
+  \titlespacing*{\chapter}{0pt}{-20pt}{10pt}
+  \patchcmd{\chapter}{\thispagestyle{plain}}{\thispagestyle{fancy}}{}{}
+
+  % paragraph
+  \titleformat{\paragraph}[hang]
+              {\normalfont\normalsize\bfseries}
+              {\theparagraph}
+              {1em}
+              {}
+  \titlespacing*{\paragraph}{0pt}{1.5ex plus .5ex minus .2ex}{1em}
+
+  \setcounter{secnumdepth}{3}
+  \setcounter{tocdepth}{3}
+
+  % number figures continously
+  \counterwithout{figure}{chapter}
+
+  %-----------------------
+  %-- HEADERS / FOOTERS --
+  %-----------------------
+  \pagestyle{fancy}
+  %--
+  \fancyhead[LE]{\slshape \rightmark}
+  \fancyhead[CE]{~}
+  \fancyhead[RE]{~}
+  \fancyhead[LO]{~}
+  \fancyhead[CO]{~}
+  \fancyhead[RO]{\slshape \leftmark}
+  %--
+  \fancyfoot[LE]{\thepage}
+  \fancyfoot[CE]{~}
+  \fancyfoot[RE]{Dr.~Thomas Tensi}
+  \fancyfoot[LO]{LTBVC}
+  \fancyfoot[CO]{~}
+  \fancyfoot[RO]{\thepage}
+
+  %-- page size --
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+  %\addtolength{\headheight}{\baselineskip}
+  \addtolength{\voffset}{-5mm}
+  \setlength{\topmargin}{0mm}
+  \addtolength{\headsep}{-5mm}
+  \addtolength{\textheight}{20mm}
+
+  %------------------------
+  %-- LENGTH DEFINITIONS --
+  %------------------------
+
+  \setlength{\parindent}{0pt}
+  \setlength{\parskip}{5pt}
+
+  \newlength{\listingMargin}
+  \setlength{\listingMargin}{4mm}
+  \newlength{\listingWidth}
+  \setlength{\listingWidth}{\linewidth}
+  \addtolength{\listingWidth}{-2\listingMargin}
+
+  \newlength{\listingInnerFrame}
+  \setlength{\listingInnerFrame}{1mm}
+
+  %-------------------
+  %-- MISC COMMANDS --
+  %-------------------
+  \newcommand{\assignedTo}{\(\rightarrow\)}
+  \newcommand{\bsl}{\textbackslash}
+
+  \newcommand{\centeredExternalPicture}[2]{%
+      \begin{center}
+          \externalPicture{#1}{#2}%
+      \end{center}
+  }
+
+  \newenvironment{centeredFigure}%
+	         {\begin{figure}[tb]\begin{center}}%
+	         {\end{center}\end{figure}}
+
+  \newcommand{\embeddedCode}[1]{\textsf{#1}}
+  \newcommand{\externalPicture}[2]{%
+      \includegraphics[scale=#1]{figures/#2}%
+  }
+
+  \newenvironment{ttGlossary}%
+	         {\begin{description}[%
+                       style=nextline, labelwidth=0pt,
+                       itemindent=\dimexpr-5mm, leftmargin=1cm%
+                 ]}
+	         {\end{description}}
+
+  \newcommand{\glossaryLink}[1]{\(\rightarrow\)\textit{#1}}
+  \newcommand{\hyperlink}[1]{\textsf{\color{blue}#1}}
+  \newcommand{\ltbvc}{LilypondToBandVideoConverter}
+  \newcommand{\ltbvcCommand}{makelilypondall.py~}
+  \newcommand{\macro}[1]{\textbackslash #1}
+  \newcommand{\meta}[1]{\guillemotleft #1\guillemotright}
+  \newcommand{\TODO}[1]{\emph{\color{red}\textbf{TODO:} #1}}
+  \newenvironment{ttDescription}%
+	         {\begin{description}[%
+                       style=nextline, labelwidth=0pt,
+                       itemindent=\dimexpr-5mm, leftmargin=1cm%
+                 ]}
+	         {\end{description}}
+
+  \definecolor{variableTableHeadingBkgnd}{RGB}{200,200,200}
+
+  \newenvironment{variableDescriptionTableFinal}
+                 {\begin{center}\scriptsize
+                    \begin{longtable}{|p{3.8cm}|p{5.1cm}|p{2.5cm}|p{0.6cm}|}
+                    \hline
+                 }
+                 {  \end{longtable}
+                  \end{center}}
+
+  \newenvironment{variableDescriptionTableLong}
+                 {\begin{center}\footnotesize
+                    \begin{tabular}{|p{3.8cm}|p{5.2cm}|p{3.4cm}|}\hline
+                 }
+                 {  \end{tabular}
+                  \end{center}}
+
+  \newenvironment{variableDescriptionTableShort}
+                 {\begin{center}\footnotesize
+                    \begin{tabular}{|p{3.8cm}|p{8.6cm}|}\hline
+                      \vdtHeadingLineShort{\textbf{Variable}}
+                                          {\textbf{Description}}
+                 }
+                 {  \end{tabular}
+                  \end{center}}
+
+  \newcommand{\varDescriptionFinal}[4]{%
+      \embeddedCode{#1}&#2&#3
+        &\mbox{\hfil\ref{figure:configFile#4Variables}\hfil}\\\hline
+  }
+
+  \newcommand{\varDescriptionHeaderFinal}{
+      \vdtHeadingLineFinal{\textbf{Variable}}
+                          {\textbf{Description}}
+                          {\textbf{Default}}
+                          {\textbf{Fig.}}
+      \endhead
+  }
+
+  \newcommand{\varDescriptionHeaderLong}{
+      \vdtHeadingLineLong{\textbf{Variable}}
+                         {\textbf{Description}}
+                         {\textbf{Example}}
+  }
+
+  \newcommand{\varDescriptionHeaderShort}{
+      \vdtHeadingLineShort{\textbf{Variable}}
+                          {\textbf{Description}}
+  }
+
+  \newcommand{\varDescriptionLong}[3]{\embeddedCode{#1}&#2&#3\\\hline}
+
+  \newcommand{\varDescriptionShort}[2]{\embeddedCode{#1}&#2\\\hline}
+
+  \newcommand{\vdtHeadingLineFinal}[4]{%
+      \cellcolor{variableTableHeadingBkgnd}#1
+      &\cellcolor{variableTableHeadingBkgnd}#2
+      &\cellcolor{variableTableHeadingBkgnd}#3
+      &\cellcolor{variableTableHeadingBkgnd}#4\\\hline
+  }
+
+  \newcommand{\vdtHeadingLineShort}[2]{%
+      \cellcolor{variableTableHeadingBkgnd}#1
+      &\cellcolor{variableTableHeadingBkgnd}#2\\\hline
+  }
+
+  \newcommand{\vdtHeadingLineLong}[3]{%
+      \cellcolor{variableTableHeadingBkgnd}#1
+      &\cellcolor{variableTableHeadingBkgnd}#2
+      &\cellcolor{variableTableHeadingBkgnd}#3\\\hline
+  }
+
+  %-------------------------
+  %-- LISTING DEFINITIONS --
+  %-------------------------
+
+  \definecolor{configFileBkgnd}   {RGB}{205,230,205}
+  \definecolor{lilypondFileBkgnd} {RGB}{205,205,230}
+  \definecolor{fileTextBkgnd}     {RGB}{220,220,220}
+
+  \newcommand{\listTitleBox}[1]{%
+    \colorbox{fileTitleTextBkgnd}%
+             {\parbox{\listingWidth}%
+                     {\color{fileTitleTextColor}\bf #1}%
+             }%
+  }
+
+  \lstdefinestyle{standard}
+                 {gobble=2, showspaces=false, showstringspaces=false,
+                  xleftmargin=\listingMargin,
+                  xrightmargin=\listingMargin,
+                  framexleftmargin=\listingInnerFrame,
+                  framextopmargin=\listingInnerFrame,
+                  framexrightmargin=\listingInnerFrame,
+                  framexbottommargin=\listingInnerFrame,
+                  basicstyle=\footnotesize\ttfamily}
+
+  \lstdefinelanguage{ltbvc}{
+      morekeywords = {INCLUDE},
+      sensitive=true,
+      morecomment=[l]{--},
+      morestring=[b]"
+  }
+
+  \def\ttlisting{\par\minipage{\linewidth}\lstset}
+  \def\endttlisting{\endminipage\par}
+
+  \lstnewenvironment{commandLine}
+                    {\ttlisting{style=standard}}
+                    {\endttlisting}
+
+  \lstnewenvironment{configurationFileCode}
+                    {\ttlisting{language=ltbvc,style=standard,
+                                backgroundcolor=\color{configFileBkgnd}}}
+                    {\endttlisting}
+
+  \lstnewenvironment{verbatimText}
+                    {\ttlisting{language=ltbvc, style=standard,
+                                backgroundcolor=\color{fileTextBkgnd}}}
+                    {\endttlisting}
+
+  \lstnewenvironment{lilypondFileCode}
+                    {\ttlisting{language=ltbvc, style=standard,
+                                backgroundcolor=\color{lilypondFileBkgnd}}}
+                    {\endttlisting}
+
+%################
+%# REUSED TEXTS #
+%################
+
+\newcommand{\DESCaacCommandLine}{%
+  aac encoder command line with parameters for input (\$1) and output
+  (\$2) (optional, if not defined ffmpeg is used for aac encoding)
+}
+
+\newcommand{\DESCalbumName}{%
+  album for song group (embedded as ``album'' in audio and video
+  files)
+}
+
+\newcommand{\DESCartistName}{%
+  artist of that song group (embedded as ``artist'' and ``album
+  artist'' in audio and video files)
+}
+
+\newcommand{\DESCattenuationLevel}{%
+  decimal value in decibels telling the volume change to be applied to
+  the final audio files; this is helpful to adjust volume levels of
+  different songs within an album
+}
+
+\newcommand{\DESCaudioGroupToVoicesMap}{%
+  mapping from freely defined voice group names to names of voices
+  contained in that group described by a slash-separated name list
+}
+
+\newcommand{\DESCaudioLevelList}{%
+  list of volume factors aligned with the list
+  \embeddedCode{voiceName} used for mixing the refined audio files
+  into cumulated audio files; the factors are decimal values with 1.0
+  meaning that the refined voice file is taken unchanged
+}
+
+\newcommand{\DESCaudioTargetDirectoryPath}{%
+  path for the final AAC audio files with subsets of rendered and
+  refined audio tracks
+}
+
+\newcommand{\DESCaudioTrackAlbumName}{%
+  name of the album of the audio file for given list of voices (where
+  an embedded dollar-sign is replaced by the global album name)
+}
+
+\newcommand{\DESCaudioTrackAudioFileTemplate}{%
+  template string defining how the audio file name of the target audio
+  file for given list of voices is constructed from the plain audio
+  file name (indicated by a dollar-sign)
+}
+
+\newcommand{\DESCaudioTrackDescription}{%
+  description for audio track within target video (typically
+  unsupported by video players)
+}
+
+\newcommand{\DESCaudioTrackGroupList}{%
+  slash-separated list of audio group names occuring as keys in
+  \embeddedCode{audioGroupToVoicesMap}
+}
+
+\newcommand{\DESCaudioTrackLanguageCode}{%
+  ISO language code for audio track within target video (typically
+  supported by video players)
+}
+
+\newcommand{\DESCaudioTrackSongNameTemplate}{%
+  template string defining how the song name for given list of voices
+  is constructed from the plain song name (indicated by a
+  dollar-sign)
+}
+
+\newcommand{\DESCaudioTrackList}{%
+  list of track descriptors defining groups of audio groups to be put
+  on some track with naming templates for audio file, song and album
+  name and a track description and language
+}
+
+\newcommand{\DESCaudioVoiceNameSet}{%
+  set of voice names to be rendered to audio files via the phases
+  ``rawaudio'' and ``refinedaudio'' based on voice representations in
+  humanized midi file
+}
+
+\newcommand{\DESCchordedVoiceMap}{%
+  mapping from voice names to phase abbreviations where chords are
+  shown for that voice system
+}
+
+\newcommand{\DESCcomposerText}{%
+  composer text to be shown in voice extracts and score
+}
+
+\newcommand{\DESCintermediateFileDirectoryPath}{%
+  path of directory where intermediate files go that are either used
+  for processing within a phase or as information between phases
+}
+
+\newcommand{\DESCkeepIntermediateFiles}{%
+  boolean telling whether temporary files are kept
+}
+
+\newcommand{\DESCextractVoiceNameSet}{%
+  set of voices to be rendered as a voice extract
+}
+
+\newcommand{\DESCffmpegCommand}{%
+  location of ffmpeg command
+}
+
+\newcommand{\DESCfileNamePrefix}{%
+  file name prefix used for all generated files for this song
+}
+
+\newcommand{\DESCfluidsynthCommand}{%
+  location of fluidsynth command
+}
+
+\newcommand{\DESChumanizationStyleXXX}{%
+  map that tells the initial count-in measures, the variation in
+  timing and velocity for several positions within a measure
+}
+
+\newcommand{\DESChumanizedVoiceNameSet}{%
+  set of voice names to be humanized by random variations of timing
+  and velocity
+}
+
+\newcommand{\DESClilypondCommand}{%
+  location of lilypond command
+}
+
+\newcommand{\DESCloggingFilePath}{%
+  path of file containing the processing log
+}
+
+\newcommand{\DESClyricsVoiceMap}{%
+  mapping from voice name to a count of parallel lyrics lines directly
+  following the target letter (``e'' for the extract, ``s'' for the
+  score and ``v'' for the video)
+}
+
+\newcommand{\DESCmeasureToHumanizationStyleNameMap}{%
+  map of measure number to humanization style name used from this
+  position onward for humanized voices
+}
+
+\newcommand{\DESCmeasureToTempoMap}{%
+  map defining the tempo for measure in bpm until another tempo
+  setting is given
+}
+
+\newcommand{\DESCmidiChannelList}{%
+  list of midi channels per voice each between 1 and 16 (10 for a drum
+  voice)
+}
+
+\newcommand{\DESCmidiInstrumentList}{%
+  list of midi instrument programs per voice each as an integer
+  between 0 and 127; each entry may be prefixed by a bank number (0 to
+  127) followed by a colon
+}
+
+\newcommand{\DESCmidiPanList}{%
+  list of pan positions per voice as a decimal value between 0 and 1
+  with suffix ``R'' or ``L'' (for right/left) or the character ``C''
+  (for center)
+}
+
+\newcommand{\DESCmidiVoiceNameList}{%
+  list of voices to be rendered in order given into the MIDI file
+}
+
+\newcommand{\DESCmidiVolumeList}{%
+  list of midi volumes per voice each as an integer between 0 and 127
+}
+
+\newcommand{\DESCmpfourboxCommand}{%
+  location of mp4box command
+}
+
+\newcommand{\DESCphaseAndVoiceNameToClefMap}{%
+  mapping from processing phase to maps from voice name to lilypond
+  clef
+}
+
+\newcommand{\DESCphaseAndVoiceNameToStaffListMap}{%
+  mapping from processing phase to maps from voice name to
+  slash-separated lilypond staff names
+}
+
+\newcommand{\DESCreverbLevelList}{%
+  list of reverb levels (as decimal values typically between 0 and 1)
+  for the voices aligned with the list \embeddedCode{voiceNameList};
+  those reverb levels are applied to each voice as the final
+  refinement operation
+}
+
+\newcommand{\DESCscoreVoiceNameList}{%
+  list of voices to be rendered in order given into the score
+}
+
+\newcommand{\DESCsoundFontDirectoryPath}{%
+  path of directory for the soundfonts
+}
+
+\newcommand{\DESCsoundFontNames}{%
+  comma-separated list of soundfont names (all located in soundfont
+  directory)
+}
+
+\newcommand{\DESCsoundStyleXXX}{%
+  sequence of sox commands to be applied on raw audio file when this
+  style is selected for \meta{voice}
+}
+
+\newcommand{\DESCsoundVariantList}{%
+  list of variant names for the sound styles of the voices aligned
+  with the list \embeddedCode{voiceName}; those style variant names
+  are combined into a complete style name to be applied during audio
+  refinement
+}
+
+\newcommand{\DESCsoxCommandLinePrefix}{%
+  sox command with global options (like buffering or multithreading
+  settings)
+}
+
+\newcommand{\DESCsoxGlobalOptions}{%
+  global options for sox command to be used in every call
+}
+
+\newcommand{\DESCtargetDirectoryPath}{%
+  path of directory where all generated files go (except for audio and
+  video files)
+}
+
+\newcommand{\DESCtempAudioDirectoryPath}{%
+  path of directory for temporary audio files
+}
+
+\newcommand{\DESCtempLilypondFilePath}{%
+  path of temporary lilypond file
+}
+
+\newcommand{\DESCtitle}{%
+  human visible title of song used as tag in the target audio file and
+  as header line in the notation files
+}
+
+\newcommand{\DESCtrackNumber}{%
+  track number within album
+}
+
+\newcommand{\DESCvoiceNameToScoreNameMap}{%
+  mapping from voices name to short score name at the beginning of a
+  system
+}
+
+\newcommand{\DESCyear}{%
+  year of arrangement
+}
+
+\newcommand{\DESCvideoFileKindDirectoryPath}{%
+  directory where final videos for that target go
+}
+
+\newcommand{\DESCvideoFileKindFileNameSuffix}{%
+  suffix to be used for the video file names for that target
+}
+
+\newcommand{\DESCvideoFileKindTarget}{%
+  name of associated video target that is used when rendering video
+  files of that kind
+}
+
+\newcommand{\DESCvideoFileKindVoiceNameList}{%
+  list of voice names to be rendered in order to audio files via the
+  phase ``silentvideo''
+}
+
+\newcommand{\DESCvideoFileKindMap}{%
+  mapping from video file kind name to video file kind descriptor with
+  several parameters for specific video file generation referencing
+  a video target that gives overall video parameters
+}
+
+\newcommand{\DESCvideoTargetFrameRate}{%
+  the frame rate of the video (in frames per second)
+}
+
+\newcommand{\DESCvideoTargetMediaType}{%
+  the Quicktime media type of the video (for example "TV Show")
+}
+
+\newcommand{\DESCvideoTargetHeight}{%
+  height of device and video (in dots)
+}
+
+\newcommand{\DESCvideoTargetLeftRightMargin}{%
+  margin for video on left and right side (in millimeters)
+}
+
+\newcommand{\DESCvideoTargetResolution}{%
+  resolution of the device (in dpi)
+}
+
+\newcommand{\DESCvideoTargetScalingFactor}{%
+  the factor by which width and height are multiplied for lilypond
+  image rendering to be downscaled accordingly by the video renderer
+  (an integer)
+}
+
+\newcommand{\DESCvideoTargetSubtitleColor}{%
+  color of overlayed subtitle in final video for measure display (as
+  integer for 16bit alpha/red/green/blue)
+}
+
+\newcommand{\DESCvideoTargetSubtitlesAreHardcoded}{%
+  flag to tell whether subtitles are burnt into the video or are
+  available as a separate subtitle track
+}
+
+\newcommand{\DESCvideoTargetSubtitleFontSize}{%
+  height of subtitle (in pixels)
+}
+
+\newcommand{\DESCvideoTargetSystemSize}{%
+  size of lilypond system (in lilypond units, cf. lilypond system
+  size)
+}
+
+\newcommand{\DESCvideoTargetTopBottomMargin}{%
+  margin for video on top and bottom (in millimeters)
+}
+
+\newcommand{\DESCvideoTargetWidth}{%
+  width of device and video (in dots)
+}
+
+\newcommand{\DESCvideoTargetMap}{%
+  mapping from video target name to video target descriptor with
+  several parameters for specific video file generation
+}
+
+\newcommand{\DESCvoiceNameToOverrideFileNameMap}{%
+  map from voice name to name of file overriding that voice in the
+  processed audio files and in the final mixdown audio files and in
+  the target videos
+}
+
+\newcommand{\DESCvoiceNameToVariationFactorMap}{%
+  map from voice name to a pair of decimal factors characterizing the
+  timing and velocity variation for this kind of voice to be applied
+  additional to the humanization style
+}
+%############################################################
+\begin{document}
+
+\title{\ltbvc\ - Automated Generation of Notation Videos with Backing
+       Tracks}
+\author{Dr.~Thomas Tensi}
+\date{2017-06-12}
+\maketitle
+
+\tableofcontents
+
+%=====================
+\chapter{Introduction}
+%=====================
+
+%-----------------
+\section{Overview}
+%-----------------
+
+The \emph{\ltbvc} is an application built from several python scripts
+that orchestrate standard command-line tools to convert a music piece
+(a song) written in the lilypond notation to
+
+\begin{itemize}
+  \item a PDF score of the whole song,
+  \item several PDF voice extracts,
+  \item a MIDI file with all voices (with some preprocessing applied
+        for humanization),
+  \item audio mix files with several subsets of voices (specified
+        by configuration), and
+  \item video files for several output targets visualizing the score
+        notation pages and having the mixes as mutually selectable
+        audio tracks as backing tracks.
+\end{itemize}
+
+The central aim is to finally have a video file with several audio
+tracks containing mixes of different voice subsets to be used as
+selectable backing tracks.  The video itself shows a score with
+``pages'' turned at the right time and an indication of the current
+measure as a subtitle.
+
+So one might have a score video to be displayed on some device (like a
+tablet) that synchronously plays, for example, a backing track without
+vocals, guitar and keyboard, but with bass and drums.  Hence a
+(partial) band can play the missing voices live (reading the score)
+and have the other voices coming from the backing track.
+
+For processing a song one must have
+\begin{itemize}
+
+  \item a lilypond include file with the score information containing
+        specific lilypond identifiers, and
+
+  \item a configuration file giving details like the voices occuring
+        in the song, their associated midi instrument, target audio
+        volume, list of mutable voices for the audio tracks
+        etc.
+
+\end{itemize}
+
+Based on those files the python scripts --~together with some
+open-source command-line software like ffmpeg~-- produce all the
+target files either incrementally or altogether.
+
+In principle, all this could also be done with standard lilypond files
+using command line tools.  But the \ltbvc\ application automates a lot
+of that: based on data given in a song-dependent configuration file
+plus the lilypond fragment for the notes of the voices, it adds
+boilerplate lilypond fragments, parametrizes the tool chain and calls
+the necessary programs automatically.  And the process is completely
+unattended: once your configuration and lilypond notation files are
+set up the process runs on its own.  Additionally the audio generation
+can be tweaked by defining midi humanization styles and command chains
+(``sound styles'') for the audio postprocessing.
+
+This document assumes that you have an adequate knowledge of the
+following underlying software:
+\begin{ttDescription}
+  \item [lilypond:] for the notation specification,
+  \item [sox:] for postprocessing the audio files
+\end{ttDescription}
+
+%---------------------------------
+\section{Outline of this Document}
+%---------------------------------
+
+This document will present how to setup a fragment lilypond file and
+an associated configuration file for processing with \ltbvc.
+
+\begin{itemize}
+
+  \item Chapter~\ref{section:preliminaries} describes the installation
+        requirements and defines some terminology used in this
+        document.
+
+  \item Chapter~\ref{section:programUsage} tells how the (command line)
+        program is used and what kind of processing phases are available.
+        There is also some dependency between the artifacts of the phases
+        that is presented there.
+
+  \item Chapter~\ref{section:configurationFileOverview} gives an overview
+        of the syntax of a \ltbvc\ configuration file.  It consists of
+        key-value-pairs; the keys are identifiers, but the values may
+        be a bit more complicated.
+
+  \item Chapter~\ref{section:lilypondFileOverview} tells how the
+        lilypond file should look.  Of course, the syntax is given by
+        the lilypond program, but ---~since we have fragments with
+        external boilerplate code~--- we discuss what kind of
+        information must be provided in those files.
+
+  \item Chapter~\ref{section:configurationFileSettings} discusses in
+        detail each configuration file variable needed by going through
+        all the processing phases in sequence.
+
+  \item Chapter~\ref{section:example} gives an example by showing all
+        the lilypond macros and all required configuration settings
+        for a simple two-verse blues song with three instruments.  It
+        shows that some initial effort is needed, but normally you can
+        reuse things once you have understood how to make it work.
+
+  \item Because things will certainly go wrong some time,
+        chapter~\ref{section:debugging} gives some hints on how to
+        trace the problem.
+
+  \item Appendix~\ref{section:configurationFileVariableList} gives
+        an overview table of all configuration file commands and
+        appendix~\ref{section:references} shows the used bibliography
+        references.
+
+\end{itemize}
+
+%============================
+\chapter{Preliminaries}
+\label{section:preliminaries}
+%============================
+
+%---------------------
+\section{Requirements}
+%---------------------
+
+All the scripts are written in python and can be installed as a python
+package.  The package requires Python 2.7 and relies on the python
+package mutagen.
+
+Additionally the following software must be available:
+\begin{ttDescription}
+
+  \item [lilypond:] for generating the score pdf, voice extract pdfs,
+        the raw midi file and the score images used in the video files
+        \cite{reference:lilypondDocumentation},
+
+  \item [ffmpeg:] for video generation and video postprocessing
+        \cite{reference:ffmpegDocumentation},
+
+  \item [fluidsynth:] for generation of voice audio files from a midi
+        file \cite{reference:fluidsynthDocumentation}, and
+
+  \item [sox:] for instrument-specific postprocessing of audio files
+        for the target mix files as well as the mixdown
+        \cite{reference:soxDocumentation}
+\end{ttDescription}
+
+The following software is optional:
+\begin{ttDescription}
+  \item [aac:] an AAC-encoder for the final audio mix
+        file compression (for example
+        \cite{reference:aacDocumentation}), and
+
+  \item [mp4box:] the MP4 container packaging software mp4box
+        \cite{reference:mp4boxDocumentation}
+\end{ttDescription}
+
+The location of all those commands as well as a few other settings has
+to be defined in a global configuration file for the \ltbvc\
+(cf. overall configuration file syntax)
+
+%------------------------
+\section{Terminology}
+%------------------------
+
+Because the different programs do not completely agree in their
+terminology, a single terminology defined here is used throughout the
+document.  Appendix~\ref{section:glossary} gives a detailed
+description of the terms used in this document.
+
+The most important terms are:
+\begin{ttDescription}
+
+  \item [voice:]
+        a polyphonic part of a composition belonging to a single
+        instrument to be notated in one or several musical staffs
+
+  \item [song:]
+        a collection of several parallel voices forming a musical piece
+
+  \item [album:]
+        a collection of several related songs (for example, related by
+        year, artist, etc.)
+
+  \item [audio track:]
+        the audio rendering of a subset of all song voices (typically
+        within the final notation video)
+
+\end{ttDescription}
+
+%===========================
+\chapter{Usage}
+\label{section:programUsage}
+%===========================
+
+The \ltbvc\ is a commandline program with the following syntax:
+\begin{commandLine}
+  ltbvc.py [-h] [-k] --phases PHASELIST [--voices VOICELIST]
+                configurationFilePath
+\end{commandLine}
+
+The options have the following meaning:
+\begin{ttDescription}
+
+  \item [\embeddedCode{-h}]
+        makes the program show all the commandline options and exit
+
+  \item [\embeddedCode{-k}]
+        force the program to keep intermediate files
+
+  \item [\embeddedCode{--phases PHASELIST}]
+        specifies the processing phases or combination of processing
+        phases to be applied; is a comma-separated identifier list
+        from the set \embeddedCode{ \{all, preprocess, postprocess,
+        extract, score, midi, silentvideo, rawaudio, refinedaudio,
+        mixdown, finalvideo\}}
+
+  \item [\embeddedCode{--voices VOICELIST}]
+        gives the comma-separated list of voices where current phase
+        should be done on (for example, only on vocals and on drums);
+        those voice names should be a subset of the list of voices
+        given in the configuration file and in the associated lilypond
+        file; this option is optional: when it is not given, all
+        voices are used; only applies to phases ``extract'',
+        ``rawaudio'' and ``refinedaudio''
+
+  \item [\embeddedCode{configurationFilePath}]
+        gives the path to the configuration file specifying all
+        information about the song to be processed
+
+\end{ttDescription}
+
+The several processing phases of \ltbvc\ produce the several outputs
+incrementally.  Those phases have the following meanings:
+
+\begin{ttDescription}
+
+  \item [extract:]
+        generates PDF notation files for single voices as extracts
+        (might use compacted versions if specified),
+
+  \item [score:]
+        generates a single PDF file containing all voices as a score,
+
+  \item [midi:]
+        generates a MIDI file containing all voices with specified
+        instruments, pan positions and volumes,
+
+  \item [silentvideo:]
+        generates (intermediate) silent videos containing the score
+        pages for several output video file kinds (with configurable
+        resolution and size),
+
+  \item [rawaudio:]
+        generates unprocessed (intermediate) audio files for all the
+        instrument voices from the midi tracks,
+
+  \item [refinedaudio:]
+        generates (intermediate) audio files for all the instrument
+        voices with additional sound processing applied,
+
+  \item [mixdown:]
+        generates final compressed audio files with submixes of all
+        instruments voices based on the refined audio files with
+        specified volume balance (where the submix variants are
+        configurable)
+
+  \item [finalvideo:]
+        generates a final video file with all submixes as selectable
+        audio tracks and with a measure indication as subtitle
+
+\end{ttDescription}
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.55}{dependencyDiagram.mps}
+  \caption{Dependencies between Generation Phases}
+  \label{figure:phaseDependencies}
+\end{centeredFigure}
+
+Of course, those phases are not independent.  Several phases rely on
+results produced by other phases.
+Figure~\ref{figure:phaseDependencies} shows how the phases depend on
+each other.  The files (in yellow) are generated by the phases (in
+magenta), the configuration file (in green) and the lilypond file (in
+blue) are the only manual inputs into the processing chain.
+
+For example, the phase \embeddedCode{rawaudio} needs a midi file as
+input containing all voices to be rendered as audio files.  When using
+combining phases (see below) or when specifying several phases for a
+single run of the \ltbvc\ application, the phases are processed in a
+correct order, but when doing a manual selection of phases, you have
+to make sure that the dependencies given are obeyed.
+
+In the following we shall use the color coding for the files as given
+in figure~\ref{figure:phaseDependencies}: text fragments from the
+configuration file have a green background, fragments from the
+lilypond file have a blue background.
+
+There are also some combining phase available as follows:
+
+\begin{ttDescription}
+
+  \item [preprocess:]
+        combining all the phases \embeddedCode{extract},
+        \embeddedCode{score}, \embeddedCode{midi} and
+        \embeddedCode{silentvideo} for generation of voice extract
+        PDFs and score PDF, MIDI file as well the silent videos for
+        all video file kinds
+
+  \item [postprocess:]
+        combining all the phases \embeddedCode{rawaudio},
+        \embeddedCode{refinedaudio}, \embeddedCode{mixdown} and
+        \embeddedCode{finalvideo} for generation of the intermediate
+        raw and refined WAV files, the submixes as compressed audios
+        and the final videos for all video file kinds
+
+  \item [all:]
+        full processing via phase groups \embeddedCode{preprocess} and
+        \embeddedCode{postprocess}
+
+\end{ttDescription}
+
+So for example
+\begin{commandLine}
+  ltbvc --phases voice/score
+        --voices vocals/strings/drums config.txt
+\end{commandLine}
+
+will generate the voice extracts for vocals, strings and drums as well
+as a song score with those three voices specified in file
+\embeddedCode{config.txt}.  The vertical order within the score as
+well as other layout parameters are given by the order of voice
+descriptions and specific variables in the configuration file.
+
+\TODO{implement proper exception handling: stop on failure with
+      message, check for missing inputs}
+
+%========================================
+\chapter{Configuration File Overview}
+\label{section:configurationFileOverview}
+%========================================
+
+Variables controlling the song processing have to be defined in the
+configuration file for a song.  The name of this file is given as a
+mandatory parameter for the application.
+
+Note that typically there is not a single configuration file, but
+several.  Often a song configuration file includes others with global
+definitions (like, for example, defining the location of the ffmpeg
+command or some style of audio postprocessing).
+
+Although there is some internal program logic separating the variables
+into different domains for global setup variables, album related
+variables and song variables, this is somewhat academical: a variable
+definition can be given at any place and a later definition overrides
+a previous one.
+
+%------------------------------------
+\section{Configuration File Location}
+%------------------------------------
+
+The configuration file(s) are searched for in the following locations
+in the given order:
+\begin{itemize}
+
+  \item the current directory
+
+  \item the directory ~/.ltbvc within the user's home directory
+
+  \item the directory config and ../config relative to the directory
+        of the python program files
+
+\end{itemize}
+
+%--------------------------------------
+\section{Configuration File Syntax}
+\label{section:configurationFileSyntax}
+%--------------------------------------
+
+Each configuration file has a simple line-oriented syntax as follows:
+\begin{itemize}
+
+  \item Leading and trailing whitespace in a line is ignored.
+        Other whitespace is only interpreted as token separator.
+
+  \item A line starting with a comment marker ``-\relax-'' or completely
+        empty is ignored.
+
+  \item A line ending with a continuation marker
+        ``\textvisiblespace\textbackslash'' is combined with the
+        following line.
+
+  \item Each relevant line starts with an identifier followed by an
+        equal sign and the associated value.  The associated value may
+        be an integer, a decimal, a boolean or a string.  By this
+        assignment the value is associated with the variable given by
+        the identifier.  A subsequent assignment to the same
+        variable will replace that value.
+
+  \item An identifier is a sequence of lower- and uppercase letters or
+        underscores.
+
+  \item One may define such variables arbitrarily.
+
+  \item An integer literal is a digit sequence, a decimal value is a digit
+        sequence with at most one decimal point, a boolean value is either
+        the string ``true'' or ``false'' and a string value is a
+        character sequence enclosed by double quotes.  Two double
+        quotes within a string are interpreted as a double quote
+        character.
+
+  \item When a variable identifier occurs on the right hand side of an
+        assignment, it is replaced by its associated value.  If there is
+        none, this is an error.  The processing is strictly
+        sequential: the use of an identifier must come after its
+        definition.  It is okay to use an identifier in its own
+        redefinition.
+
+  \item A sequence of adjacent string literals or variables with
+        string contents are concatenated into a single string value.
+
+  \item A line starting with ``INCLUDE'' followed by a string
+        specifies the name of a file to be included in place.
+
+  \item As a convention sets have comma-separated string values and
+        maps are strings with a leading and trailing brace and key and
+        values separated by a colon.  White space within those strings
+        is not significant except when it is itself part of a value
+        string enclosed in single quotation marks.
+
+  \item It is helpful to distinguish auxiliary variables from those
+        used by the program.  In this document we prefix auxiliary
+        variables with an underscore (but any convention ---~even
+        none~--- is fine).
+
+\end{itemize}
+
+Assume for an example the following definitions in two files
+``test.text'' and ``config.txt'':
+
+\begin{configurationFileCode}
+  -- test.txt file to be included elsewhere
+  voiceNameList = "vocals, guitar, drums"
+  humanizedVoiceNameSet = "vocals"
+  _initialTempo = "90"
+  year = 2017
+\end{configurationFileCode}
+
+\begin{configurationFileCode}
+  -- config.txt file including test file
+  INCLUDE "test.txt"
+  voiceNameList = "vocals, guitar"
+  humanizedVoiceNameSet = humanizedVoiceNameSet ", drums"
+  measureToTempoMap = "{ 1 : " _initialTempo ", 20 : 67 }"
+\end{configurationFileCode}
+
+leads to the following overall variable settings:
+
+\begin{verbatimText}
+  _initialTempo         = "90"
+  year                  = 2017
+  voiceNameList         = "vocals, guitar"
+  humanizedVoiceNameSet = "vocals, drums"
+  measureToTempoMap     = "{ 1 : 90, 20 : 67 }"
+\end{verbatimText}
+
+%===================================
+\chapter{Lilypond File Overview}
+\label{section:lilypondFileOverview}
+%===================================
+
+The lilypond file used for a song contains lilypond macros.  At least
+there must be definitions for the following items:
+
+\begin{ttDescription}
+
+  \item [\embeddedCode{keyAndTime}:]
+        tells the key and time of the song and assumes that this
+        applies to all voices
+
+  \item [\embeddedCode{\meta{voice}XXX}:]
+        for each voice given in the configuration file containing the
+        musical expression to be used in an extract, in a score, in
+        the midi file or in the video; here ``XXX'' depends on the
+        target, so you might have different macros for a voice for the
+        different targets it occurs in (extract, score, midi, video).
+
+\end{ttDescription}
+
+The names of all voices are given by the configuration variable
+\embeddedCode{voiceNameList}.  Because lilypond only allows letters in
+macro names, those voice names must consist of small and capital
+letters only (no blanks, no digits, no special characters!) and they
+are case sensitive.  And they should not clash with predefined lilypond
+macros
+\footnote{Like \embeddedCode{drums}, but because this is a common
+          voice name it is automatically mapped to
+          \embeddedCode{myDrums} by the generator.}.
+
+The above looks quite complicated because you need macros for each
+voice and each processing phase.  But often you will reuse lilypond
+macros and typically the MIDI macro \embeddedCode{\meta{voice}Midi} is
+the same as the score macro \embeddedCode{\meta{voice}} only with
+\emph{all repetitions unfolded}.  You do not have to do this by
+yourself: for midi output this unfolding is done by the generator.
+
+There is even another automatism: if the generator looks for some
+voice macro with some extension it also accepts the plain macro for
+the voice (if available).  For example, if the macro
+\embeddedCode{guitarMidi} cannot be found, the generator looks for the
+macro \embeddedCode{guitar} and automatically applies necessary
+lilypond transformations (like unfolding repeats).
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \vdtHeadingLineLong{\textbf{Config. Variable}}
+                       {\textbf{Description}}
+                       {\textbf{Lilypond Var.}}
+
+    \varDescriptionLong{audioVoiceNameSet}
+                       {for each voice given in the set the lilypond
+                        macro gives the musical expression for the
+                        voice to be rendered as an audio file with
+                        the voice name}
+                       {\meta{voice}Midi}
+
+    \varDescriptionLong{extractVoiceNameSet}
+                       {for each voice given in the list the lilypond
+                        macro gives the musical expression for a
+                        voice to be rendered in the corresponding
+                        voice extract}
+                       {\meta{voice}Extract}
+
+    \varDescriptionLong{midiVoiceNameList}
+                       {for each voice given in the list the lilypond
+                        macro gives the musical expression for the
+                        voice to be rendered in the \emph{midi file}
+                        and rendered as an audio file with the voice
+                        name; the list is the order of the voices in
+                        the file}
+                       {\meta{voice}Midi}
+
+    \varDescriptionLong{scoreVoiceNameList}
+                       {for each voice given in the list the lilypond
+                        macro gives the musical expression for the
+                        voice to be rendered in the \emph{midi
+                        file}, the list is the order of the voices
+                        in the score from top to bottom}
+                       {\meta{voice}Score}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Dependency of Lilypond Macros on Configuration Variables}
+  \label{figure:lilypondDependencyOnConfig}
+\end{centeredFigure}
+
+Some variables in the configuration file make other lilypond macros
+``mandatory''.  The table in
+figure~\ref{figure:lilypondDependencyOnConfig} gives the configuration
+variable, the corresponding lilypond macro(s) and a short description.
+The dependency is not strict, because some default settings are done,
+but in general the logic described in the figure is a good
+orientation.  Video voice names are not specified in a single
+variable, but via video target and video file kind definitions (see
+section~\ref{section:videoGeneration}).
+
+For example, assume we have three voices in the song called
+``vocals'', ``drums'' and ``guitar''. We also assume that we shall
+have all voices in the midi file, vocals in an extract, drums and
+guitar in the score and vocals and guitar in the video.
+
+So the configuration file for the song contains the following
+definitions:
+
+\begin{configurationFileCode}
+  ...
+  voiceNameList       = "vocals, drums, guitar"
+  extractVoiceNameSet = "vocals"
+  scoreVoiceNameList  = "guitar, drums"
+  midiVoiceNameList   = "vocals, guitar, drums"
+  ...
+\end{configurationFileCode}
+
+Note that the \embeddedCode{midiVoiceNameList} could be omitted,
+because the default is to use the voices from the overall voice list
+\embeddedCode{voiceNameList} and the ``wrong'' order of voices does
+not really matter in the midi file.  The audio variable
+\embeddedCode{audioVoiceNameSet} has been omitted: it defaults to the
+setting of \embeddedCode{midiVoiceNameList}, so we have audio for
+``vocals'', ``guitar'' and ``drums'' (that means, all voices).
+
+For the given configuration we must have the following macros in the
+lilypond file:
+\begin{lilypondFileCode}
+  keyAndTime = {...}
+
+  vocalsExtract = {...}
+  vocalsScore   = {...}
+  vocalsMidi    = {...}
+
+  guitarScore   = {...}
+  guitarMidi    = {...}
+  guitarVideo   = {...}
+
+  myDrumsScore  = {...}
+  myDrumsMidi   = {...}
+\end{lilypondFileCode}
+
+Again some simplification is possible: when some global macros like
+\embeddedCode{guitar} is introduced, the associated variants
+can be omitted.
+
+%---------------
+\section{Chords}
+%---------------
+
+Because the software is used in a band context, chord symbols may also
+be used.  Chords may depend on voice and very often depend on the
+processing target, because the voice formatting may be different per
+target.
+
+The configuration file variable responsible for chords is
+\embeddedCode{chordedVoiceMap} and tells where chords are shown and
+for which voices.
+
+All voices with chords are mentioned as keys and mapped onto a slash
+separated list of single character abbreviations for the targets.  We
+have ``e'' for the extract, ``s'' for the score and ``v'' for the
+video.  There are no chords for the midi file.
+
+So for the configuration file line
+
+\begin{configurationFileCode}
+  chordedVoiceMap = "{ vocals: v/s, guitar: e }"
+\end{configurationFileCode}
+
+the chords are shown for the vocals in video and score and for guitar
+in its extract.  This means the lilypond file must contain the
+following definitions in \embeddedCode{\macro{chordmode}}:
+
+\begin{lilypondFileCode}
+  guitarChordsExtract = {...}
+  vocalsChordsScore   = {...}
+  vocalsChordsVideo   = {...}
+\end{lilypondFileCode}
+
+Again there is a default: when some chord macro is missing, either the
+plain chords macro for the voice or even the chords for all voices are
+used.
+
+So for example, for a missing \embeddedCode{guitarChordsExtract} the
+search is first for \embeddedCode{guitarChords} and finally for
+\embeddedCode{allChords} (the latter as a catch-all since
+\embeddedCode{chords} is a keyword in lilypond).
+
+%---------------
+\section{Lyrics}
+%---------------
+
+Also lyrics may be attached to voices.  Lyrics may occur in voice
+extracts, in the score and in the video.  The difference to chords is
+that multiple lyrics lines (for example, for stanzas) may be attached
+to a single voice, hence we need an additional count information.
+
+It is assumed that each lyrics line is always valid for all the notes
+in the voice, hence you have to provide appropriate padding (at least
+leading padding).
+
+The syntax is similar to chords, hence we have a
+\embeddedCode{lyricsVoiceMap}, but it also contains a count of
+parallel lyrics lines directly following the target letter (``e'' for
+the extract, ``s'' for the score and ``v'' for the video).
+
+So for the configuration file line
+
+\begin{configurationFileCode}
+  lyricsVoiceMap = "{ vocals: e2/s2/v, bgVocals: e3 }"
+\end{configurationFileCode}
+
+the lyrics are shown for the vocals in extract, video and score and
+for the background vocals only in its extract.  The lyrics line macros
+have capital letters as suffices (A, B, \dots) and hence are confined
+to 26 parallel lines per voice.
+
+This means the lilypond file must contain the
+following definitions in \embeddedCode{\macro{lyricmode}}:
+\begin{lilypondFileCode}
+  vocalsLyricsExtractA = {...}
+  vocalsLyricsExtractB = {...}
+  vocalsLyricsScoreA   = {...}
+  vocalsLyricsScoreB   = {...}
+  vocalsLyricsVideoA   = {...}
+
+  bgVocalsLyricsExtractA = {...}
+  bgVocalsLyricsExtractB = {...}
+  bgVocalsLyricsExtractC = {...}
+\end{lilypondFileCode}
+
+Again there is a default: when some lyrics macro is missing, the macro
+for the voice without the target but with the appropriate suffix is
+used.  So for example, for a missing \embeddedCode{vocalsLyricsScoreB}
+an existing \embeddedCode{vocalsLyricsB} is used.  Additionally for
+the first line the suffix may be totally omitted, so
+\embeddedCode{vocalsLyricsScoreA} can be replaced by
+\embeddedCode{vocalsLyricsScore} or even \embeddedCode{vocalsLyrics}.
+
+%========================================
+\chapter{Configuration File Settings}
+\label{section:configurationFileSettings}
+%========================================
+
+In the following we show all the settings of the configuration file in
+detail and what to put in an associated lilypond music fragment file.
+
+In principle one only needs a \emph{single} configuration file and a
+single lilypond fragment file.  For systematic reasons the information
+can be divided for didactic reasons and must then be combined into a
+single configuration file by \embeddedCode{INCLUDE} statements.
+
+%------------------------------
+\section{Overall Configuration}
+%------------------------------
+
+In this section the configuration file settings are discussed that
+define the locations of programs and files used.  Note that paths use
+the Unix forward slash as a separator.  If a relative path is used, it
+is relative to the current directory where the program call is made.
+
+Some variables define the program locations and global program
+parameters and are shown in
+figure~\ref{figure:configFileProgramVariables}.  For example,
+\embeddedCode{ffmpegCommand} tells the path of the ffmpeg command (you
+wouldn't have guessed that, would you?).
+
+Two entries are special: \embeddedCode{aacCommandLine} and
+\embeddedCode{soxCommandLinePrefixLinePrefix}.
+\begin{itemize}
+
+  \item The aac command line specifies the complete line for an aac
+        encoding command with \$1 and \$2 as placeholders for the
+        input and output file names.  If empty, ffmpeg is used for aac
+        encoding.
+
+  \item The sox command line prefix specifies the prefix for the sox
+        command with the command name and global options (like
+        buffering).  All the other parts of sox commands will be
+        appended to that string.
+
+\end{itemize}
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{aacCommandLine}
+               {\DESCaacCommandLine}
+               {"/pathto/qaac -V100 -i \$1 -o \$2"}
+
+    \varDescriptionLong{ffmpegCommand}
+               {\DESCffmpegCommand}
+               {"/pathto/ffmpeg"}
+
+    \varDescriptionLong{fluidsynthCommand}
+               {\DESCfluidsynthCommand}
+               {"/pathto/fluidsynth"}
+
+    \varDescriptionLong{lilypondCommand}
+               {\DESClilypondCommand}
+               {"/pathto/lilypond"}
+
+    \varDescriptionLong{mp4boxCommand}
+               {\DESCmpfourboxCommand}
+               {"/pathto/mp4box"}
+
+    \varDescriptionLong{soxCommandLinePrefix}
+               {\DESCsoxCommandLinePrefix}
+               {"/pathto/sox"}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Global Configuration Variables for Programs}
+  \label{figure:configFileProgramVariables}
+\end{centeredFigure}
+
+So an example setting in the configuration file for the global
+configuration variables could look like that:
+
+\begin{configurationFileCode}
+  aacCommandLine    = "/usr/local/qaac -V100 -i $1 -o $2"
+  ffmpegCommand     = "/usr/local/ffmpeg"
+  fluidsynthCommand = "/usr/local/fluidsynth"
+  lilypondCommand   = "/usr/local/lilypond"
+  soxCommandLinePrefix = "/usr/local/sox" \
+                         " --buffer 100000 --multi-threaded"
+\end{configurationFileCode}
+
+Other variables shown in figure~\ref{figure:configFilePathVariables}
+define file and path locations.  Very important is the path where the
+logging file \embeddedCode{ltvbc.log} is located: sometimes it is the
+only way to find out what went wrong.
+
+Temporary files go to \embeddedCode{intermediateFileDirectoryPath}.
+By default, all temp files go to the current directory and the
+phase-internal files are deleted at the end of a phase (but you can
+prevent that, see~\ref{section:debugging}).
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{intermediateFile\-DirectoryPath}
+               {\DESCintermediateFileDirectoryPath}
+               {"temp"}
+
+    \varDescriptionLong{loggingFilePath}
+               {\DESCloggingFilePath}
+               {"/pathto/ltbvc.log"}
+
+    \varDescriptionLong{soundFontDirectoryPath}
+               {\DESCsoundFontDirectoryPath}
+               {"/pathto/soundfonts"}
+
+    \varDescriptionLong{soundFontNames}
+               {\DESCsoundFontNames}
+               {"FluidR3\_GM.SF2, Ultimate\_Drums.sf2"}
+
+    \varDescriptionLong{targetDirectoryPath}
+               {\DESCtargetDirectoryPath}
+               {"generated"}
+
+    \varDescriptionLong{tempAudioDirectoryPath}
+               {\DESCtempAudioDirectoryPath}
+               {"/pathto/audiofiles"}
+
+    \varDescriptionLong{tempLilypondFilePath}
+               {\DESCtempLilypondFilePath}
+               {"temp.ly"}
+
+  \end{variableDescriptionTableLong}
+  \caption{Global Configuration Variables for File Paths}
+  \label{figure:configFilePathVariables}
+\end{centeredFigure}
+
+An example setting in the configuration file for file path
+configuration variables could look like that:
+
+\begin{configurationFileCode}
+  intermediateFileDirectoryPath = "temp"
+  loggingFilePath = "/var/logs/ltbvc.log"
+  soundFontDirectoryPath = "/usr/lib/soundfonts"
+  soundFontNames = "FluidR3_GM.SF2, Ultimate_Drums.sf2"
+  targetDirectoryPath = "generated"
+  tempAudioDirectoryPath = "~/ltbvc_audiofilesdir"
+  tempLilypondFilePath = "temp.ly"
+\end{configurationFileCode}
+
+%---------------------------------
+\section{Song Group Configuration}
+%---------------------------------
+
+Very often several songs are combined into a song group, for example,
+into an album.
+
+A song group is characterized by two parameters in the configuration
+file as shown in
+figure~\ref{figure:configFileSongGroupRelatedVariables}.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{albumName}
+               {\DESCalbumName}
+               {"Best of Fredo"}
+
+    \varDescriptionLong{artistName}
+               {\DESCartistName}
+               {"Fredo"}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Song Group Related Configuration File Variables}
+  \label{figure:configFileSongGroupRelatedVariables}
+\end{centeredFigure}
+
+%---------------------------
+\section{Song Configuration}
+%---------------------------
+
+The song is characterized by some very simple parameters in the
+configuration file shown in
+figure~\ref{figure:configFileSongRelatedVariables}.  The most
+important variable is \embeddedCode{fileNamePrefix} because it is used
+in the file names of the generated files; all the other variables may
+be missing and are set to some reasonable default.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{title}
+               {\DESCtitle}
+               {"Wonderful Song"}
+
+    \varDescriptionLong{fileNamePrefix}
+               {\DESCfileNamePrefix}
+               {"wonderful\_song"}
+
+    \varDescriptionLong{year}
+               {\DESCyear}
+               {2017}
+
+    \varDescriptionLong{composerText}
+               {\DESCcomposerText}
+               {"arranged by Fred, 2017"}
+
+    \varDescriptionLong{trackNumber}
+               {\DESCtrackNumber}
+               {22}
+
+    \varDescriptionLong{measureToTempoMap}
+               {\DESCmeasureToTempoMap}
+               {"\{\}"}
+
+    \varDescriptionLong{keepIntermediateFiles}
+               {\DESCkeepIntermediateFiles}
+               {False}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Song Related Configuration File Variables}
+  \label{figure:configFileSongRelatedVariables}
+\end{centeredFigure}
+
+Note: the lilypond include file containing the fragments must be
+called called \embeddedCode{fileNamePrefix} plus ``-music.ly''.
+
+%-----------------------------------------------
+\section{Configuration of the Processing Phases}
+%-----------------------------------------------
+
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Preprocessing Phases}
+\label{section:preprocessingPhases}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All preprocessing phases rely on the configuration and the lilypond
+file, while the postprocessing phase start from the generated midi
+file and the silent videos.
+
+In each preprocessing phase some boilerplate lilypond file is
+generated that encapsulated the include lilypond file with the music
+and puts it through the notation typesetter \embeddedCode{lilypond}.
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.55}{preprocessingPhaseDependencies.mps}
+  \caption{Information Flow for the Preprocessing Phases}
+  \label{figure:preprecessingPhases}
+\end{centeredFigure}
+
+Figure~\ref{figure:preprecessingPhases} shows the connection between
+the inputs and the outputs for the phases.  Both lilypond file and
+configuration file serve as manual input into the processing chain,
+the other files are generated.
+
+For the ``extract'' and ``score'' phases this is all there is to do,
+but the ``midi'' and ``silentvideo'' phases do further processing:
+\begin{ttDescription}
+  \item [midi:]
+        the midi file produced by lilypond has humanization applied to
+        the voices, and
+
+  \item [silentvideo:]
+        the image files produced by lilypond are combined into a
+        correctly timed video and a subtitle file in SRT format is
+        produced
+\end{ttDescription}
+
+If you \emph{really} want to fiddle with lilypond, the processing
+phase is provided as the lilypond macro
+\embeddedCode{ltbvcProcessingPhase} with values ``extract'',
+``score'', ``midi'' or ``silentvideo''.  You can use that for
+conditional processing, layout changes etc., because the fragment file
+is included into the boilerplate file at a very late position.  Be
+warned that the whole generation might fail, because the generator
+assumes a simple-structured lilypond include file.
+
+%...................................................................
+\subsubsection{Notation Generation: ``extract'' and ``score'' Phase}
+%...................................................................
+
+%````````````````````````````
+\paragraph{Preliminaries}
+%````````````````````````````
+
+The central settings in the configuration file define the
+characteristics of the voices.  Each voice is given by its name (an
+identifier) in the variable \embeddedCode{voiceNameList}.
+
+Note that the order in the voice name list is significant, because
+later on variable in other phases rely on that order.  For example,
+the audio volumes for phase ``mixdown'' in variable
+\embeddedCode{audioVolumeList} have the same order as the
+\embeddedCode{voiceNameList}.  So the lines
+
+\begin{configurationFileCode}
+  voiceNameList   = "vocals, guitar, drums"
+  audioVolumeList = "   0.9,    0.7,   1.0"
+\end{configurationFileCode}
+
+associate ``vocals'' with volume 0.9, ``guitar'' with volume 0.7 etc.
+A simple table logic: and it is fine to align the data in different
+entries with blanks.
+
+The staff layout is specified by several variables that map voice
+names into several kinds of staff-related layout information.  Because
+this might be phase-dependent, another mapping layer is added, mapping
+the phase onto the voice name to staff info map.
+
+\embeddedCode{phaseAndVoiceNameToStaffListMap} tells the staff to use for
+the voice in extract, score and video for a given processing phase.
+Default is ``Staff'', special staffs like ``DrumStaff'' may be defined
+in the map.  The mapping goes from phase name to a map from voice name
+to staff names.
+
+To reduce the mental complexity we first define a map from voice name
+to staff by the following configuration file lines
+
+\begin{configurationFileCode}
+  _voiceNameToStaffListMap = \
+      "{ drums      : DrumStaff,"    \
+       " keyboard   : PianoStaff,"   \
+       " percussion : DrumStaff }"
+\end{configurationFileCode}
+
+that are reused in the mapping from phase name
+
+\begin{configurationFileCode}
+  phaseAndVoiceNameToStaffListMap = \
+      "{ extract : " _voiceNameToStaffListMap ","  \
+       " midi    : " _voiceNameToStaffListMap ","  \
+       " score   : " _voiceNameToStaffListMap ","  \
+       " video   : " _voiceNameToStaffListMap "}"
+\end{configurationFileCode}
+
+Very often the different phases use exactly identical definitions, so
+the technique shown above is often fine (with individual definitions
+per phase if necessary).  Note that only
+\embeddedCode{phaseAndVoiceNameToStaffListMap} is used by the
+generator, \embeddedCode{\_voiceNameToStaffListMap} is just an
+auxiliary variable.
+
+It is also allowed to have more than one staff as the target of a
+voice.  In that case the staff names are slash-separated and are
+filled from several voice macros in the lilypond file.  For two
+systems the macros are \meta{voice}Top and \meta{voice}Bottom with the
+phase target name appended, for three systems we have \meta{voice}Top,
+\meta{voice}Middle and \meta{voice}Bottom.  For example, a keyboard
+with a piano staff in a score references the macros
+\embeddedCode{keyboardTopScore} and
+\embeddedCode{keyboardBottomScore}.
+
+Some replacement is done: if, for example, \meta{voice}MiddleExtract
+does not exist, \meta{voice}Middle and finally \meta{voice} are taken
+instead.
+
+So for a guitar with a tab the following definition in the
+configuration file is fine and it either reuses the
+\embeddedCode{guitar} macro in the lilypond file for both staffs or
+you can define special guitarTop/guitarBottom macros to differentiate:
+
+\begin{configurationFileCode}
+  ...
+  "guitar"   : "Staff/TabStaff",
+  ...
+\end{configurationFileCode}
+
+When reusing the same voice data in different staffs, be careful with
+respect to the midi generation.  Normally you only want the voice
+notes \emph{once} in the midi file, hence you will have to adapt the
+\embeddedCode{phaseAndVoiceNameToStaffListMap} definition and only
+include one staff in the midi file.
+
+A similar logic as for the staffs applies to the mapping from voice
+name to clef.  The standard clef is ``G'', others have to be defined
+explicitely.  Especially this applies to multi-system-staffs like the
+``PianoStaff'': here at least the ``xxxBottom'' must have a special
+clef definition (it must be a bass clef).
+
+A typical definition might be given as follows:
+
+\begin{configurationFileCode}
+  _voiceNameToClefMap = \
+      "{ bass"           : 'bass_8', "  \
+       " drums"          : '',"         \
+       " guitar"         : 'G_8',"      \
+       " keyboardBottom" : 'bass',"     \
+       " percussion"     : '' }"
+\end{configurationFileCode}
+
+Here bass and guitar have the transposed clef (as their traditional
+notation), drums and percussion have none and the lower part of a
+piano staff is notated in a bass clef.
+
+Again the above is only an auxiliary definition.  The relevant
+variable is \embeddedCode{phaseAndVoiceNameToClefMap} shown below.  In
+our case ---~as above~--- the mapping is identical for all phases,
+but, of course, individual definitions per phase are possible.
+
+\begin{configurationFileCode}
+  phaseAndVoiceNameToClefMap = \
+      "{ extract : " _voiceNameToClefMap ","  \
+       " midi    : " _voiceNameToClefMap ","  \
+       " score   : " _voiceNameToClefMap ","  \
+       " video   : " _voiceNameToClefMap "}"
+\end{configurationFileCode}
+
+Figure~\ref{figure:configFileNotationVariables} shows all notation
+related configuration variables discussed in the current section.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{chordedVoiceMap}
+                       {\DESCchordedVoiceMap}
+                       {"\{vocals: v/s, guitar: e\}"}
+
+    \varDescriptionLong{lyricsVoiceMap}
+                       {\DESClyricsVoiceMap}
+                       {"\{vocals: e2/s2/v\}"}
+
+    \varDescriptionLong{phaseAndVoiceName\-ToClefMap}
+                       {\DESCphaseAndVoiceNameToClefMap}
+                       {see text}
+
+    \varDescriptionLong{phaseAndVoiceName\-ToStaffListMap}
+                       {\DESCphaseAndVoiceNameToStaffListMap}
+                       {see text}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Notation Generation Configuration File Variables}
+  \label{figure:configFileNotationVariables}
+\end{centeredFigure}
+
+%````````````````````````````
+\paragraph{``extract'' Phase}
+%````````````````````````````
+
+Once everything is set up as described above, the ``extract'' phase
+generates an extract for each voice given in
+\embeddedCode{extractVoiceNameSet}.  The processing order of the
+voices is undefined.
+
+For each voice an extract pdf file is put into the directory given by
+\embeddedCode{targetDirectoryPath} with name
+\embeddedCode{fileNamePrefix}, a dash, the voice name and the
+extension ``.pdf''.
+
+The headings in the extract are set as follows: the song name from the
+\embeddedCode{title} variable is the extract title, the voice name is
+the extract subtitle, and the contents of \embeddedCode{composerText}
+is the text for the composer part.
+
+Figure~\ref{figure:exampleExtractLayout} shows how the first page of
+an extract might look like and
+figure~\ref{figure:configFileExtractVariables} shows the specific
+configuration variables for voice extracts.
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.3}{demo-extract.png}
+  \caption{Example Layout of an Extract File}
+  \label{figure:exampleExtractLayout}
+\end{centeredFigure}
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{extractVoiceNameSet}
+                       {\DESCextractVoiceNameSet}
+                       {"vocals, drums"}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Extract Generation Configuration File Variables}
+  \label{figure:configFileExtractVariables}
+\end{centeredFigure}
+
+%``````````````````````````
+\paragraph{``score'' Phase}
+%``````````````````````````
+
+In the ``score'' phase the generator produces a single score with the
+voices given in \embeddedCode{scoreVoiceNameList} in the order given
+and with default layout parameters.
+
+The score pdf file is put into the directory given by
+\embeddedCode{targetDirectoryPath} with name
+\embeddedCode{fileNamePrefix} followed by ``\_score'' and the
+extension ``.pdf''.
+
+Headings in the score are set as follows: the song name from the
+\embeddedCode{title} variable is the score title and the contents of
+\embeddedCode{composerText} is the text for the composer part.
+
+Because voice names might be long, there is a mapping that provides a
+short name for each voice to be used in the score as the system
+identification by filling the variable
+\embeddedCode{voiceNameToScoreNameMap}.  A possible setting is:
+
+\begin{configurationFileCode}
+  voiceNameToScoreNameMap = \
+      "{ bass           : bs,"   \
+       " bgVocals       : bvc,"  \
+       " drums          : dr,"   \
+       " guitar         : gtr,"  \
+       " keyboard       : kb,"   \
+       " keyboardSimple : kb,"   \
+       " organ          : org,"  \
+       " percussion     : prc,"  \
+       " strings        : str,"  \
+       " synthesizer    : syn,"  \
+       " vocals         : voc }"
+\end{configurationFileCode}
+
+With the settings above, the ``bass'' voice has a ``bs'' name in the
+score.  You do not have to use that mechanism: the default is just to
+use the original voice name for staff identification in the score.
+
+Figure~\ref{figure:exampleScoreLayout} shows how the first page of a
+score might look like, figure~\ref{figure:configFileScoreVariables}
+shows the specific configuration variables for scores.
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.22}{demo-score.png}
+  \caption{Example Layout of a Score File}
+  \label{figure:exampleScoreLayout}
+\end{centeredFigure}
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{scoreVoiceNameList}
+                       {\DESCscoreVoiceNameList}
+                       {"vocals, guitar, drums"}
+
+    \varDescriptionLong{voiceNameToScore\-NameMap}
+                       {\DESCvoiceNameToScoreNameMap}
+                       {"\{ vocals : voc, bass : bs \}"}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Score Generation Configuration File Variables}
+  \label{figure:configFileScoreVariables}
+\end{centeredFigure}
+
+%...................................................
+\subsubsection{Midi File Generation: ``midi'' Phase}
+\label{section:midiPhase}
+%...................................................
+
+The lilypond file normally does not contain any further macros for
+MIDI because the voices used for the score are often fine for the MIDI
+file.
+
+Nevertheless it could happen that you need special processing here.
+Examples are
+\begin{itemize}
+
+  \item A voice has different notes or is transposed in the MIDI and
+        audio rendering than in the notation. This can be achieved by
+        having a different \embeddedCode{\meta{voice}Midi} macro.
+
+  \item Some hidden voice occurs in MIDI and audio output, for example,
+        a voice delayed or transposed relative to some other voice (to
+        enhance the sound of the original voice).  This can be
+        achieved by adding a voice to the \embeddedCode{voiceNameList}
+        macro, but excluding it from extracts, score and video.
+\end{itemize}
+
+The ``midi'' processing phase unfolds all repeats in the given voices
+and generates corresponding midi streams.  Those streams are generated
+for all voices specified in the configuration variable
+\embeddedCode{midiVoiceNameList} and stored in a single file in the
+directory given by \embeddedCode{targetDirectoryPath} with name
+\embeddedCode{fileNamePrefix} plus ``-std'' and extension ``.mid''.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{midiVoiceNameList}
+               {\DESCmidiVoiceNameList}
+               {"guitar, drums"}
+
+    \varDescriptionLong{midiChannelList}
+               {\DESCmidiChannelList}
+               {see text}
+
+    \varDescriptionLong{midiInstrumentList}
+               {\DESCmidiInstrumentList}
+               {see text}
+
+    \varDescriptionLong{midiVolumeList}
+               {\DESCmidiVolumeList}
+               {see text}
+
+    \varDescriptionLong{midiPanList}
+               {\DESCmidiPanList}
+               {see text}
+  \end{variableDescriptionTableLong}
+
+  \caption{Midi Related Configuration File Variables}
+  \label{figure:configFileMidiRelatedVariables}
+\end{centeredFigure}
+
+All those voices have specific settings defined by several list
+variables, that align with the list \embeddedCode{voiceNameList} and
+are shown in figure~\ref{figure:configFileMidiRelatedVariables}.
+
+For example, the following settings in the configuration file
+
+\begin{configurationFileCode}
+  voiceNameList      = "vocals, guitar, drums"
+  midiChannelList    = "   1,      2,     10 "
+  midiInstrumentList = "  54,   2:29,     16 "
+  midiVolumeList     = "  90,     60,    110 "
+  midiPanList        = "   C,   0.5L,    0.1R"
+\end{configurationFileCode}
+
+define vocals to be a synth vox in the center with 3/4 volume, the
+guitar to be an overdrive guitar (in bank 2), located half left with
+medium volume, and the drums to be a power set, located slightly right
+with almost full volume.
+
+Nevertheless the midi phase not only transforms lilypond to plain
+midi, but does further processing by adding \emph{humanization}.  The
+variable \embeddedCode{humanizedVoiceNameSet} tells what voices shall
+be humanized, the others are left untouched.
+
+Humanization is done by adding random variations in timing and
+velocity to the notes in a voice.  This is not completely random, but
+depends on voice, position within measure and on the style of the
+song.
+
+The voice- (or instrument-specific) variation is global and defined by
+the configuration variable
+\embeddedCode{voiceNameToVariationFactorMap}.  Each voice name is
+mapped onto a slash-separated pair of two numbers with the first
+giving the velocity, the second the timing variation percentage.
+
+For a standard band instrument set, we take the variations of the drum
+as the reference in a humanization style.  Hence drums should have an
+instrument-specific variation factor of 1.0 each which means that the
+calculated variation for some note is taken directly for drums.  Other
+voices like, for example, vocals are slightly more loose and might
+have a value of 1.5 for velocity and 1.2 for timing which means that
+the calculated variation for those parameters is scaled accordingly.
+Of course, the velocity values are adjusted to their ranges after the
+variation, because there is a maximum and minimum velocity.
+
+Our example would result in
+
+\begin{configurationFileCode}
+  voiceNameToVariationFactorMap = "{ drums: 1.0/1.0," \
+                                   " vocals: 1.5/1.2}"
+\end{configurationFileCode}
+
+The \emph{humanization style} of a song tells individual variations
+based on the position of a note within a measure.  Hence it gives
+timing and velocity variations for the main beats, the other
+sixteenths and all other notes.  A timing variation is a positive
+decimal number and tells how much a note can be shifted in
+\(1/32^{nd}\) notes (where 0 means never, 1 means by at most a
+\(1/32^{nd}\) etc.).  A velocity variation tells the standard velocity
+level of a note at this position and the slack gives the maximum
+variation.
+
+The algorithmic logic for a note humanization is as follows:
+\begin{enumerate}
+
+  \item Assume that the given note has time \(t_i\) and velocity
+        \(v_i\). Further assume that length of a thirtysecond
+        note in time units is \(\ell\) and that the instrument-specific
+        adjustments from the table are \(adj_t\) and \(adj_v\).
+
+  \item Pick two random numbers \(r_t\) and \(r_v\) both in
+        the interval \([0,1[\) from a quadratic probability
+        distribution (which favours smaller numbers).
+
+  \item Depending on \(t_i\) find the note position \(p_i\) within its
+        measure: it may be at a full beat (``1'', ``2'', ``3'',
+        ``4''), at another sixteenth (``S'') or at another position
+        (``OTHER'').
+
+  \item For the timing take the offset \(\tau(p_i)\) given by the timing
+        map for the current position \(p_i\) and multiply it by
+        \(r_t\) and by the length of a quarter note and by the
+        instrument-specific adjustment \(adj_t\) giving \(\Delta_t\).
+        If the offset has a ``B''(ehind) prefix, set the factor
+        \(f_i\) to 1, because the note may only be behind the
+        position; if the offset has an ``A''(head) prefix, set the
+        factor \(f_i\) to -1, because the note may only be ahead of
+        the position; otherwise with each 50\% probability set the
+        factor \(f_i\) to either -1 or 1.
+
+        Finally we have
+            \[t^\prime_i := t_i + f_i\cdot \Delta_t
+                = t_i + f_i\cdot \tau(p_i)\cdot r_t\cdot \ell\cdot adj_t\]
+        The timing of simultaneous notes in a voice is changed
+        identically.
+
+  \item For the velocity take the associated scaling value \(\sigma(p_i)\)
+        given by the velocity map for the current position and the
+        global slack in the velocity map \(\psi\).  The velocity is
+        first scaled by the scaling value \(\sigma(p_i)\) (to
+        accentuate beats), then randomly adjusted by the product of
+        slack \(\psi\) and instrument-specific adjustment \(adj_v\)and
+        finally capped to the MIDI velocity interval \([0, 127]\).
+
+        Finally we have
+            \[v^\prime_i :=
+              min(127,
+                  max(0, v_i\cdot \sigma(p_i) + \psi\cdot r_v\cdot adj_v))\]
+
+\end{enumerate}
+
+The idea behind the approach for the velocity is to accent some beats
+in a measure.  For example, a rock style would favour the 2 and 4, a
+march the 1.  Timing may be varied or even be dragged or hurried.
+
+So altogether a single style definition is a map telling about the
+number of count-in measures (where the drum counts the beats), the
+timing and the velocity.  The latter two are themselves maps from (an
+encoded) position within measure to decimal values.
+
+Let us take a rock style with steady beats on two and four (so no time
+variation here) and some emphasis on the second beat.  In the
+configuration file it might look like
+
+\begin{configurationFileCode}
+  humanizationStyleRockHard  = \
+      "{ countIn : 2, "                               \
+       " timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
+                   " S:B0.15, OTHER:B0.2 },"          \
+       " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
+                   " S:0.9, OTHER:0.85, SLACK:0.1 } }"
+\end{configurationFileCode}
+
+All available humanization styles in the configuration file must have
+a ``humanizationStyle'' prefix in their names to be elegible.
+
+Note that because all those definitions go anywhere in the
+configuration files, humanization styles could even be song-specific.
+On the other hand it is helpful to just reuse those styles, because
+humanization normally should not depend on the song, but on the style
+of the song only.
+
+The song itself defines the styles to be applied as a style map from
+measure number to style starting here.  Styles apply to all humanized
+instruments simultaneously, it is not possible to have, for example, a
+reggae on drums against a rumba on bass.
+
+So the style map in the configuration file might look like
+
+\begin{configurationFileCode}
+  measureToHumanizationStyleNameMap =   \
+  "{   1 : humanizationStyleRockHard,"  \
+    " 45 : humanizationStyleBeat}"
+\end{configurationFileCode}
+
+and tells that the ``rock hard'' style defined above is used at the
+beginning and that the style switches to a ``beat'' style in measure
+45.
+
+All humanization variables discussed above are shown summarized in the
+table in figure~\ref{figure:configFileHumanizationVariables}.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{humanizedVoiceNameSet}
+               {\DESChumanizedVoiceNameSet}
+               {"vocals, drums, keyboard"}
+
+    \varDescriptionLong{measureToHumaniza\-tionStyleNameMap}
+               {\DESCmeasureToHumanizationStyleNameMap}
+               {"{ 1: styleXXX, 5: styleYYY }"}
+
+    \varDescriptionLong{humanizationStyle\-\meta{name}}
+               {\DESChumanizationStyleXXX}
+               {see text}
+
+    \varDescriptionLong{voiceNameToVaria\-tionFactorMap}
+               {\DESCvoiceNameToVariationFactorMap}
+               {see text}
+  \end{variableDescriptionTableLong}
+
+  \caption{Midi Humanization Related Configuration File Variables}
+  \label{figure:configFileHumanizationVariables}
+\end{centeredFigure}
+
+%......................................................
+\subsubsection{Video Generation: ``silentvideo'' Phase}
+\label{section:videoGeneration}
+%......................................................
+
+The video from the lilypond file is produced by combining rendered
+images from lilypond in an intelligent fashion.  ``silentvideo'' just
+renders the video without sound, later on the ``finalvideo'' phase in
+the postprocessing combines the silent video with the rendered audio
+tracks.
+
+For the video rendering we need the characteristics of the video
+target, for example, the size and resolution of the device used.
+Additionally there is data as the rendering directory or the suffix
+used for the video files.
+
+Because it might happen that several video renderings have similar
+video target properties, the information is split: a video rendering
+relies on a specific video target and gives details such as the
+directory where the video file goes or the names of the displayed
+voices.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableShort}
+
+    \varDescriptionShort{height}
+                        {\DESCvideoTargetHeight}
+
+    \varDescriptionShort{width}
+                        {\DESCvideoTargetWidth}
+
+    \varDescriptionShort{resolution}
+                        {\DESCvideoTargetResolution}
+
+    \varDescriptionShort{topBottomMargin}
+                        {\DESCvideoTargetTopBottomMargin}
+
+    \varDescriptionShort{leftRightMargin}
+                        {\DESCvideoTargetLeftRightMargin}
+
+    \varDescriptionShort{systemSize}
+                        {\DESCvideoTargetSystemSize}
+
+    \varDescriptionShort{scalingFactor}
+                        {\DESCvideoTargetScalingFactor}
+
+    \varDescriptionShort{frameRate}
+                        {\DESCvideoTargetFrameRate}
+
+    \varDescriptionShort{mediaType}
+                        {\DESCvideoTargetMediaType}
+
+    \varDescriptionShort{subtitleColor}
+                        {\DESCvideoTargetSubtitleColor}
+
+    \varDescriptionShort{subtitleFontSize}
+                        {\DESCvideoTargetSubtitleFontSize}
+
+    \varDescriptionShort{subtitlesAreHardcoded}
+                        {\DESCvideoTargetSubtitlesAreHardcoded}
+  \end{variableDescriptionTableShort}
+
+  \caption{Parameters for Video Target in
+          \embeddedCode{videoTargetMap} Variable}
+  \label{figure:configFileVideoTargetVariables}
+\end{centeredFigure}
+
+\begin{centeredFigure}
+  \centeredExternalPicture{1}{videoTargetDimensions.mps}
+  \caption{Target Parameters for Video Generation}
+  \label{figure:targetVideoVariables}
+\end{centeredFigure}
+
+So we have two configuration file variables:
+\begin{itemize}
+
+  \item \embeddedCode{videoTargetMap} provides video device dependent
+        properties of notation videos, but also some device
+        independent parameters (like, for example, the subtitle font
+        size).
+
+        This variable is a map from ``target name'' to a target
+        descriptor.  A target descriptor is itself a map with the
+        several fields as shown in
+        figure~\ref{figure:configFileVideoTargetVariables}.  Some of
+        the variables like \embeddedCode{resolution},
+        \embeddedCode{height} or \embeddedCode{width} describe
+        ``hardware'' parameters (because normally the video should
+        have the appropriate size), others like
+        \embeddedCode{topBottomMargin} the layout of the video.
+        
+        Figure~\ref{figure:targetVideoVariables} shows how some of the
+        parameters for video generation are connected to the physical
+        output device and the video target in general.
+
+  \item \embeddedCode{videoFileKindMap} provides further details on
+        the rendering (like, for example, the list of voices to be
+        shown).
+
+        This variable is a map from a ``video file kind name'' to a
+        video file kind descriptor.  A video file kind descriptor is
+        itself a map with the several fields as shown in
+        figure~\ref{figure:configFileVideoFileKindVariables}.  There
+        is information about the target file given by
+        \embeddedCode{videoDirectoryPath} and
+        \embeddedCode{fileNameSuffix} and the list of the voices in
+        those video files.
+
+        \begin{centeredFigure}
+          \begin{variableDescriptionTableShort}
+
+            \varDescriptionShort{target}
+                                {\DESCvideoFileKindTarget}
+
+            \varDescriptionShort{directoryPath}
+                                {\DESCvideoFileKindDirectoryPath}
+
+            \varDescriptionShort{fileNameSuffix}
+                                {\DESCvideoFileKindFileNameSuffix}
+
+            \varDescriptionShort{voiceNameList}
+                                {\DESCvideoFileKindVoiceNameList}
+          \end{variableDescriptionTableShort}
+
+
+          \caption{Parameters for Video File Kind in
+                   \embeddedCode{videoFileKindMap} Variable}
+          \label{figure:configFileVideoFileKindVariables}
+        \end{centeredFigure}
+\end{itemize}
+
+So a video target definition for a single midrange tablet
+could look like this:
+\begin{configurationFileCode}
+  videoTargetMap = \
+    "{" \
+      " tablet:" \
+        " { fileNameSuffix:           '-i-v',"           \
+          " targetVideoDirectoryPath: '/pathto/tablet'," \
+          " resolution:               132,"              \
+          " height:                   1024,"             \
+          " width:                    768,"              \
+          " topBottomMargin:          5,"                \
+          " leftRightMargin:          10,"               \
+          " systemSize:               25,"               \
+          " scalingFactor:            4,"                \
+          " frameRate:                10,"               \
+          " mediaType:                'TV Show',"        \
+          " subtitleColor:            2281766911,"       \
+          " subtitleFontSize:         20,"               \
+          " subtitlesAreHardcoded:    false }"           \
+    "}"
+\end{configurationFileCode}
+
+The above defines a target called ``tablet'' having a video with
+1024x768~pixels, a resolution of 132dpi, a margin of 5mm at top and
+bottom, a margin of 10mm left and right, slightly enlarged systems
+(lilypond standard system size is 20), a yellow semi-transparent
+subtitle with size 20~pixels.  The video runs at a frame rate of 10fps
+(which is ample for a more or less static video and ensures that the
+time resolution for page turning and subtitle changes is 0.1s) and
+lilypond produces images 4~times wider and higher than needed to be
+downscaled by the video renderer for better video image quality.  The
+quicktime media type is ``TV Show'' and subtitles in the final video
+are on a separate track.
+
+Based on the video target definition given above a video file kind
+definition could look like this:
+\begin{configurationFileCode}
+  videoFileKindMap = \
+    "{" \
+      " tabletVocGtr:" \
+        " { target:          tablet,"             \
+          " fileNameSuffix:  '-i-v',"             \
+          " directoryPath:   '/pathto/xyz',"      \
+          " voiceNameList:   'vocals, guitar' }"  \
+    "}"
+\end{configurationFileCode}
+
+The above defines a single file kind for output.  The target
+characteristics are those of a ``tablet'', those videos contain a
+score with vocals plus guitar and all the files have suffix '-i-v'
+(followed by '.mp4', of course).
+
+So the silent video generation produces an MP4 video file for each
+video file kind specified.  Each video displays a score with all
+voices specified in the configuration variable
+\embeddedCode{videoFileKind.voiceNameList} with automatic page turning
+at the right points in time.  That video is stored in a single file in
+the directory given by \embeddedCode{videoFileKind.directoryPath} with
+name \embeddedCode{fileNamePrefix} plus "\_noaudio" and the
+\embeddedCode{videoFileKind.fileNameSuffix} from the file kind
+specification and extension ``.mp4''.
+
+Additionally a subtitle file with all measure numbers is generated in
+the directory given by \embeddedCode{targetDirectoryPath} with name
+\embeddedCode{fileNamePrefix} plus "\_subtitle" and extension
+``.srt''.
+
+This means that a song with file name prefix ``wonderful\_song'' and a
+target file name suffix ``-tablet'' leads to a silent video file of
+``wonderful\_song\_no\-audio-tablet.mp4'' and a subtitle file of
+``wonderful\_song\_subtitle.srt''.  Note that the subtitle file is
+independent of the video target, because it only gives the time
+intervals of each measure and those do not depend on the video.
+
+If you \emph{really} want to fiddle with the video generation, the
+video target name is provided as the lilypond macro
+\embeddedCode{ltbvcVideoTargetName} and has the values specified as
+keys in the list \embeddedCode{videoTargetMap}.  You can use this for
+conditional processing, video layout changes etc., because the file
+inclusion into the boilerplate file is done at a very late position.
+Be warned that the whole video generation might fail, because the
+generator assumes that it has to handle a simple-structured lilypond
+include file.
+
+There is only a single configuration file variable for video as shown
+in figure~\ref{figure:configFileVideoVariables} that defines all video
+targets that are used in the generation.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{videoTargetMap}
+                       {\DESCvideoTargetMap}
+                       {see text}
+
+    \varDescriptionLong{videoFileKindMap}
+                       {\DESCvideoFileKindMap}
+                       {see text}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Video Configuration File Variables}
+  \label{figure:configFileVideoVariables}
+\end{centeredFigure}
+
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Postprocessing Phases}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+All postprocessing phases rely on the configuration file, the
+generated midi file and the silent videos; the lilypond file is not
+used any longer.
+
+Figure~\ref{figure:postprecessingPhases} shows the connection between
+the inputs and the outputs for the phases.  Only the configuration
+file serves as manual input into the processing chain, the other files
+are generated from files coming from the preprocessing phases in
+section~\ref{section:preprocessingPhases}.
+
+The following processing is done:
+\begin{ttDescription}
+  \item [rawaudio:]
+        the midi file is rendered via \embeddedCode{fluidsynth} and
+        sound fonts into plain audio files for each relevant audio
+        voice,
+
+  \item [refinedaudio:]
+        based on voice-specific sound definitions each plain audio
+        file is refined by \embeddedCode{sox} processing for each
+        relevant audio voice into a refined audio file,
+
+  \item [mixdown:]
+        mixed versions of the voice audio
+        files are generated with \embeddedCode{sox} grouped into audio
+        groups from the configuration file (for later selection as
+        audio track), and
+
+  \item [finalvideo:]
+        the still videos and the subtitle file produced from the
+        lilypond file are combined with the grouped audio files to
+        video files with selectable audio tracks and either selectable
+        or burnt in
+\end{ttDescription}
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.55}{postprocessingPhaseDependencies.mps}
+  \caption{Information Flow for the Postprocessing Phases}
+  \label{figure:postprecessingPhases}
+\end{centeredFigure}
+
+%........................................................................
+\subsubsection{Audio Generation: ``rawaudio'' and ``refinedaudio'' Phase}
+%........................................................................
+
+Each voice in \embeddedCode{audioVoiceNameSet} is rendered to audio
+files via the phases ``rawaudio'' and ``refinedaudio'' based on the
+humanized midi file from section~\ref{section:midiPhase}.  The
+\embeddedCode{audioVoiceNameSet} variable is an (unordered) list of
+voices names that are a subset of those occuring in the
+\embeddedCode{midiVoiceNameList}.
+
+%`````````````````````````````
+\paragraph{``rawaudio'' Phase}
+%`````````````````````````````
+
+The ``rawaudio'' phase simply takes each voice given in the audio
+voice name set and converts the humanized midi stream into a wave file
+using \embeddedCode{fluidsynth}.  It relies on the soundfont files
+given by the variables \embeddedCode{soundFontDirectoryPath} and
+\embeddedCode{soundFontNameList}.  The name order of the soundfonts
+give the order of matching a given midi instrument number: the first
+match is accepted.
+
+Note that the midi volume is not used by this phase: any midi volume
+changes are suppressed and only the velocity is used.
+
+For each voice the resulting wave file after generation is stored in
+directory \embeddedCode{tempAudioDirectoryPath} as an intermediate
+file for further processing.  The naming convention is to use the
+voice name with a ``.wav'' extension (for example, ``bass.wav'' stores
+the result for a bass voice).
+
+%`````````````````````````````````
+\paragraph{``refinedaudio'' Phase}
+%`````````````````````````````````
+
+Normally the sounds produced by soundfonts need some beefing up.  This
+is done in the ``refinedaudio'' phase where the audio file from the
+previous phase are postprocessed by the sound processor
+\embeddedCode{sox}.
+
+sox is a commandline program where chains of effects are applied to
+audio input files producing audio output files.  For example, the
+command
+\begin{commandLine}
+  sox input.wav output.wav highpass 80 2q reverb 50
+\end{commandLine}
+applies a double-pole highpass filter at 80Hz with a width of 2q
+followed by a medium reverb to file \embeddedCode{input.wav} and
+stores the result in file \embeddedCode{output.wav}.
+
+sox has a lot of those filters and all those can be used for sound
+shaping.  In this document we cannot go into details, but a thorough
+information can be found in the sox
+documentation~\cite{reference:soxDocumentation}.
+
+Each audio voice is transformed depending on voice-specific settings
+in the configuration file.  Because the input file comes from the
+previous ``rawaudio'' phase (for example ``bass.wav'') and the output
+file name for the ``refinedaudio'' phase is also well-defined (for
+example as ``bass-processed.wav''), we only have to specify the sox
+commands for the transformation itself.
+
+Those commands depend on the voice/instrument and on the style of the
+playing and this is combined in a so-called \emph{sound style}
+variable.
+
+The name of sound style variables is constructed as follows: the
+prefix ``soundStyle'' is followed by the voice name with initial caps
+(for example ``Bass'') and by the style variant ---~a single word~---
+capitalized as suffix (``Hard'').  When following this convention, a
+hard bass has a sound style name ``soundStyleBassHard''.
+
+Very often a sound style is not defined on its own, but relies on
+other definitions.  Let us assume we have some standard postprocessing
+for a bass.  This consists of a normalization with 24dB headroom (to
+prevent distortion in the following steps), an enhancement of the
+150Hz band by 10dB and a 6dB cutoff of high frequencies above 600Hz.
+In the configuration file this could look as follows:
+
+\begin{configurationFileCode}
+  _bassPostprocess = \
+      " norm -24" \
+      " equalizer  150 4o +10" \
+      " lowpass -2 600 1.2o"
+\end{configurationFileCode}
+
+Based on that definition above the actual sound style can be defined
+as follows (referencing the definition by name):
+
+\begin{configurationFileCode}
+  soundStyleBassHard = \
+      " highpass -2 40"  \
+      " lowpass -2 2k"   \
+      " norm -6 "        \
+      " tee"             \
+      " overdrive 12 0 " \
+      _bassPostprocess
+\end{configurationFileCode}
+
+The sound style definition uses a low- and highpass followed by an
+overdrive and the final equalization. Note that the name is \emph{not}
+in double quotes: this distinguishes it from plain text (as explained
+in section~\ref{section:configurationFileSyntax}).
+
+There are four things to note:
+\begin{enumerate}
+
+  \item As demonstrated sound styles may rely on other definitions; so
+        you can build a hierarchy of effect chains.
+
+  \item The special effect ``tee'' is not part of sox.  When debugging
+        is active, this ``effect'' writes out the audio data available
+        at that position in the chain into a temporary file in the
+        target audio directory called ``\meta{voice}X.wav'' where X
+        stands for a hex number.  Multiple ``tee'' commands are
+        possible, so you can do an audio debugging of your chain.
+
+  \item Processing is purely sequential with a single signal path.
+        There is no sidechaining, no New York parallel compression
+        etc.
+
+        More complicated processing paths are planned for a future
+        version (see section~\ref{section:futureExtensions}).
+
+  \item Reverb is normally not specified in the chain.  Reverb is
+        automatic and always applied with default parameters and
+        an intensity defined by the configuration variable
+        \embeddedCode{reverbLevelList} to the final audio.
+
+        If that simple reverb is not good enough and specific settings
+        are needed, you can set the reverb level for some voice to 0
+        and add a more elaborated reverb effect to the sound style.
+
+\end{enumerate}
+
+So how do we apply the specific sound style and some reverb to our
+bass?  The settings in the song configuration file are as follows
+
+\begin{configurationFileCode}
+  voiceNameList    = "...,  bass, ..."
+  reverbLevelList  = "...,   0.4, ..."
+  soundVariantList = "...,  hard, ..."
+\end{configurationFileCode}
+
+As above \embeddedCode{reverbLevelList} and
+\embeddedCode{soundVariantList} are lists with elements in the same
+order as \embeddedCode{voiceNameList}.  There is a special sound
+variant called \embeddedCode{copy} that just takes the raw audio file
+and applies the specified reverb to it.
+
+The sound variant may be given in any letter case, because it is
+automatically adapted for the selection of the sound style.  Combined
+with the above sound style this leads to the following sox commands
+---~when debugging is active~--- (note the command split at the tee
+effect and the added final reverb with \embeddedCode{100\(\cdot\)
+reverbLevel}):
+
+\begin{commandLine}
+  sox bass.wav bassA.wav highpass -2 40 lowpass -2 2k norm -6
+  sox bassA.wav bass-processed.wav overdrive 12 0 norm -24 \
+       equalizer 150 4o +10 lowpass -2 600 1.2o reverb 40
+\end{commandLine}
+
+Sound styles can be defined per song or globally.  I prefer the
+latter, because I use a few bread-and-butter sounds per instrument and
+adapt them only by using different midi instruments, audio volumes and
+reverb levels in the voice configuration; hence the sound styles
+itself are not adapted.  But in principle you can fine-tune the voice
+sounds per song, which I find tedious.
+
+It is helpful to use a simple set of variants that apply to all
+voices, for example, ``STD'' (for a normal sound), ``HARD'' (for some
+heavier sound), ``EXTREME'' (for an ultra-hard sound) etc.
+
+So finally each audio voice has its processed wav version in
+\embeddedCode{targetDirectoryPath} called
+``\meta{voice}-processed.wav'' for later mixdown.
+
+There are two cases that can also be handled by the audio processing
+phases:
+
+\begin{enumerate}
+  \item One can override a processed track by some external audio
+        file.
+  \item A parallel track in a file not related to some voice can
+        be added.
+\end{enumerate}
+
+So both cases involve external audio files to be added.
+
+The first case is common when you want to replace a track by a real
+recording.  For example, the vocals with midi beeps could be enhanced
+by having a real singer sing the track.
+
+All those tracks are described in the configuration variable
+\embeddedCode{voiceNameToOverrideFileNameMap}.  As its name tells, it
+maps voice names to file names.
+
+\begin{configurationFileCode}
+  voiceNameToOverrideFileNameMap = \
+      "{ vocals : 'vocals.flac'," \
+        "bass   : 'mybass.wav'  }"
+\end{configurationFileCode}
+
+This approach replaces the processed voice files by the contents of
+the files given in the map.  File types supported are all those
+supported by sox as input.  Note that the overriding file has to have
+the length of a refined voice file, that means, it also has to contain
+material for the count-in measures.
+
+In the second case no specific voice track is replaced, but some
+parallel track is introduced.  For example, this could be used for
+lead-in text or audience audio.
+
+In principle this could be handled by introducing an artificial voice
+only used for audio, but for convenience there is another variable
+called \embeddedCode{parallelTrack} for a single additional track.  It
+contains comma-separated data for an audio file name, a volume factor
+and offset relative to the start of the song in seconds as follows:
+
+\begin{configurationFileCode}
+  parallelTrack = " parallelFile.wav, 1.0, 2.8"
+\end{configurationFileCode}
+
+Note that it is only possible to have a single parallel track.
+
+%```````````````````````````````````````````````````
+\paragraph{Summary of Audio Configuration Variables}
+%```````````````````````````````````````````````````
+
+Figure~\ref{figure:configFileAudioVariables} shows all the
+configuration variables described for the ``rawaudio'' and
+``refinedaudio'' phases.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{audioVoiceNameSet}
+                       {\DESCaudioVoiceNameSet}
+                       {"vocals, drums, bass"}
+
+    \varDescriptionLong{reverbLevelList}
+                       {\DESCreverbLevelList}
+                       {"0.1, 1.1, 0.5, 0.0"}
+
+    \varDescriptionLong{soundStyle\meta{Voice}\-\meta{Variant}}
+                       {\DESCsoundStyleXXX}
+                       {see text}
+
+    \varDescriptionLong{soundVariantList}
+                       {\DESCsoundVariantList}
+                       {"COPY, EXTREME, STD, HARD"}
+
+    \varDescriptionLong{voiceNameToOverride\-FileNameMap}
+                       {\DESCvoiceNameToOverrideFileNameMap}
+                       {see text}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Audio Configuration File Variables}
+  \label{figure:configFileAudioVariables}
+\end{centeredFigure}
+
+%........................................................
+\subsubsection{Final Audio Generation: ``mixdown'' Phase}
+%........................................................
+
+The ``mixdown'' phase combines the refined audio files into one or
+more audio file with all voices and in aac audio format.
+
+Audio levels of the individual voices and a final attenuation factor
+are specified in the configuration; the audio voices are mixed with
+those levels and the attenuation is applied to the mix before it gets
+compressed into an AAC file.
+
+The entries are specified as follows:
+
+\begin{configurationFileCode}
+  voiceNameList  = "...,  bass, guitar, ..."
+  audioLevelList = "...,   0.7,    0.5, ..."
+
+  attenuationLevel = -0.2
+\end{configurationFileCode}
+
+The target file is stored in the
+\embeddedCode{audioTargetDirectoryPath} with a name concatenated from
+\embeddedCode{targetFileNamePrefix}, \embeddedCode{fileNamePrefix} and
+suffix ``-ALL.m4a''.
+
+But: you do not want a backing track with all voices of your
+arrangement, but the ones to be played live should be missing and
+ideally one should be able to switch them on and off!
+
+Again we specify this by several mapping variables in the
+configuration file.
+
+The first variable, \embeddedCode{audioGroupToVoicesMap}, specifies a
+partitioning of the audio voices into groups where some freely
+selectable audio group names are mapped onto sets of audio voice
+names.
+
+\begin{configurationFileCode}
+  audioGroupToVoicesMap = "{" \
+      " base : bass/keyboard/keyboardSimple/strings," \
+      " voc  : vocals/bgVocals," \
+      " gtr  : guitar," \
+      " drm  : drums/percussion" \
+   "}"
+\end{configurationFileCode}
+
+The voice names in the song should be a subset of the voice names
+mentioned in the audio group map, missing or extraneous voice names
+will be ignored.  When defining those settings globally for a group of
+songs, ensure that typical voice name variants (like, for example,
+``keyboardSimple'') are included in one of the lists; otherwise those
+voices will be missed in the mix files and videos.
+
+The second variable, \embeddedCode{audioTrackList}, specifies all
+tracks that will later occur as tracks in the video, but also that are
+rendered as compressed audio files.
+
+Each track is described by a track descriptor with several fields as
+shown in figure~\ref{figure:configFileAudioTrackVariables}.  It
+consists of a list of the several groups to be combined, templates for
+the audio file and the song name, an album name, and some description
+and a language code for the video track.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableShort}
+
+    \varDescriptionShort{audioGroupList}
+                        {\DESCaudioTrackGroupList}
+
+    \varDescriptionShort{audioFileTemplate}
+                        {\DESCaudioTrackAudioFileTemplate}
+
+    \varDescriptionShort{songNameTemplate}
+                        {\DESCaudioTrackSongNameTemplate}
+
+    \varDescriptionShort{albumName}
+                        {\DESCaudioTrackAlbumName}
+
+    \varDescriptionShort{description}
+                        {\DESCaudioTrackDescription}
+
+    \varDescriptionShort{languageCode}
+                        {\DESCaudioTrackLanguageCode}
+
+  \end{variableDescriptionTableShort}
+
+  \caption{Parameters for Audio Track in \embeddedCode{audioTrackList}
+           Variable}
+  \label{figure:configFileAudioTrackVariables}
+\end{centeredFigure}
+
+``Language code'' sounds a bit strange: why do you need that?
+
+Unfortunately not many video players support audio track description
+texts for MP4 videos, but most of them allow to select audio tracks by
+``language''.  So the audio tracks in the final video are tagged with
+both description and language code for some kind of identification.
+Of course, the selected languages are quite arbitrary, because you
+typically do not find a connection between a list of audio voice names
+and some language name.  So you must be creative\dots
+
+Altogether we have something like that in the configuration file:
+
+\begin{configurationFileCode}
+  audioTrackList = "{" \
+    "all :   { audioGroupList    : base/voc/gtr/drm,"    \
+    "          audioFileTemplate : '$',"                 \
+    "          songNameTemplate  : '$ [ALL]',"           \
+    "          albumName         : 'Best',"              \
+    "          description       : 'all voices',"        \
+    "          languageCode      : eng },"               \
+    "novoc : { audioGroupList    : base/gtr/drm,"        \
+    "          audioFileTemplate : '$-novoc',"           \
+    "          songNameTemplate  : '$ [-V]',"            \
+    "          albumName         : 'Best [no vocals]',"  \
+    "          description       : 'no vocals',"         \
+    "          languageCode      : deu },"               \
+    ...
+  "}"
+\end{configurationFileCode}
+
+So any number of audio tracks is possible.  In the example above we
+have two (if you ignore the ellipsis!).  If we assume that the target
+file name prefix is ``test-'' and that the song has file name prefix
+``wonderful\_song'' and is called ``Wonderful Song'', the files have
+the following properties:
+\begin{enumerate}
+
+  \item The first track has all voices, is stored in
+        ``test-wonderful\_song.m4a'' with title
+        ``Wonderful~Song~[ALL]'' in album ``Best'' and it has
+        description ``all voices'' and an English language tag.
+
+  \item The second track has all voices except for vocals and bg
+        vocals, is stored in ``test-wonderful\_song-novoc.m4a'' with
+        title ``Wonderful~Song~[-V]'' in album ``Best~[no~vocals]''
+        and it has description ``no vocals'' and a German language
+        tag.
+
+\end{enumerate}
+
+Figure~\ref{figure:configFileMixdownVariables} shows the variables
+introduced in this section in summary.
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableLong}
+
+    \varDescriptionHeaderLong
+
+    \varDescriptionLong{attenuationLevel}
+                       {\DESCattenuationLevel}
+                       {-1.3}
+
+    \varDescriptionLong{audioGroupToVoicesMap}
+                       {\DESCaudioGroupToVoicesMap}
+                       {see text}
+
+    \varDescriptionLong{audioLevelList}
+                       {\DESCaudioLevelList}
+                       {"0.7, 0.5, 1.2"}
+
+    \varDescriptionLong{audioTargetDirectoryPath}
+                       {\DESCaudioTargetDirectoryPath}
+                       {"/pathto/XXX"}
+
+    \varDescriptionLong{audioTrackList}
+                       {\DESCaudioTrackList}
+                       {see text}
+
+  \end{variableDescriptionTableLong}
+
+  \caption{Mixdown Configuration File Variables}
+  \label{figure:configFileMixdownVariables}
+\end{centeredFigure}
+
+%.....................................................
+\subsubsection{Video Generation: ``finalvideo'' Phase}
+%.....................................................
+
+The still videos from the lilypond file contain rendered score images
+from lilypond with appropriate display times.  The ``finalvideo''
+phase combines those silent videos with the subtitle file and the
+rendered audio tracks from above.
+
+There are no big surprises here: for every video file kind in the
+list \embeddedCode{videoFileKindMap} a video is built with the
+following parts:
+
+\begin{itemize}
+
+  \item the file-kind-specific still video with the appropriate
+        extension \embeddedCode{fileNameSuffix} for the given target
+        name finally located in \embeddedCode{targetDirectoryPath},
+
+  \item the subtitle file located in
+        \embeddedCode{targetDirectoryPath}, and
+
+  \item the compressed audio files generated by the ``mixdown'' phase
+        and located in \embeddedCode{audioTargetDirectoryPath}
+\end{itemize}
+
+If \embeddedCode{subtitlesAreHardcoded} is set for the target, the
+subtitle is burnt into the video with specified
+\embeddedCode{subtitleFontSize} and \embeddedCode{subtitleColor}.
+Otherwise the subtitle is put into the target video as a subtitle
+track (to be switched on or off).  In the latter case, the rendering
+ of the subtitle is done by the video player.
+
+The name of the combined video is constructed as follows: the
+\embeddedCode{targetFileNamePrefix} is concatenated with
+\embeddedCode{fileNamePrefix} for the song, a minus character, the
+video file kind name suffix and ``.mp4'' extension.  It is stored in
+the directory given by \embeddedCode{videoFileKind.directoryPath}.
+
+For example, by those conventions the ``Wonderful Song'' for the
+``tablet'' has name ``test-wonderful\_song-tablet.mp4'' and is stored
+in the directory given in the target definition.
+
+%----------------
+\section{Summary}
+%----------------
+
+We're done! We have achieved the following results from a lilypond
+file with song voices and a song configuration file:
+
+\begin{itemize}
+  \item notation extracts of selected voices as PDF files,
+  \item a notation score of selected voices as a PDF file,
+  \item a MIDI file with selected voices slightly humanized,
+  \item several single voice audio files,
+  \item audio file mixes combining voices into groups, and
+  \item video files for different target devices containing selectable
+        audio tracks and possibly a selectable subtitle with measure
+        indication
+\end{itemize}
+
+%======================
+\chapter{Example}
+\label{section:example}
+%======================
+
+As the example we take a twelve-bar blues in E with two verses and
+some intro and outro.  Note that this song is just an example, its
+musical merit is limited.
+
+In the following we shall work with three files:
+\begin{itemize}
+
+  \item a global configuration file containing overall settings (like
+        for example, the path to programs),
+
+  \item a song-specific configuration file containing the settings
+        for the song (like, for example, the title of the song or the
+        voice names), and
+
+  \item a lilypond music file containing the music fragments used by
+        the generator.
+
+\end{itemize}
+
+In principle one only needs a \emph{single} configuration file and a
+single lilypond fragment file, but by this approach we can keep global
+and song-specific stuff separate.
+
+In the following we explain the lilypond file and configuration file
+in pieces; the complete versions are in the distribution.
+
+%------------------------------
+\section{Example Lilypond File}
+%------------------------------
+
+The lilypond file starts with the version definition and the inclusion
+of the note name language file:
+
+\begin{lilypondFileCode}
+  \version "2.18.2"
+  \include "english.ly"
+\end{lilypondFileCode}
+
+The first musical definition is the key and time designation of the
+song: it is in e major and uses common time.
+
+\begin{lilypondFileCode}
+  keyAndTime = { \key e \major  \time 4/4 }
+\end{lilypondFileCode}
+
+The chords are those of a plain blues with a very simple intro and
+outro.  Note that the chords differ for extract and other notation
+renderings: for the extract and score we use a volta repeat for the
+verses, hence in that case all verse lyrics are stacked vertically and
+we only have one pass of the verse.
+
+All chords are generic: there is no distinction by instrument.
+
+\begin{lilypondFileCode}
+  chordsIntro = \chordmode { b1*2 | }
+  chordsOutro = \chordmode { e1*2 | b2 a2 | e1 }
+  chordsVerse = \chordmode { e1*4 | a1*2 e1*2 | b1 a1 e1*2 }
+
+  allChords = {
+    \chordsIntro  \repeat unfold 2 { \chordsVerse }
+    \chordsOutro
+  }
+
+  chordsExtract = { \chordsIntro  \chordsVerse  \chordsOutro }
+  chordsScore   = { \chordsExtract }
+\end{lilypondFileCode}
+
+The vocals are simple with a pickup measure.  Because we want to keep
+the notation consistent across the voices we have to use two alternate
+endings for the \embeddedCode{vocalsExtract} and
+\embeddedCode{vocalsScore}.
+
+\begin{lilypondFileCode}
+  vocTransition = \relative c' { r4 b'8 as a g e d | }
+  vocVersePrefix = \relative c' {
+    e2 r | r8 e e d e d b a |
+    b2 r | r4 e8 d e g a g | a8 g4. r2 | r4 a8 g a e e d |
+    e2 r | r1 | b'4. a2 g8 | a4. g4 d8 d e~ | e2 r |
+  }
+
+  vocIntro = { r1 \vocTransition }
+  vocVerse = { \vocVersePrefix \vocTransition }
+
+  vocals = { \vocIntro \vocVerse \vocVersePrefix R1*5 }
+  vocalsExtract = {
+    \vocIntro
+    \repeat volta 2 { \vocVersePrefix }
+    \alternative {
+	{ \vocTransition }{ R1 }
+    }
+    R1*4
+  }
+  vocalsScore = { \vocalsExtract }
+\end{lilypondFileCode}
+
+The lyrics of the demo song are really bad.  Nevertheless note the
+lilypond separation for the syllables and the stanza marks.  For the
+video notation the lyrics are serialized.  Because of the pickup
+measure, the lyrics have to be juggled around.
+
+\begin{lilypondFileCode}
+  vocalsLyricsBPrefix = \lyricmode {
+    \set stanza = #"2. " Don't you know I'll go for }
+
+  vocalsLyricsBSuffix = \lyricmode {
+    good, be- cause you've ne- ver un- der- stood,
+    that I'm bound to leave this quar- ter,
+    walk a- long to no- ones home:
+    go down to no- where in the end. }
+
+  vocalsLyricsA = \lyricmode {
+    \set stanza = #"1. "
+    Fee- ling lone- ly now I'm gone,
+    it seems so hard I'll stay a- lone,
+    but that way I have to go now,
+    down the road to no- where town:
+    go down to no- where in the end.
+    \vocalsLyricsBPrefix }
+
+  vocalsLyricsB = \lyricmode {
+    _ _ _ _ _ _ \vocalsLyricsBSuffix }
+  vocalsLyrics = { \vocalsLyricsA \vocalsLyricsBSuffix}
+\end{lilypondFileCode}
+
+The bass simply hammers out eighth notes.  As before there is an
+extract and a score version with volta repeats and an unfolded version
+for the rest.
+
+\begin{lilypondFileCode}
+  bsTonPhrase  = \relative c, { \repeat unfold 7 { e8  } fs8 }
+  bsSubDPhrase = \relative c, { \repeat unfold 7 { a'8 } gs8 }
+  bsDomPhrase  = \relative c, { \repeat unfold 7 { b'8 } cs8 }
+  bsDoubleTonPhrase = { \repeat percent 2 { \bsTonPhrase } }
+  bsOutroPhrase = \relative c, { b8 b b b gs a b a | e1 | }
+
+  bsIntro = { \repeat percent 2 { \bsDomPhrase } }
+  bsOutro = { \bsDoubleTonPhrase  \bsOutroPhrase }
+  bsVersePrefix = {
+    \repeat percent 4 { \bsTonPhrase }
+    \bsSubDPhrase \bsSubDPhrase \bsDoubleTonPhrase
+    \bsDomPhrase \bsSubDPhrase \bsTonPhrase
+  }
+  bsVerse = { \bsVersePrefix \bsTonPhrase }
+
+  bass = { \bsIntro  \bsVerse \bsVerse  \bsOutro }
+  bassExtract = {
+    \bsIntro
+    \repeat volta 2 { \bsVersePrefix }
+    \alternative {
+      {\bsTonPhrase} {\bsTonPhrase}
+    }
+    \bsOutro
+  }
+  bassScore = { \bassExtract }
+\end{lilypondFileCode}
+
+The guitar plays arpeggios.  As can be seen here, very often the
+lilypond macro structure is similar for different voices.
+
+\begin{lilypondFileCode}
+  gtrTonPhrase  = \relative c { e,8 b' fs' b, b' fs b, fs }
+  gtrSubDPhrase = \relative c { a8 e' b' e, e' b e, b }
+  gtrDomPhrase  = \relative c { b8 fs' cs' fs, fs' cs fs, cs }
+  gtrDoubleTonPhrase  = { \repeat percent 2 { \gtrTonPhrase } }
+  gtrOutroPhrase = \relative c { b4 fs' a, e | <e b'>1 | }
+
+  gtrIntro = { \repeat percent 2 { \gtrDomPhrase } }
+  gtrOutro = { \gtrDoubleTonPhrase | \gtrOutroPhrase }
+  gtrVersePrefix = {
+    \repeat percent 4 { \gtrTonPhrase }
+    \gtrSubDPhrase  \gtrSubDPhrase  \gtrDoubleTonPhrase
+    \gtrDomPhrase  \gtrSubDPhrase  \gtrTonPhrase
+  }
+  gtrVerse = { \gtrVersePrefix \gtrTonPhrase }
+
+  guitar = { \gtrIntro  \gtrVerse  \gtrVerse  \gtrOutro }
+  guitarExtract = {
+    \gtrIntro
+    \repeat volta 2 { \gtrVersePrefix }
+    \alternative {
+      {\gtrTonPhrase} {\gtrTonPhrase}
+    }
+    \gtrOutro
+  }
+  guitarScore = { \guitarExtract }
+\end{lilypondFileCode}
+
+Finally the drums do some monotonic blues accompaniment.  We have to
+use the \embeddedCode{myDrums} name here, because \embeddedCode{drums}
+is a predefined name in lilypond.
+
+\begin{lilypondFileCode}
+  drmPhrase = \drummode { <bd hhc>8 hhc <sn hhc> hhc }
+  drmOstinato = { \repeat unfold 2 { \drmPhrase } }
+  drmFill = \drummode { \drmPhrase tomh8 tommh toml tomfl }
+
+  drmIntro = { \drmOstinato  \drmFill }
+  drmVersePrefix = {
+    \repeat percent 3 { \drmOstinato }  \drmFill
+    \repeat percent 2 { \drmOstinato  \drmFill }
+    \repeat percent 3 { \drmOstinato }
+  }
+  drmVerse = { \drmVersePrefix \drmFill }
+
+  myDrums = { \drmIntro  \drmVerse \drmVerse  \drmOutro }
+  myDrumsExtract = { \drmIntro
+    \repeat volta 2 {\drmVersePrefix}
+    \alternative {
+     {\drmFill} {\drmFill}
+    }
+    \drmOutro }
+  myDrumsScore = { \myDrumsExtract }
+\end{lilypondFileCode}
+
+So we are done with the lilypond file.  What we have defined are
+\begin{itemize}
+  \item the song key and time,
+  \item the chords,
+  \item the vocal lyrics, and
+  \item voices for vocals, bass, guitar and drums.
+\end{itemize}
+
+All those definitions take care that the notations shall differ in our
+case for extracts/score and other notation renderings.
+
+%------------------------------------
+\section{Example Configuration Files}
+%------------------------------------
+
+As mentioned above the configuration is split up into a file with
+global settings and one with the song settings.
+
+As a convention we prefix auxiliary variable with an underscore to
+distinguish them from the real configuration variables.
+
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Example Global Configuration}
+\label{section:exampleGlobalConfiguration}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The first setup steps define the program locations.  We assume that
+programs are located together in some directory, but this depends on
+the environment.  All definitions assume a Unix context, but you may
+also use slashes as path separators for Windows.
+
+\begin{configurationFileCode}
+  _programDirectory = "/usr/local"
+  aacCommandLine = _programDirectory "/qaac -V100 -i $1 -o $2"
+  ffmpegCommand = _programDirectory "/ffmpeg"
+  fluidsynthCommand = _programDirectory "/fluidsynth"
+  lilypondCommand = _programDirectory "/lilypond"
+  soxCommandLinePrefix = _programDirectory "/sox"
+\end{configurationFileCode}
+
+We have not provided a definition for the \embeddedCode{mp4boxcommand}
+because ---~as a default~--- ffmpeg can also do the MP4 container
+packaging.  Note also that aac and sox must have more extensive
+definitions.
+
+Other global settings define paths for files or directories.  The
+generated PDF and MIDI files go to subdirectory ``generated'' of the
+current directory, audio into ``/tmp/audiofiles''.
+
+\begin{configurationFileCode}
+  loggingFilePath = "/tmp/logs/ltbvc.log"
+  soundFontDirectoryPath = _programDirectory "/soundfonts"
+  targetDirectoryPath = "generated"
+  tempAudioDirectoryPath = "/tmp/audiofiles"
+  soundFontNames = "FluidR3_GM.SF2"
+\end{configurationFileCode}
+
+For the notation we ensure that drums use the drum staff and that the
+clefs for bass and guitar are transposed by an octave and that drums
+have no clef at all.  Chords shall be shown for all extracts of
+melodic instruments and on the top voice ``vocals'' in the score and
+video.
+
+\begin{configurationFileCode}
+  _voiceNameToStaffListMap = "{ drums : DrumStaff }"
+  _voiceNameToClefMap = "{" \
+    "bass : bass_8, drums : '', guitar : G_8" \
+  "}"
+
+  phaseAndVoiceNameToStaffListMap = "{"      \
+      "extract :" _voiceNameToStaffListMap ","  \
+      "midi    :" _voiceNameToStaffListMap ","  \
+      "score   :" _voiceNameToStaffListMap ","  \
+      "video   :" _voiceNameToStaffListMap "}"
+
+  phaseAndVoiceNameToClefMap = "{"      \
+      "extract :" _voiceNameToClefMap ","  \
+      "midi    :" _voiceNameToClefMap ","  \
+      "score   :" _voiceNameToClefMap ","  \
+      "video   :" _voiceNameToClefMap "}"
+
+  voiceNameToChordsMap = "{" \
+    "vocals : s/v, bass : e, guitar : e" \
+  "}"
+\end{configurationFileCode}
+
+The humanization for the MIDI and audio files is quite simple: we use
+a rock groove with tight hits on two and four and slight variations
+for other measure positions.  The timing variations are very subtle
+as the variation is at most 0.2 \(1/32^{nd}\) notes.
+
+As the velocity variation there is a hard accent on two and a slighter
+accent on four while the other positions are much weaker.
+
+We have \emph{not} defined individual variation factors per
+instrument; hence all humanized instruments have similar variations in
+timing and velocity.
+
+\begin{configurationFileCode}
+  humanizationStyleRockHard  = \
+      "{ countIn : 2, "                               \
+       " timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
+                   " S:B0.15, OTHER:B0.2 },"          \
+       " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
+                   " S:0.9, OTHER:0.85, SLACK:0.1 } }"
+\end{configurationFileCode}
+
+The video generation is just done for a single video target called
+``tablet'' with a portrait orientation and a classical 4:3 aspect
+ratio.  The strange integer below for the subtitle color is a
+hexadecimal 8800FFFF, that is a yellow with about 45\% transparency.
+And the videos show both vocals and guitar and are characterized as
+``Music Videos'' in their media type.
+
+\begin{configurationFileCode}
+  videoTargetMap = "{" \
+      "tablet: { fileNameSuffix: '-tblt'," \
+               " targetVideoDirectoryPath: '~/videos' ," \
+               " resolution: 132," \
+               " height: 1024," \
+               " width: 768," \
+               " topBottomMargin: 5," \
+               " leftRightMargin: 10," \
+               " scalingFactor: 4," \
+               " frameRate: 10.0," \
+               " mediaType: 'Music Video'," \
+               " systemSize: 25," \
+               " subtitleColor: 2281766911," \
+               " subtitleFontSize: 20," \
+               " subtitlesAreHardcoded: true } }"
+
+  videoFileKindMap = "{" \
+      "tabletVocGtr: { target:         tablet,"      \
+                     " fileNameSuffix: '-tblt-vg',"     \
+                     " directoryPath:  '~/videos' ," \
+                     " voiceNameList:  'vocals, guitar' } }"
+\end{configurationFileCode}
+
+For the transformation from midi tracks to audio files there are only
+two sound style definitions: an extreme bass and a crunchy guitar.
+Both use overdrive and some sound shaping, the guitar style also
+applies a bit of compression.  Details of the parameters can be found
+in the sox documentation~\cite{reference:soxDocumentation}.
+
+For all the other voices we shall specify later that they just use the
+raw audio files with some reverb added.
+
+\begin{configurationFileCode}
+  soundStyleBassExtreme = \
+      " norm -12 highpass -2 40 lowpass -2 2k" \
+      " norm -10 overdrive 30 0" \
+      " norm -24 equalizer  150 4o +10 lowpass -2 600 1.2o"
+
+  soundStyleGuitarCrunch = \
+      " highpass -1 100 norm -6" \
+      " compand 0.04,0.5 6:-25,-20,-5 -6 -90 0.02" \
+      " overdrive 10 40"
+\end{configurationFileCode}
+
+For the final audio files we have two variants: one with all voices,
+the other one with missing vocals and background vocals (the ``karaoke
+version'').  The song and album names have the appropriate info in
+brackets.
+
+All songs will go to the ``musicFiles'' subdirectory of HOME and have
+a jpeg-file as their embedded album art.  Audio and video files have
+``test-'' as their prefix before the song name.  So, for example, the
+audio file for ``Wonderful Song'' with all voices has path
+``~/musicFiles/test-wonderful\_song.m4a''.
+
+\begin{configurationFileCode}
+  targetFileNamePrefix = "test-"
+  audioTargetDirectoryPath = "~/musicFiles"
+  albumArtFilePath = "~/musicFiles/demo.jpg"
+
+  audioGroupToVoicesMap = "{" \
+      " base : bass/keyboard/strings/drums/percussion," \
+      " voc  : vocals/bgVocals," \
+      " gtr  : guitar" \
+  "}"
+
+  audioTrackList = "{" \
+      "all :      { audioGroupList    : base/voc/gtr,"  \
+      "             audioFileTemplate : '$',"      \
+      "             songNameTemplate  : '$ [ALL]',"     \
+      "             albumName         : '$',"           \
+      "             description       : 'all voices',"  \
+      "             languageCode      : deu },"         \
+      "novocals : { audioGroupList    : base/gtr,"      \
+      "             audioFileTemplate : '$-v',"    \
+      "             songNameTemplate  : '$ [-V]',"      \
+      "             albumName         : '$ [-V]',"      \
+      "             description       : 'no vocals',"   \
+      "             languageCode      : eng }"          \
+  "}"
+\end{configurationFileCode}
+
+
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Example Song Configuration}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is not much left to define the song.  First come the overall
+properties:
+
+\begin{configurationFileCode}
+  title = "Wonderful Song"
+  fileNamePrefix = "wonderful_song"
+  year = 2017
+  composerText = "arranged by Fred, 2017"
+  trackNumber = 99
+\end{configurationFileCode}
+
+The main information about a song is given in the table of voices with
+the voice names, midi data, audio and reverb levels and the sound
+variants.  As mentioned before only bass and guitar have an audio
+postprocessing.
+
+\begin{configurationFileCode}
+  voiceNameList      =  "vocals,    bass,  guitar,   drums"
+  midiChannelList    =  "     2,       3,       4,      10"
+  midiInstrumentList =  "    54,      35,      29,      18"
+  midiVolumeList     =  "   100,     120,      70,     110"
+  panPositionList    =  "     C,    0.3R,    0.8R,    0.1L"
+  audioLevelList     =  "   1.0,    0.83,    0.33,    1.48"
+  reverbLevelList    =  "   0.3,     0.2,     0.0,     0.4"
+  soundVariantList   =  "  COPY, EXTREME,  CRUNCH,    COPY"
+\end{configurationFileCode}
+
+We also have lyrics: two lines of lyrics in vocals extract and score,
+one (serialized) line in the video.
+
+\begin{configurationFileCode}
+  voiceNameToLyricsMap = "{ vocals : e2/s2/v }"
+\end{configurationFileCode}
+
+Humanization relies on the humanization style defined
+in~\ref{section:exampleGlobalConfiguration}.  It applies to all voices
+except vocals.
+
+\begin{configurationFileCode}
+  styleHumanizationKind = "humanizationStyleRockHard"
+  humanizedVoiceNameSet = "bass, guitar, drums"
+\end{configurationFileCode}
+
+The overall tempo is 85bpm throughout the song.
+
+\begin{configurationFileCode}
+  measureToTempoMap = "{ 1 : 85 }"
+\end{configurationFileCode}
+
+%--------------------------------
+\section{Putting it All Together}
+%--------------------------------
+
+Now we are set to start the tool chain.  Assuming that the
+configuration is in file ``wonderful\_song-config.txt'' and the
+lilypond stuff is in ``wonderful\_song-music.ly'', the command to
+produce everything is
+
+\begin{commandLine}
+  python ltbvc.py wonderful_song-config.txt
+\end{commandLine}
+
+and it produces the following target files
+\begin{itemize}
+  \item in directory ``generated'' the extracts
+        ``wonderful\_song-bass.pdf'',
+        ``won\-der\-ful\_song-\-drums.pdf'',
+        ``wonderful\_song-guitar.pdf'' and
+        ``wonder\-ful\_\-song-vocals.pdf'',
+
+  \item the score file ``generated/wonderful\_song\_score.pdf'',
+
+  \item the midi file ``generated/wonderful\_song-std.mid'',
+
+  \item in directory ``~/musicFiles'' the audio files
+        ``test-wonderful\_song.m4a'' and ``test-wonderful\_song-v.m4a'',
+        and
+
+  \item the video file with two audio tracks
+        ``~/videos/test-wonderful\_song-tblt.mp4''
+\end{itemize}
+
+Figure~\ref{figure:exampleTargetImages} shows an extract page (a), one
+image of the target video (b) and the first score page (c) as an
+illustration.
+
+\begin{centeredFigure}
+  \begin{center}
+    \begin{minipage}[b]{6.5cm}
+      a) \externalPicture{0.14}{demo-extract.png}\\*[3mm]
+      b) \externalPicture{0.13}{d.png}
+    \end{minipage}
+    \hspace*{3mm}
+    c) \externalPicture{0.14}{demo-score.png}
+  \end{center}
+
+  \caption{Examples for Target File Images}
+  \label{figure:exampleTargetImages}
+\end{centeredFigure}
+
+%========================
+\chapter{Debugging}
+\label{section:debugging}
+%========================
+
+Several tools are orchestrated by the script and typically something
+goes wrong.  The script or one of the underlying tools issues some
+error message, but how can you find out what really went wrong?
+
+The first place to look is the logging file located in
+\embeddedCode{loggingFilePath}.  It does a very fine-grained tracing
+of the relevant function calls and the last lines should give you some
+indication about the error.
+
+Note that the outputs of the called programs are not logged, but at
+least the commandlines to call them.  This would not be helpful in
+itself, because typically those programs work on generated
+intermediate files.  But you can tell ltbvc to keep the intermediate
+files by setting \embeddedCode{keepIntermediateFiles} to true or
+alternatively calling the program with the ``-d'' flag.  This only
+applies to the preprocessing phases, because in the postprocessing
+phases all files are kept as they serve as input for other phases
+\footnote{The silent videos and the subtitle file also go into the
+          intermediate file directory, because they are not
+          interesting in themselves, but must be kept.}.
+
+For example, assume that the score generation phase does not produce a
+meaningful output.  If you have set the keep-files-flag, then a file
+called ``temp.ly'' is produced and kept that contains the boiler-plate
+code for the score.  You can then run
+\begin{commandLine}
+  lilypond test.ly
+\end{commandLine}
+and see what happens.  Of course, you must be able to get by with the
+lilypond messages, but this is plain lilypond expertise.
+
+Assuming default settings of the configuration variables, the
+following temporary files will be produced:
+
+\begin{ttDescription}
+  \item [extract:] a single temp.ly file containing a single voice,
+
+  \item [score:] a single temp.ly file for the complete score,
+
+  \item [midi:] a single temp.ly file for the midi voices and a
+        generated ``.mid'' file containing the voices with standard
+        sound assignment and no humanization, and
+
+  \item [silentvideo:] a single temp.ly file for the video voices,
+        ``.png'' image files with single pages of the video and
+        ``.mp4'' files containing the parts of the video showing just
+        a single page.
+\end{ttDescription}
+
+For the postprocessing phases all intermediate files are kept as follows:
+\begin{ttDescription}
+
+  \item [rawaudio:] each voice wave-file goes into the path specified
+        by \embeddedCode{tempAudioDirectoryPath} as ``\meta{voice}.wav'',
+
+  \item [refinedaudio:] each voice wave-file goes into the path
+        specified by \embeddedCode{tempAudioDirectoryPath} as
+        ``\meta{voice}-processed.wav'',
+
+  \item [mixdown and finalvideo:] both phases only have target files
+        in \embeddedCode{audioTargetDirectoryPath} and the target
+        specific path in \embeddedCode{targetVideoDirectory}.
+
+\end{ttDescription}
+
+Most problems in postprocessing probably occur in the ``refinedaudio''
+phase, because sox does a lot of complex transformations.  It might be
+helpful to insert ``tee'' commands in the sox processing chain in the
+command file to have a peek at intermediate audio stages.
+
+Be aware that ``tee'' is not a standard sox command: if you execute
+the sox steps directly on the command line, you must take care of any
+intermediate files yourself.
+
+%===============================
+\chapter{Future Extensions}
+\label{section:futureExtensions}
+%===============================
+
+The following things are not contained in the current version, but are
+planned for future versions:
+
+\begin{itemize}
+
+  \item The audio processing chain during the postprocessing phase 
+        is currently linear.  It is planned to allow complicated graphs
+        (DAGs) for audio processing.
+
+  \item The sound variant list (describing a single sound variant for
+        each voice) shall be replaced by map from voice to a map from
+        measure to sound variant.  This allows to have individual
+        sound styles for different parts in a song (like, for example,
+        for an instrument solo part).
+  
+\end{itemize}
+
+
+%########################################
+\chapter{DONE}
+
+\begin{itemize}
+  \item provide a mechanism against multiple includes of the
+        same file or circular includes
+  \item implement that location search
+  \item rename phase ``voices'' to ``voice'' in program;
+        rename phase ``voice'' to ``extract'' in program
+  \item rename keepIntermediateFiles into keepIntermediateFiles
+  \item implement search for variables in lilypond file
+  \item implement chord and lyrics maps
+  \item implement chordedVoiceMap
+  \item implement lyricsToVoiceMap
+  \item implement the replacement logic for lyrics suffix "A"
+  \item implement measureToHumanizationStyleNameMap
+  \item add audioVoiceNameSet variable
+  \item rename aacCommand to aacCommandLine and add parameters
+  \item move humanization style and sound style configuration
+        into standard configuration file
+  \item rename style to humanizationStyle and also use soundStyle
+  \item allow midi banks for midi instruments
+  \item remove the percentage scaling and use decimals instead, allow B
+        and A indicators, adapt description in style file
+  \item change name of variation factors and make it a map
+  \item introduce voiceNameToOverrideFileNameMap in program and
+        changes.txt
+  \item implement sanitizing of strings in convertStringToMap
+  \item implement audio grouping logic
+  \item add videoscaling, framerate and subtitlesAreHardcoded to video
+        device definition
+  \item rename ``video device'' to ``video target''
+  \item rename targetVideoDirectory to targetVideoDirectoryPath
+  \item remove guitar and drums specific logic for voice classification
+  \item add generated lilypond macro to tell current processing phase
+  \item add generated lilypond macro to tell current video device
+  \item strengthen initial checks of configuration variables by
+        regular expression matching
+  \item convert configuration file number variable to string in a
+    string context
+  \item implement multiple staffs
+  \item improve mapping logic for voice names: drums to myDrums,
+        xxxSimple to xxx, xxxExtended to xxx
+  \item make mediaType customizable (per target)
+  \item define and implement mandatory and optional attribute values
+        for types AudioTrack and VideoTarget
+  \item introduce intermediateFileDirectoryPath variable and move files
+        there
+  \item REJECTED: clarify category of config var names like title to
+        songTitle
+  \item REJECTED: introduce raw tagging in mp4tagmanager (with
+        arbitrary tags)
+\end{itemize}
+
+\newpage
+\listoffigures
+
+\appendix
+
+%=================================================
+\chapter{Table of Configuration File Variables}
+\label{section:configurationFileVariableList}
+%=================================================
+
+The following table describes all the configuration variables with
+their default values and the figure numbers where those variables have
+been mentioned first in the current document.
+
+\newcommand{\bdot}{\linebreak[0].}
+\newcommand{\mandatory}{\textbf{MANDATORY}}
+
+\begin{variableDescriptionTableFinal}
+
+    \varDescriptionHeaderFinal
+
+    \varDescriptionFinal{aacCommandLine}
+                        {\DESCaacCommandLine}
+                        {empty}
+                        {Program}
+
+    \varDescriptionFinal{albumName}
+                        {\DESCalbumName}
+                        {"UNKNOWN ALBUM"}
+                        {SongGroupRelated}
+
+    \varDescriptionFinal{artistName}
+                        {\DESCartistName}
+                        {"UNKNOWN ARTIST"}
+                        {SongGroupRelated}
+
+    \varDescriptionFinal{attenuationLevel}
+                        {\DESCattenuationLevel}
+                        {0}
+                        {Mixdown}
+
+    \varDescriptionFinal{audioGroupToVoicesMap}
+                        {\DESCaudioGroupToVoicesMap}
+                        {\mandatory}
+                        {Mixdown}
+
+    \varDescriptionFinal{audioLevelList}
+                        {\DESCaudioLevelList}
+                        {\mandatory, compatible to voiceNameList}
+                        {Mixdown}
+
+    \varDescriptionFinal{audioTargetDirectory\-Path}
+                        {\DESCaudioTargetDirectoryPath}
+                        {current directory}
+                        {Mixdown}
+
+    \varDescriptionFinal{audioTrack\bdot albumName}
+                        {\DESCaudioTrackAlbumName}
+                        {albumName}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot audioFileTemplate}
+                        {\DESCaudioTrackAudioFileTemplate}
+                        {\mandatory}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot audioGroupList}
+                        {\DESCaudioTrackGroupList}
+                        {\mandatory}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot description}
+                        {\DESCaudioTrackDescription}
+                        {empty}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot languageCode}
+                        {\DESCaudioTrackLanguageCode}
+                        {eng}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot songNameTemplate}
+                        {\DESCaudioTrackSongNameTemplate}
+                        {title}
+                        {AudioTrack}
+
+    \varDescriptionFinal{audioTrackList}
+                        {\DESCaudioTrackList}
+                        {\mandatory}
+                        {Mixdown}
+
+    \varDescriptionFinal{audioVoiceNameSet}
+                        {\DESCaudioVoiceNameSet}
+                        {voiceNameList}
+                        {Audio}
+
+    \varDescriptionFinal{chordedVoiceMap}
+                        {\DESCchordedVoiceMap}
+                        {empty}
+                        {Notation}
+
+    \varDescriptionFinal{composerText}
+                        {\DESCcomposerText}
+                        {empty}
+                        {SongRelated}
+
+    \varDescriptionFinal{extractVoiceNameSet}
+                        {\DESCextractVoiceNameSet}
+                        {voiceNameList}
+                        {Extract}
+
+    \varDescriptionFinal{ffmpegCommand}
+                        {\DESCffmpegCommand}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{fileNamePrefix}
+                        {\DESCfileNamePrefix}
+                        {\mandatory}
+                        {SongRelated}
+
+    \varDescriptionFinal{fluidsynthCommand}
+                        {\DESCfluidsynthCommand}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{humanizationStyleXXX}
+                        {\DESChumanizationStyleXXX}
+                        {empty}
+                        {Humanization}
+
+    \varDescriptionFinal{humanizedVoiceNameSet}
+                        {\DESChumanizedVoiceNameSet}
+                        {empty}
+                        {Humanization}
+
+    \varDescriptionFinal{intermediateFileDirectoryPath}
+                        {\DESCintermediateFileDirectoryPath}
+                        {"temp"}
+                        {Path}
+
+    \varDescriptionFinal{keepIntermediateFiles}
+                        {\DESCkeepIntermediateFiles}
+                        {false}
+                        {SongRelated}
+
+    \varDescriptionFinal{lilypondCommand}
+                        {\DESClilypondCommand}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{loggingFilePath}
+                        {\DESCloggingFilePath}
+                        {\mandatory}
+                        {Path}
+
+    \varDescriptionFinal{lyricsVoiceMap}
+                        {\DESClyricsVoiceMap}
+                        {empty}
+                        {Notation}
+
+    \varDescriptionFinal{measureToHumanization\-StyleNameMap}
+                        {\DESCmeasureToHumanizationStyleNameMap}
+                        {empty}
+                        {Humanization}
+
+    \varDescriptionFinal{measureToTempoMap}
+                        {\DESCmeasureToTempoMap}
+                        {\mandatory}
+                        {SongRelated}
+
+    \varDescriptionFinal{midiChannelList}
+                        {\DESCmidiChannelList}
+                        {\mandatory, compatible to voiceNameList}
+                        {MidiRelated}
+
+    \varDescriptionFinal{midiInstrumentList}
+                        {\DESCmidiInstrumentList}
+                        {\mandatory, compatible to voiceNameList}
+                        {MidiRelated}
+
+    \varDescriptionFinal{midiPanList}
+                        {\DESCmidiPanList}
+                        {\mandatory, compatible to voiceNameList}
+                        {MidiRelated}
+
+    \varDescriptionFinal{midiVoiceNameList}
+                        {\DESCmidiVoiceNameList}
+                        {voiceNameList}
+                        {MidiRelated}
+
+    \varDescriptionFinal{midiVolumeList}
+                        {\DESCmidiVolumeList}
+                        {\mandatory, compatible to voiceNameList}
+                        {MidiRelated}
+
+    \varDescriptionFinal{mp4boxCommand}
+                        {\DESCmpfourboxCommand}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{phaseAndVoiceName\-ToClefMap}
+                        {\DESCphaseAndVoiceNameToClefMap}
+                        {empty}
+                        {Notation}
+
+    \varDescriptionFinal{phaseAndVoiceName\-ToStaffListMap}
+                        {\DESCphaseAndVoiceNameToStaffListMap}
+                        {empty}
+                        {Notation}
+
+    \varDescriptionFinal{reverbLevelList}
+                        {\DESCreverbLevelList}
+                        {\mandatory}
+                        {Audio}
+
+    \varDescriptionFinal{scoreVoiceNameList}
+                        {\DESCscoreVoiceNameList}
+                        {voiceNameList}
+                        {Score}
+
+    \varDescriptionFinal{soundFontDirectoryPath}
+                        {\DESCsoundFontDirectoryPath}
+                        {\mandatory}
+                        {Path}
+
+    \varDescriptionFinal{soundFontNames}
+                        {\DESCsoundFontNames}
+                        {\mandatory}
+                        {Path}
+
+    \varDescriptionFinal{soundStyleXXX}
+                        {\DESCsoundStyleXXX}
+                        {empty}
+                        {Audio}
+
+    \varDescriptionFinal{soundVariantList}
+                        {\DESCsoundVariantList}
+                        {\mandatory, compatible to voiceNameList}
+                        {Audio}
+
+    \varDescriptionFinal{soxCommandLinePrefix}
+                        {\DESCsoxCommandLinePrefix}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{targetDirectoryPath}
+                        {\DESCtargetDirectoryPath}
+                        {current directory}
+                        {Path}
+
+    \varDescriptionFinal{tempAudioDirectoryPath}
+                        {\DESCtempAudioDirectoryPath}
+                        {current directory}
+                        {Path}
+
+    \varDescriptionFinal{tempLilypondFilePath}
+                        {\DESCtempLilypondFilePath}
+                        {current directory}
+                        {Path}
+
+    \varDescriptionFinal{title}
+                        {\DESCtitle}
+                        {\mandatory}
+                        {SongRelated}
+
+    \varDescriptionFinal{trackNumber}
+                        {\DESCtrackNumber}
+                        {0}
+                        {SongRelated}
+
+    \varDescriptionFinal{videoFileKind\bdot directoryPath}
+                        {\DESCvideoFileKindDirectoryPath}
+                        {current directory}
+                        {VideoFileKind}
+
+    \varDescriptionFinal{videoFileKind\bdot fileNameSuffix}
+                        {\DESCvideoFileKindFileNameSuffix}
+                        {\mandatory}
+                        {VideoFileKind}
+
+    \varDescriptionFinal{videoFileKind\bdot target}
+                        {\DESCvideoFileKindTarget}
+                        {\mandatory}
+                        {VideoFileKind}
+
+    \varDescriptionFinal{videoFileKind\bdot voiceNameList}
+                        {\DESCvideoFileKindVoiceNameList}
+                        {voiceNameList}
+                        {VideoFileKind}
+
+    \varDescriptionFinal{videoTarget\bdot frameRate}
+                        {\DESCvideoTargetFrameRate}
+                        {10}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot height}
+                        {\DESCvideoTargetHeight}
+                        {\mandatory}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot leftRightMargin}
+                        {\DESCvideoTargetLeftRightMargin}
+                        {\mandatory}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot mediaType}
+                        {\DESCvideoTargetMediaType}
+                        {"TV Show"}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot resolution}
+                        {\DESCvideoTargetResolution}
+                        {\mandatory}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot scalingFactor}
+                        {\DESCvideoTargetScalingFactor}
+                        {1}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot subtitleColor}
+                        {\DESCvideoTargetSubtitleColor}
+                        {(yellow)}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot subtitleFontSize}
+                        {\DESCvideoTargetSubtitleFontSize}
+                        {10}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot subtitlesAreHardcoded}
+                        {\DESCvideoTargetSubtitlesAreHardcoded}
+                        {false}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot systemSize}
+                        {\DESCvideoTargetSystemSize}
+                        {20 (default of lilypond)}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot topBottomMargin}
+                        {\DESCvideoTargetTopBottomMargin}
+                        {\mandatory}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTarget\bdot width}
+                        {\DESCvideoTargetWidth}
+                        {\mandatory}
+                        {VideoTarget}
+
+    \varDescriptionFinal{videoTargetMap}
+                        {\DESCvideoTargetMap}
+                        {\mandatory}
+                        {Video}
+
+    \varDescriptionFinal{voiceNameToOverride\-FileNameMap}
+                        {\DESCvoiceNameToOverrideFileNameMap}
+                        {empty}
+                        {Audio}
+
+    \varDescriptionFinal{voiceNameToScore\-NameMap}
+                        {\DESCvoiceNameToScoreNameMap}
+                        {empty}
+                        {Score}
+
+    \varDescriptionFinal{voiceNameToVariation\-FactorMap}
+                        {\DESCvoiceNameToVariationFactorMap}
+                        {empty}
+                        {Humanization}
+
+    \varDescriptionFinal{year}
+                        {\DESCyear}
+                        {current year}
+                        {SongRelated}
+
+\end{variableDescriptionTableFinal}
+
+%=======================
+\chapter{Glossary}
+\label{section:glossary}
+%=======================
+
+\begin{ttGlossary}
+    \item [album]
+        \glossaryLink{song group}
+
+    \item [all (phase group)]
+        a group of \glossaryLink{processing phase}s doing full
+        processing via phase groups \glossaryLink{preprocess} and
+        \glossaryLink{postprocess}
+
+    \item [audio group]
+        a group of \glossaryLink{voice} audio tracks to be mixed into
+        a target audio file or into a single audio track in the target
+        video files
+
+    \item [audio track]
+        the audio rendering of a subset of all song voices (typically
+        within the final notation video)
+
+    \item [(song) configuration file]
+        a text file containing configuration information for a single
+        \glossaryLink{song} (possibly including other text
+        configuration files) that is used in generation of wrapper
+        \glossaryLink{lilypond} files and parametrization of
+        underlying generation programs; consists of key-value pairs
+        with variable names as keys followed by an equal sign and a
+        string, boolean or numeric value
+        
+    \item [extract (phase)]
+        a \glossaryLink{processing phase} producing the extract PDF
+        notation files for single \glossaryLink{voice}s
+
+    \item [finalvideo (phase)]
+        a \glossaryLink{processing phase} generating final video files
+        for each \glossaryLink{video file kind} with all submixes as
+        selectable audio tracks and with a measure indication as
+        subtitle
+
+    \item [fluidsynth]
+        a program for conversion of MIDI files into WAV audio files
+
+    \item [humanization]
+        a part of the \glossaryLink{midi} phase applying algorithmic
+        and rule-based random time and volume (velocity) shifts to
+        notes in the midi stream of \glossaryLink{voices}
+
+    \item [humanization style]
+        the configuration information for \glossaryLink{humanization}
+        of a \glossaryLink{song} telling individual variations based
+        on the position of a note within a measure; gives timing and
+        velocity variations for the main beats, the other sixteenths
+        and all other notes; multiple styles may be given for a song
+        for non-overlapping measure ranges
+
+    \item [lilypond]
+        a typesetting program transforming text files with music
+        notation information into PDF or MIDI files
+
+    \item [lilypond fragment file]
+        a text file with fragmentary \glossaryLink{lilypond} typesetting
+        information; based on a song-specific
+        \glossaryLink{configuration file} the generator provides wrapping
+        lilypond code and calls the appropriated underlying programs
+        
+    \item [midi (phase)]
+        a \glossaryLink{processing phase} producing a MIDI file
+        containing all \glossaryLink{voice}s with specified
+        instruments, pan positions and volumes
+
+    \item [mixdown (phase)]
+        a \glossaryLink{processing phase} generating final compressed
+        audio files with submixes of all instruments
+        \glossaryLink{voice}s based on the refined audio files with
+        specified volume balance (where the submix variants are
+        configurable)
+
+    \item [override (of a voice audio)]
+        a replacement of the refined audio file for some
+        \glossaryLink{voice} by an external audio file to be applied
+        in the \glossaryLink{refinedaudio} file; is normally applied
+        when the external file has a higher quality (like, for
+        example, with a real singer instead of a vocals instrumental
+        rendition)
+
+    \item [parallel track (audio)]
+        an additional audio file to be added in the
+        \glossaryLink{mixdown} phase; this is used for a single external
+        audio file not associated with some voice (like, for example,
+        background sounds)
+
+    \item [preprocess (phase group)]
+        a group of \glossaryLink{processing phase}s combining
+        \glossaryLink{extract}, \glossaryLink{score},
+        \glossaryLink{midi} and \glossaryLink{silentvideo} for
+        generation of \glossaryLink{voice} extract PDFs and score PDF,
+        MIDI file as well the silent videos for all
+        \glossaryLink{video file kind}s
+
+    \item [postprocess (phase group)]
+        a group of \glossaryLink{processing phase}s combining
+        \glossaryLink{rawaudio},
+        \glossaryLink{refinedaudio}, \glossaryLink{mixdown} and
+        \glossaryLink{finalvideo} for generation of the intermediate
+        raw and refined WAV files, the submixes as compressed audios
+        and the final videos for all \glossaryLink{video file kind}s
+
+    \item [processing phase]
+        a part of the generation of \glossaryLink{song} artifacts from
+        given \glossaryLink{lilypond fragment file} and
+        \glossaryLink{configuration file}; possible processing phases
+        or processing phase groups are ``all'', ``preprocess'',
+        ``postprocess'', ``extract'', ``score'', ``midi'',
+        ``silentvideo'', ``rawaudio'', ``refinedaudio'', ``mixdown'',
+        ``finalvideo''
+
+    \item [rawaudio (phase)]
+        a \glossaryLink{processing phase} producing unprocessed (intermediate)
+        audio files for all the instrument \glossaryLink{voice}s from
+        the midi tracks
+
+    \item [refinedaudio (phase)]
+        a \glossaryLink{processing phase} producing (intermediate)
+        audio files for all the instrument \glossaryLink{voice}s
+        with additional sound processing applied
+
+    \item [score (phase)]
+        a \glossaryLink{processing phase} producing a single PDF
+        notation file containing all \glossaryLink{voice}s as a score
+
+    \item [silentvideo (phase)]
+        a \glossaryLink{processing phase} (intermediate) silent videos
+        containing the score pages for several output
+        \glossaryLink{video target}s (with configurable resolution and
+        size)
+
+    \item [song]
+        a collection of several parallel \glossaryLink{voice}s forming
+        a musical piece
+
+    \item [song group]
+        a collection of several related \glossaryLink{song}s (for
+        example, related by year, artist, etc.) sharing common
+        characteristics
+
+    \item [sound font (file)]
+        a file containing data for a sample-based rendering of MIDI
+        data as audio files; the generator uses the
+        \glossaryLink{fluidsynth} program for this conversion within
+        the \glossaryLink{rawaudio} phase
+
+    \item [sound style]
+        a (sequential) chain of \glossaryLink{sox} audio filters to be
+        applied to a an audio rendering of a \glossaryLink{voice} in
+        phase \glossaryLink{refinedaudio}; typically those sound
+        styles are instrument specific
+
+    \item [sox]
+        a program for transformation of audio files via parametrizable
+        audio filters (like, for example, equalizers, distortions or
+        reverbs)
+
+    \item [video file kind]
+        the configuration information used in the
+        \glossaryLink{silentvideo} and \glossaryLink{finalvideo} phases
+        giving video rendering properties of notation videos enhancing
+        characteristics of a \glossaryLink{video target} by data
+        (like, for example, the list of voices to be shown or the video
+        files target directory)
+
+    \item [video target]
+        the configuration information used in the
+        \glossaryLink{silentvideo} and \glossaryLink{finalvideo}
+        phases giving video device dependent properties of notation
+        videos (like, for example, device resolution or pixel width
+        and height), but also some device independent parameters
+        (like, for example, the subtitle font size)
+
+    \item [voice]
+        a polyphonic part of a composition belonging to a single
+        instrument to be notated in one or several musical staffs
+
+\end{ttGlossary}
+
+%=========================
+\chapter{References}
+\label{section:references}
+%=========================
+
+\begingroup
+\renewcommand{\chapter}[2]{}%
+\bibliographystyle{plain}
+\begin{thebibliography}{FFMPEG}
+  \bibitem[AAC]{reference:aacDocumentation}
+    \textit{QAAC - Quicktime AAC}.\\
+    \hyperlink{https://sites.google.com/site/qaacpage/}
+
+  \bibitem[FFMPEG]{reference:ffmpegDocumentation}
+    \textit{FFMPEG - Documentation}.\\
+    \hyperlink{http://ffmpeg.org/documentation.html}
+
+  \bibitem[FLUID]{reference:fluidsynthDocumentation}
+    \textit{FluidSynth - Software synthesizer based on the
+            SoundFont~2 specifications}.\\
+    \hyperlink{http://fluidsynth.org}
+
+  \bibitem[LILY]{reference:lilypondDocumentation}
+    \textit{Lilypond - Music Notation for Everyone}.\\
+    \hyperlink{http://lilypond.org}
+
+  \bibitem[MP4BOX]{reference:mp4boxDocumentation}
+    \textit{GPAC - General Documentation MP4Box}.\\
+    \hyperlink{https://gpac.wp.imt.fr/mp4box/mp4box-documentation/}
+
+  \bibitem[SOX]{reference:soxDocumentation}
+    Chris Bagwell, Lance Norskog et al.:
+    \textit{SoX - Sound eXchange - Documentation}.\\
+    \hyperlink{http://sox.sourceforge.net/Docs/Documentation}
+
+\end{thebibliography}
+\endgroup
+
+\end{document}

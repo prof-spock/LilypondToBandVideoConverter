@@ -10,11 +10,11 @@
 
 import math
 
-from operatingsystem import OperatingSystem
-from simpleassertion import Assertion
-from simplelogging import Logging
-from ttbase import iif, intListToHex, stringToIntList
-from utf8file import UTF8File 
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simpleassertion import Assertion
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import iif, intListToHex, stringToIntList
+from basemodules.utf8file import UTF8File 
 
 #====================
 

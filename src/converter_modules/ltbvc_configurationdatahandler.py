@@ -11,16 +11,18 @@
 import datetime
 import re
 
-from configurationfile import ConfigurationFile
-from operatingsystem import OperatingSystem
+from basemodules.configurationfile import ConfigurationFile
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.regexppattern import RegExpPattern
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import convertStringToList, convertStringToMap, \
+                               iif, isInRange
+from basemodules.validitychecker import ValidityChecker
+
 from ltbvc_businesstypes import generateObjectListFromString, \
                                 generateObjectMapFromString, \
                                 AudioTrack, TempoTrack, \
                                 VideoFileKind, VideoTarget, VoiceDescriptor
-from regexppattern import RegExpPattern
-from simplelogging import Logging
-from ttbase import convertStringToList, convertStringToMap, iif, isInRange
-from validitychecker import ValidityChecker
 
 #====================
 

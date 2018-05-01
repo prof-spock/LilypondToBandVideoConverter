@@ -11,12 +11,13 @@
 import re
 import sys
 
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import convertStringToList, iif
+from basemodules.utf8file import UTF8File 
+from basemodules.validitychecker import ValidityChecker
+
 from mp4tagmanager import MP4TagManager
-from operatingsystem import OperatingSystem
-from simplelogging import Logging
-from ttbase import convertStringToList, iif
-from utf8file import UTF8File 
-from validitychecker import ValidityChecker
 
 #====================
 

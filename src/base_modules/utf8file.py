@@ -5,7 +5,7 @@
 
 import io
 
-from python2and3support import isPython2
+from basemodules.python2and3support import toUnicodeString
 
 #============================================================
 
@@ -52,4 +52,5 @@ class UTF8File:
     def write (self, st):
         """Writes string <st> to <self>"""
 
+        st = toUnicodeString(st) if self._isTextFile else st
         self._file.write(st)

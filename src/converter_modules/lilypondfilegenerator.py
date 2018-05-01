@@ -13,10 +13,11 @@ import argparse
 import re
 import sys
 
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import iif, iif2
+from basemodules.utf8file import UTF8File 
+
 from ltbvc_businesstypes import humanReadableVoiceName
-from simplelogging import Logging
-from ttbase import iif, iif2
-from utf8file import UTF8File 
 
 #-------------------------
 # configuration constants

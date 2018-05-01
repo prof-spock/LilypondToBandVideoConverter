@@ -8,8 +8,8 @@
 
 import re
 
-from simplelogging import Logging
-from ttbase import iif
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import iif
 
 #====================
 

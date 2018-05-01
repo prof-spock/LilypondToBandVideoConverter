@@ -12,12 +12,14 @@
 
 import re
 
-import simpleassertion
-from simplelogging import Logging
-from operatingsystem import OperatingSystem
-from ttbase import iif
-from utf8file import UTF8File 
-from validitychecker import ValidityChecker
+import basemodules.simpleassertion
+from basemodules.simplelogging import Logging
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.ttbase import iif
+from basemodules.utf8file import UTF8File 
+from basemodules.validitychecker import ValidityChecker
+
+simpleassertion = basemodules.simpleassertion
 
 #====================
 

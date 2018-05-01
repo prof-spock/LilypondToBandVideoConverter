@@ -8,8 +8,11 @@
 #====================
 
 from mutagen.mp4 import MP4, MP4Cover
+
+from python2and3support import isPython2
 from simplelogging import Logging
 from ttbase import convertStringToList, iif
+from utf8file import UTF8File 
 
 #====================
 
@@ -18,24 +21,24 @@ class MP4TagManager:
        a video file and provides an updater as single service."""
 
     _nameToIdMap = { "album"           : u"©alb",
-                     "albumArtist"     :  "aART",
+                     "albumArtist"     : u"aART",
                      "artist"          : u"©ART",
-                     "cover"           :  "covr",
-                     "itunesMediaType" :  "stik",
+                     "cover"           : u"covr",
+                     "itunesMediaType" : u"stik",
                      "title"           : u"©nam",
-                     "track"           :  "trkn",
-                     "tvShowName"      :  "tvsh",
+                     "track"           : u"trkn",
+                     "tvShowName"      : u"tvsh",
                      "year"            : u"©day" }
 
     _tagNameAndValueToNewValueMap = {
         "itunesMediaType" : {
-            "Normal"      : str(unichr(1)),
-            "Audiobook"   : str(unichr(2)),
-            "Music Video" : str(unichr(6)),
-            "Movie"       : str(unichr(9)),
-            "TV Show"     : str(unichr(10)),
-            "Booklet"     : str(unichr(11)),
-            "Ringtone"    : str(unichr(14))
+            "Normal"      : bytes([0x01]),
+            "Audiobook"   : bytes([0x02]),
+            "Music Video" : bytes([0x06]),
+            "Movie"       : bytes([0x09]),
+            "TV Show"     : bytes([0x0a]),
+            "Booklet"     : bytes([0x0b]),
+            "Ringtone"    : bytes([0x0d])
             }
         }
     
@@ -48,7 +51,7 @@ class MP4TagManager:
         """Adjusts <value> for given <tagName> and returns adjusted
            value"""
 
-        Logging.trace(">>: tagName = '%s', value = %s", tagName, value)
+        Logging.trace(">>: tagName = '%s', value = '%s'", tagName, value)
 
         if tagName in cls._tagNameAndValueToNewValueMap:
             # map value to one character encoding
@@ -60,16 +63,17 @@ class MP4TagManager:
             isPngFile = coverFileName.lower().endswith('.png')
             imageFormat = iif(isPngFile, MP4Cover.FORMAT_PNG,
                               MP4Cover.FORMAT_JPEG)
-            coverFile = open(coverFileName, "rb")
+
+            coverFile = UTF8File(coverFileName, "rb")
             singleCover = MP4Cover(coverFile.read(), imageFormat)
-            coverFile.close()
             result = [ singleCover ]
+            coverFile.close()
         else:
             result = str(value)
 
         resultRepresentation = iif(tagName != "cover",
                                    result, str(result)[:100] + "...")
-        Logging.trace("<<: '%s'", resultRepresentation)
+        Logging.trace("<<: '%s' (%s)", resultRepresentation, type(result))
         return result
 
     #--------------------
@@ -90,12 +94,17 @@ class MP4TagManager:
         for tagName in tagNameList:
             isOkay = (tagName in tagToValueMap
                       and tagToValueMap[tagName] is not None)
+            Logging.trace("--: tagName = '%s', changed = %s",
+                          tagName, isOkay)
 
             if isOkay:
                 newValue = tagToValueMap[tagName]
                 newValue = cls._adjustValueForSpecialTags(tagName, newValue)
                 technicalTagName = cls._nameToIdMap[tagName]
-                technicalTagName = technicalTagName.encode("latin-1")
+
+                if isPython2:
+                    technicalTagName = technicalTagName.encode("latin-1")
+
                 tagList[technicalTagName] = newValue
 
         tagList.save()

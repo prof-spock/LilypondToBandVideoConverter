@@ -4,6 +4,10 @@
 
 #====================
 
+import sys
+
+#====================
+
 missingValue = "@!XYZZY"
 
 #====================
@@ -83,10 +87,25 @@ def adaptToRange (x, lowBound, highBound, isCyclic=False):
 
 #--------------------
 
+def stringToIntList (st):
+    """Returns integer list for string <st>"""
+
+    list = [ ord(st[i]) for i in range(len(st)) ]
+    return list
+    
+#--------------------
+
+def intListToHex (list):
+    """Returns hex representation of integer <list>"""
+
+    return "".join(map(lambda x: ("%02X" % x), list))
+
+#--------------------
+
 def stringToHex (st):
     """Returns hex representation of <st>"""
 
-    return "".join(map(lambda x: ("%02X" % ord(x)), st))
+    return intListToHex(stringToIntList(st))
 
 #===============================
 # STRING TO CONTAINER CONVERSION
@@ -274,9 +293,9 @@ def convertStringToList (st, separator=",", kind="S"):
     position, result = _convertStringToList("[" + st + "]", 0, separator)
 
     if kind == "I":
-        result = map(lambda x: int(x), result)
+        result = list(map(lambda x: int(x), result))
     elif kind == "F":
-        result = map(lambda x: float(x), result)
+        result = list(map(lambda x: float(x), result))
 
     return result
 

@@ -8,13 +8,13 @@
 # IMPORTS
 #====================
 
-from binascii import hexlify
 import math
 
 from operatingsystem import OperatingSystem
 from simpleassertion import Assertion
 from simplelogging import Logging
-from ttbase import adaptToRange, iif, iif2, isInRange, MyRandom, stringToHex
+from ttbase import iif, intListToHex, stringToIntList
+from utf8file import UTF8File 
 
 #====================
 
@@ -34,13 +34,13 @@ class MidiFileHandler:
     _trackHead = "MTrk"
     _trackEndMarker  = "TrkEnd"
 
-    _byteToEventKindMap = { x: "Off" for x in xrange(0x80, 0x90) }
-    _byteToEventKindMap.update({ x: "On" for x in xrange(0x90, 0xA0) })
-    _byteToEventKindMap.update({ x: "PolyPress" for x in xrange(0xA0, 0xB0) })
-    _byteToEventKindMap.update({ x: "Par" for x in xrange(0xB0, 0xC0) })
-    _byteToEventKindMap.update({ x: "PrCh" for x in xrange(0xC0, 0xD0) })
-    _byteToEventKindMap.update({ x: "ChanPress" for x in xrange(0xD0, 0xE0) })
-    _byteToEventKindMap.update({ x: "PitchWhl" for x in xrange(0xE0, 0xF0) })
+    _byteToEventKindMap = { x: "Off" for x in range(0x80, 0x90) }
+    _byteToEventKindMap.update({ x: "On" for x in range(0x90, 0xA0) })
+    _byteToEventKindMap.update({ x: "PolyPress" for x in range(0xA0, 0xB0) })
+    _byteToEventKindMap.update({ x: "Par" for x in range(0xB0, 0xC0) })
+    _byteToEventKindMap.update({ x: "PrCh" for x in range(0xC0, 0xD0) })
+    _byteToEventKindMap.update({ x: "ChanPress" for x in range(0xD0, 0xE0) })
+    _byteToEventKindMap.update({ x: "PitchWhl" for x in range(0xE0, 0xF0) })
     _byteToEventKindMap.update({ 0xF0: "SysEx", 0xF7: "SysExEnd",
                                  0xFF: "Meta" })
 
@@ -78,11 +78,13 @@ class MidiFileHandler:
     #--------------------
     #--------------------
 
-    def _appendToByteList (self, st):
-        """Appends <st> to internal byte list and traces operation"""
+    def _appendToByteList (self, list):
+        """Appends integer list <list> to internal byte list and
+           traces operation"""
 
-        Logging.trace("--: %d -> %s", len(self._byteList), stringToHex(st))
-        self._byteList += st
+        Logging.trace("--: %d -> %s",
+                      len(self._byteList), intListToHex(list))
+        self._byteList.extend(list)
 
     #--------------------
 
@@ -106,10 +108,10 @@ class MidiFileHandler:
         self.writeFile(testFileName, lineList)
         otherByteList = self._byteList
 
-        for i in xrange(min(len(byteList), len(otherByteList))):
+        for i in range(min(len(byteList), len(otherByteList))):
             if byteList[i] != otherByteList[i]:
                 Logging.trace("--: byte list difference at %d: %d <-> %d",
-                              i, ord(byteList[i]), ord(otherByteList[i]))
+                              i, byteList[i], otherByteList[i])
 
         Logging.trace("<<")
         
@@ -126,7 +128,7 @@ class MidiFileHandler:
         
         trackCount = self._readMidiHeader()
 
-        for i in xrange(trackCount):
+        for i in range(trackCount):
             self._readMidiTrack()
 
         Logging.trace("<<")
@@ -140,10 +142,10 @@ class MidiFileHandler:
         Logging.trace(">>")
 
         self._position = 0
-        self._byteList = ""
+        self._byteList = []
         trackCount = self._writeMidiHeader()
 
-        for i in xrange(trackCount):
+        for i in range(trackCount):
             self._writeMidiTrack()
 
         Logging.trace("<<")
@@ -191,15 +193,15 @@ class MidiFileHandler:
            <self._position> and returns them as an integer"""
 
         newPosition = self._position + count
-        part = self._byteList[self._position:newPosition]
+        partList = self._byteList[self._position:newPosition]
         self._position = newPosition
 
         result = 0
         maxValue = 0
 
-        for i in part:
+        for i in partList:
             maxValue = maxValue * 256 + 255
-            result = result * 256 + ord(i)
+            result = result * 256 + i
 
         if isSigned:
             referenceValue = (maxValue + 1) / 2
@@ -236,7 +238,7 @@ class MidiFileHandler:
             if metaEventKind != "SeqMeta":
                 st = "\"%s\"" % self._readStringBytes(eventLength)
             else:
-                for i in xrange(eventLength):
+                for i in range(eventLength):
                     st += iif(i > 0, " ", "") + ("%d" % readIntProc(1))
         else:
             eventLengthInFile = readIntProc(1)
@@ -303,7 +305,7 @@ class MidiFileHandler:
             eventLength = self._readVariableBytes()
             st = ""
 
-            for i in xrange(eventLength):
+            for i in range(eventLength):
                 value = self._readIntBytes(1)
                 st = st + iif(i > 0, " ", "") + "%d" % value
         else:
@@ -397,13 +399,13 @@ class MidiFileHandler:
            <self._position> and returns them as a string"""
 
         newPosition = self._position + count
-        part = self._byteList[self._position:newPosition]
+        partList = self._byteList[self._position:newPosition]
         self._position = newPosition
 
         result = ""
 
-        for ch in part:
-            result = result + ch
+        for ch in partList:
+            result = result + chr(ch)
 
         Logging.trace("--: %s", result)
         return result
@@ -418,7 +420,7 @@ class MidiFileHandler:
         result = 0
 
         while not isDone:
-            part = ord(self._byteList[self._position])
+            part = self._byteList[self._position]
             self._position += 1
             isDone = (part < 128)
             part = part & 127
@@ -463,15 +465,15 @@ class MidiFileHandler:
 
         if isSigned and value < 0:
             maxValue = 256 ** count
-            value = maxValue - value
+            value = int(maxValue - value)
 
-        part = ""
+        partList = []
 
-        for i in xrange(count):
-            part = chr(value % 256) + part
-            value /= 256
+        for i in range(count):
+            partList = [ value % 256 ] + partList
+            value //= 256
 
-        self._appendToByteList(part)
+        self._appendToByteList(partList)
 
     #--------------------
 
@@ -524,7 +526,7 @@ class MidiFileHandler:
                 self._writeIntBytes(int(argumentList[0]), eventLength)
             elif metaEventKind == "SMPTEOffset":
                 argumentList = map(lambda x: int(x[3:]), argumentList)
-                for i in xrange(len(argumentList)):
+                for i in range(len(argumentList)):
                     self._writeIntBytes(argumentList[i], 1)
             elif metaEventKind == "TimeSig":
                 numerator, denominator = argumentList[0].split("/")
@@ -678,7 +680,7 @@ class MidiFileHandler:
         """Writes integer <value> as <count> bytes and appends to
            <self._byteList>"""
 
-        self._appendToByteList(st)
+        self._appendToByteList(stringToIntList(st))
 
     #--------------------
 
@@ -689,16 +691,17 @@ class MidiFileHandler:
         Logging.trace(">>: %08X", value)
 
         isDone = False
-        part = ""
+        partList = []
 
         while not isDone:
-            partialValue = value % 128
+            partialValue = value % 128 + 128
             value = value // 128
             isDone = (value == 0)
-            part = chr(partialValue) + part
+            partList = [ partialValue ] + partList
 
-        part = "".join(map(lambda x: chr(ord(x) + 128), part[:-1])) + part[-1]
-        self._appendToByteList(part)
+        partList[len(partList) - 1] -= 128
+
+        self._appendToByteList(partList)
         Logging.trace("<<")
 
     #--------------------
@@ -721,8 +724,8 @@ class MidiFileHandler:
 
         Logging.trace(">>: %s", fileName)
 
-        midiFile = open(fileName, "rb")
-        self._byteList = midiFile.read()
+        midiFile = UTF8File(fileName, "rb")
+        self._byteList = bytearray(midiFile.read())
         midiFile.close()
 
         self._convertByteListToLineList()
@@ -744,8 +747,8 @@ class MidiFileHandler:
             
         self._convertLineListToByteList()
 
-        midiFile = open(fileName, "wb")
-        midiFile.write(self._byteList)
+        midiFile = UTF8File(fileName, "wb")
+        midiFile.write(bytearray(self._byteList))
         midiFile.close()
 
         Logging.trace("<<")

@@ -18,15 +18,15 @@ from midifilehandler import MidiFileHandler
 from operatingsystem import OperatingSystem
 from simpleassertion import Assertion
 from simplelogging import Logging
-from ttbase import adaptToRange, convertStringToMap, \
-                   iif, iif2, iif4, isInRange, MyRandom
+from ttbase import adaptToRange, convertStringToMap, iif, iif2, \
+                   isInRange, MyRandom
 
 #====================
 
-maximumInteger = 999999999
-voiceNameToVariationFactorMap  = {}
-humanizationStyleNameToTextMap = {}
-humanizedTrackNameSet = set()
+_infinity = 999999999
+_humanizationStyleNameToTextMap = {}
+_humanizedTrackNameSet = set()
+_voiceNameToVariationFactorMap  = {}
 
 #====================
 
@@ -138,7 +138,7 @@ class _MusicTime:
         cls._quartersPerMeasure   = quartersPerMeasure
         cls._ticksPerQuarterNote  = ticksPerQuarterNote
         cls.sixteenthDuration = _MusicTime("0:0:1:0", True)
-        st = "0:0:0:" + str(ticksPerQuarterNote / 8)
+        st = "0:0:0:" + str(ticksPerQuarterNote // 8)
         cls.thirtysecondDuration = _MusicTime(st, True)
 
         Logging.trace("<<")
@@ -212,13 +212,13 @@ class _MusicTime:
         ticksPerQuarterNote = cls._ticksPerQuarterNote
 
         factorList = [ ticksPerQuarterNote * cls._quartersPerMeasure,
-                       ticksPerQuarterNote, ticksPerQuarterNote / 4, 1 ]
+                       ticksPerQuarterNote, ticksPerQuarterNote // 4, 1 ]
         partList = []
 
         for factor in factorList:
             part = remainingMidiTime // factor
             remainingMidiTime -= factor * part
-            partList.append(part)
+            partList.append(int(part))
         
         measure, quarter, sixteenth, remainder = partList
 
@@ -262,7 +262,7 @@ class _MusicTime:
         
         midiTimeA = time.toMidiTime()
         midiTimeB = referenceTime.toMidiTime()
-        maxDeviation = cls._ticksPerQuarterNote / 8
+        maxDeviation = cls._ticksPerQuarterNote // 8
         difference = abs(midiTimeA - midiTimeB)
         result = (maxDeviation >= difference)
 
@@ -347,14 +347,14 @@ class _MusicTime:
         timePartList = timeString.split(cls._separator)
 
         if not self._isDuration:
-            for i in xrange(len(timePartList)):
+            for i in range(len(timePartList)):
                 # for a time: make all entries in part list zero-based
                 # instead of one-based
                 timePartList[i] = str(int(timePartList[i]) - 1)
 
         result = ((((int(timePartList[0]) * cls._quartersPerMeasure
                      + int(timePartList[1])) * 4
-                    + int(timePartList[2])) * cls._ticksPerQuarterNote / 4)
+                    + int(timePartList[2])) * cls._ticksPerQuarterNote // 4)
                   + int(timePartList[3]))
         result = iif(isNegative, -result, result)
 
@@ -400,16 +400,16 @@ class _HumanizationStyle:
         Logging.trace(">>: %s", styleName)
 
         cls = self.__class__
-        humanizationStyleNameList = humanizationStyleNameToTextMap.keys()
+        humanizationStyleNameList = _humanizationStyleNameToTextMap.keys()
 
         if styleName in humanizationStyleNameList:
-            styleAsString = humanizationStyleNameToTextMap[styleName]
+            styleAsString = _humanizationStyleNameToTextMap[styleName]
         else:
             Logging.trace("--: could not find style name %s", styleName)
 
             if cls.defaultStyleName in humanizationStyleNameList:
                 styleAsString = \
-                    humanizationStyleNameToTextMap[cls.defaultStyleName]
+                    _humanizationStyleNameToTextMap[cls.defaultStyleName]
             else:
                 styleAsString = cls._defaultStyleAsString
 
@@ -489,8 +489,8 @@ class _HumanizationStyle:
            for <instrumentName>"""
 
         Logging.trace(">>: %s", instrumentName)
-        result = voiceNameToVariationFactorMap.get(instrumentName,
-                                                   [1,1])
+        result = _voiceNameToVariationFactorMap.get(instrumentName,
+                                                    [1.0,1.0])
         Logging.trace("<<: [%4.3f, %4.3f]", result[0], result[1])
         return result
 
@@ -663,7 +663,7 @@ class _Humanizer:
 
         for event in self._eventList:
             midiTime = event.midiTime
-            currentLine = iif(isInRange(midiTime, 0, maximumInteger - 1),
+            currentLine = iif(isInRange(midiTime, 0, _infinity - 1),
                               str(midiTime) + " ", "")
 
             if event.kind not in ["On", "Off"]:
@@ -692,7 +692,7 @@ class _Humanizer:
 
         # split MIDI event lines into time and event text part
         # and process note on and note off events
-        for i in xrange(eventCount):
+        for i in range(eventCount):
             currentLine = lineList[i]
 
             if " " in currentLine:
@@ -702,7 +702,7 @@ class _Humanizer:
                 kind = tokenList[0]
             else:
                 st = currentLine
-                midiTime = iif(currentLine == "MTrk", -1, maximumInteger)
+                midiTime = iif(currentLine == "MTrk", -1, _infinity)
                 kind = "special"
 
             channel      = None
@@ -770,9 +770,9 @@ class _Humanizer:
 
         # traverse all quarter beats and the sixteenth notes and
         # check for match
-        for i in xrange(1, cls._quartersPerMeasure + 1):
+        for i in range(1, cls._quartersPerMeasure + 1):
             if result is None:
-                for j in xrange(1, 9):
+                for j in range(1, 9):
                     referenceTime = _MusicTime("%d:%d:1" % (i, j), False)
 
                     if time.isAt(referenceTime):
@@ -797,7 +797,7 @@ class _Humanizer:
         eventCount = len(self._eventList)
         noteToStartIndexMap = {}
 
-        for i in reversed(xrange(eventCount)):
+        for i in reversed(range(eventCount)):
             event    = self._eventList[i]
             midiTime = event.midiTime
 
@@ -844,7 +844,13 @@ class _Humanizer:
            <instrumentTimingVariation> give the instrument specific
            factors for the variation"""
 
-        Logging.trace(">>: %d", eventIndex)
+        Logging.trace(">>: index = %d, midiTime = %s,"
+                      + " note = %s, velocity = %s,"
+                      + " midiDuration = %s, instrumentVelocityVariation = %s,"
+                      + " instrumentTimingVariation = %s",
+                      eventIndex, midiTime, note, velocity,
+                      midiDuration, instrumentVelocityVariation,
+                      instrumentTimingVariation)
 
         time              = _MusicTime.fromMidiTime(midiTime, False)
         eventPositionKind = self._findEventPositionKind(time)
@@ -871,13 +877,10 @@ class _Humanizer:
         kindOrder = { "special":0, "Meta":1, "PrCh":2, "Par":3, "KeySig":4,
                       "TimeSig":5, "Tempo":6, "Off":7, "On":8 }
         trackEndMetaEventText = "Meta TrkEnd"
-        eventComparisonProc = (lambda x,y:
-                               iif4(x.midiTime < y.midiTime, -1,
-                                    x.midiTime > y.midiTime, 1,
-                                    x.text == trackEndMetaEventText, 1,
-                                    y.text == trackEndMetaEventText, -1,
-                                    cmp(kindOrder[x.kind], kindOrder[y.kind])))
-        self._eventList.sort(eventComparisonProc)
+        keyExtractionProc = (lambda x:
+                             iif(x.text == trackEndMetaEventText, _infinity,
+                                 x.midiTime * 10 + kindOrder[x.kind]))
+        self._eventList.sort(key=keyExtractionProc)
 
         Logging.trace("<<")
 
@@ -1160,6 +1163,11 @@ class MidiTransformer:
             trackName = originalTrackName
             trackName = iif(trackName > "" and trackName[-1] in "ABCDEFG",
                             trackName[:-1], trackName)
+
+            for suffix in [ "Top", "Middle", "Bottom" ]:
+                if trackName.endswith(suffix):
+                    trackName = trackName[:-len(suffix)]
+
             Logging.trace("--: trackName = '%s', normalized = '%s'",
                           originalTrackName, trackName)
             lineBuffer.writeLine(currentLine)
@@ -1217,16 +1225,16 @@ class MidiTransformer:
     def initialize (cls, voiceNameMap, styleNameToTextMap, trackNameSet):
         """Sets global variables for this module"""
 
-        global humanizerConfigurationFileName, humanizedTrackNameSet
-        global humanizationStyleNameToTextMap
+        global _humanizationStyleNameToTextMap, _humanizedTrackNameSet
+        global _voiceNameToVariationFactorMap
 
         Logging.trace(">>: voiceNameMap = %s, styleNameToTextMap = %s,"
                       + " trackList = %s",
                       voiceNameMap, styleNameToTextMap, trackNameSet)
 
-        voiceToVariationFactorMap      = voiceNameMap
-        humanizationStyleNameToTextMap = styleNameToTextMap
-        humanizedTrackNameSet          = trackNameSet
+        _humanizationStyleNameToTextMap = styleNameToTextMap
+        _humanizedTrackNameSet          = trackNameSet
+        _voiceNameToVariationFactorMap  = voiceNameMap
 
         Logging.trace("<<")
 
@@ -1359,7 +1367,7 @@ class MidiTransformer:
 
                     if trackName in trackNameList:
                         tagLine = (tagLinePrefix
-                                   + iif(trackName in humanizedTrackNameSet,
+                                   + iif(trackName in _humanizedTrackNameSet,
                                          "humanized", "processed")
                                    + tagLineSuffix)
                         Logging.trace("--: tagLine = %s", tagLine)
@@ -1489,7 +1497,7 @@ class MidiTransformer:
                         matchResult = cls._trackNameRegExp.search(currentLine)
                         trackName = matchResult.group(1)
                         Logging.trace("--: trackName = %s", trackName)
-                        trackKind = iif(trackName in humanizedTrackNameSet,
+                        trackKind = iif(trackName in _humanizedTrackNameSet,
                                         TrackKind_instrument, TrackKind_other)
 
             self._lineList = lineList

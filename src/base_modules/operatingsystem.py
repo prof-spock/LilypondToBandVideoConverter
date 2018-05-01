@@ -105,14 +105,13 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def removeFile (cls, fileName, debuggingIsActive=False):
+    def removeFile (cls, fileName, fileIsKept=False):
         """Removes file with <fileName> permanently."""
 
         Logging.trace(">>: %s", fileName)
 
-        if debuggingIsActive:
-            Logging.trace("--: not removed because of debugging '%s'",
-                          fileName)
+        if fileIsKept:
+            Logging.trace("--: not removed '%s'", fileName)
         elif not cls.hasFile(fileName):
             Logging.trace("--: file already nonexisting '%s'", fileName)
         else:

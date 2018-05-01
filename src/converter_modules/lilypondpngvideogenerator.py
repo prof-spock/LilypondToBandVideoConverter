@@ -16,38 +16,27 @@ import simpleassertion
 from simplelogging import Logging
 from operatingsystem import OperatingSystem
 from ttbase import iif
+from utf8file import UTF8File 
 from validitychecker import ValidityChecker
 
 #====================
 
-ffmpegCommand   = None
-lilypondCommand = None
+_ffmpegCommand   = None
+_lilypondCommand = None
 
-infinity = 999999
+_infinity = 999999
 
 # ==== configuration settings ====
 # show measure number in subtitle only for 95% of the measure duration
-displayTimePercentage = 0.95
+_displayTimePercentage = 0.95
 
 # the log level for ffmpeg rendering
-ffmpegLogLevel = "error"
+_ffmpegLogLevel = "error"
+
+# encoding of Postscript file of lilypond
+_postscriptFileEncoding = "latin_1"
 
 # ==== end of configuration settings ====
-#============================================================
-
-def _moveOrRemoveFile (fileName, fileIsKept, targetPath):
-    """removes file with <fileName> if <fileIsKept> is unset, otherwise
-       moves it to directory given by <targetPath>"""
-
-    Logging.trace(">>: fileName = '%s', isKept = %s, targetPath = '%s'",
-                  fileName, fileIsKept, targetPath)
-
-    if fileIsKept:
-        OperatingSystem.moveFile(fileName, targetPath)
-    else:
-        OperatingSystem.removeFile(fileName)
-
-    Logging.trace("<<")
 
 #============================================================
 
@@ -152,7 +141,7 @@ class DurationManager:
 
         result = []
         previousPageMeasureNumber = min(measureToDurationMap.keys())
-        pageList = pageToMeasureMap.keys()
+        pageList = list(pageToMeasureMap.keys())
         pageList.sort()
 
         for page in pageList:
@@ -181,7 +170,7 @@ class DurationManager:
            quarters and <tempo> given in quarters per minute."""
 
         if tempo <= 1:
-            result = infinity
+            result = _infinity
         else:
             result = (60.0 * measureLength) / tempo
 
@@ -256,16 +245,19 @@ class PostscriptFile:
         ParseState_inLimbo       = 1
         ParseState_inPage        = 2
         ParseState_inMeasureText = 3
+        result = {}
+        lineList = []
 
         # do the processing
-        postscriptFile = open(cls._fileName, 'rb')
-        lineList = postscriptFile.readlines()
+        postscriptFile = UTF8File(cls._fileName, 'rb')
+        lineList = [ line.decode(_postscriptFileEncoding).rstrip()
+                     for line in postscriptFile.readlines() ]
         postscriptFile.close()
 
+        Logging.trace("--: lineListCount = %d", len(lineList))
         parseState = ParseState_inLimbo
         maximumPageNumber = 0
         maximumMeasureNumber = 0
-        result = {}
 
         for line in lineList:
             if parseState == ParseState_inLimbo:
@@ -278,7 +270,7 @@ class PostscriptFile:
                 matchList = pageRegexp.match(line)
                 pageNumber = int(matchList.group(1))
                 maximumPageNumber = max(pageNumber, maximumPageNumber)
-                pageMeasureNumber = infinity
+                pageMeasureNumber = _infinity
                 parseState = ParseState_inPage
                 Logging.trace("--: entering page %d", pageNumber)
             elif fontDescription in line:
@@ -288,7 +280,8 @@ class PostscriptFile:
             elif parseState >= ParseState_inMeasureText:
                 if printGlyphsPart in line:
                     if currentNumber > maximumMeasureNumber:
-                        Logging.trace("--: measure number %d", currentNumber)
+                        Logging.trace("--: measure number %d",
+                                      currentNumber)
                         pageMeasureNumber = min(currentNumber,
                                                 pageMeasureNumber)
                         result[pageNumber] = pageMeasureNumber
@@ -329,7 +322,7 @@ class MP4Video:
     # command
     _ffmpegCommand = None
 
-    # files
+    # files and paths
     _concatSpecificationFileName = None
     _intermediateFileNameTemplate = None
     _pageFileNameTemplate = None
@@ -373,25 +366,23 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def cleanupOrMove (cls, filesAreKept, targetPath):
-        """Deletes all intermediate files if <filesAreKept> is unset,
-           otherwise moves them to directory given by <targetPath>"""
+    def cleanUpConditionally (cls, filesAreKept):
+        """Deletes all intermediate files when <filesAreKept> is unset"""
 
-        Logging.trace(">>: filesAreKept = %s, targetPath = '%s'",
-                      filesAreKept, targetPath)
+        Logging.trace(">>: %s", filesAreKept)
 
         for page in range(1, cls._pageCount + 1):
             Logging.trace("--: %d", page)
             fileName = cls._intermediateFileNameTemplate % page
-            _moveOrRemoveFile(fileName, filesAreKept, targetPath)
+            OperatingSystem.removeFile(fileName, filesAreKept)
             fileName = cls._pageFileNameTemplate % page
-            _moveOrRemoveFile(fileName, filesAreKept, targetPath)
+            OperatingSystem.removeFile(fileName, filesAreKept)
 
-        _moveOrRemoveFile(cls._concatSpecificationFileName,
-                          filesAreKept, targetPath)
+        OperatingSystem.removeFile(cls._concatSpecificationFileName,
+                                 filesAreKept)
 
         if cls.fileName and cls.fileName == cls._tempFileName:
-            _moveOrRemoveFile(cls.fileName, filesAreKept, targetPath)
+            OperatingSystem.removeFile(cls.fileName, filesAreKept)
 
         Logging.trace("<<")
 
@@ -406,16 +397,25 @@ class MP4Video:
 
         # for each page an MP4 fragment file is generated and finally
         # concatenated into the target file
-        concatSpecificationFile = open(cls._concatSpecificationFileName, 'w')
+        concatSpecificationFile = \
+                UTF8File(cls._concatSpecificationFileName, 'wt')
 
         for (i, pageDuration) in enumerate(pageDurationList):
             page = i + 1
-            intermediateFileName = cls._intermediateFileNameTemplate % page
-            concatSpecificationFile.write("file '%s'\n" % intermediateFileName)
+
             requiredNumberOfFrames = int(cls._frameRate * pageDuration) + 1
+            pageFileName = cls._pageFileNameTemplate % page
+            intermediateFileName = cls._intermediateFileNameTemplate % page
+
+            # write file name to concatenation file
+            normalizedFileName = intermediateFileName.replace("\\", "/")
+            st = "file '%s'\n" % normalizedFileName
+            concatSpecificationFile.write(st)
+
+            # make silent video from single lilypond page
             command = (cls._ffmpegCommand,
                        "-framerate", "1/" + str(requiredNumberOfFrames),
-                       "-i", str(cls._pageFileNameTemplate % page),
+                       "-i", str(pageFileName),
                        "-vf", "scale=iw/%d:ih/%d" % (cls._scaleFactor,
                                                      cls._scaleFactor),
                        "-r", str(cls._frameRate),
@@ -428,6 +428,8 @@ class MP4Video:
             OperatingSystem.executeCommand(command, False)
 
         concatSpecificationFile.close()
+
+        # concatenate silent video fragments into single file
         cls._pageCount = page
         command = (cls._ffmpegCommand,
                    "-y",
@@ -494,15 +496,16 @@ class SubtitleFile:
         Logging.trace(">>: mToDMap = %s, countIn = %d",
                       measureToDurationMap, countInMeasures)
 
-        measureNumberList = measureToDurationMap.keys()
+        measureNumberList = list(measureToDurationMap.keys())
         measureNumberList.sort()
 
         startTime = 0
-        subtitleFile = open(cls.fileName, 'w')
+
+        subtitleFile = UTF8File(cls.fileName, 'wt')
 
         for measureNumber in measureNumberList:
             duration = measureToDurationMap[measureNumber]
-            endTime = startTime + displayTimePercentage * duration
+            endTime = startTime + _displayTimePercentage * duration
             st = (cls._formatTime(startTime) + " --> "
                   + cls._formatTime(endTime))
             startTime += duration
@@ -511,13 +514,11 @@ class SubtitleFile:
                 # write 4 lines of SRT data: number, time interval,
                 # measure number and an empty separation line
                 Logging.trace("--: measure %d: %s", measureNumber, st)
-                subtitleFile.write("%d\n" % measureNumber)
-                subtitleFile.write(st + "\n")
-                subtitleFile.write("%d\n" % measureNumber)
-                subtitleFile.write("\n")
+                st = ("%d\n%s\n%d\n\n"
+                      % (measureNumber, st, measureNumber))
+                subtitleFile.write(st)
 
         subtitleFile.close()
-
         Logging.trace("<<: subtitles done.")
 
     #--------------------
@@ -538,14 +539,14 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def cleanupOrMove (cls, filesAreKept, targetPath):
+    def cleanUpConditionally (cls, filesAreKept):
         """Cleans up subtitle file if <filesAreKept> is unset,
            otherwise moves it to directory given by <targetPath>"""
 
-        Logging.trace(">>")
+        Logging.trace(">>: %s", filesAreKept)
 
         if cls.fileName == cls._tempFileName:
-            _moveOrRemoveFile(cls.fileName, filesAreKept, targetPath)
+            OperatingSystem.removeFile(cls.fileName, filesAreKept)
 
         Logging.trace("<<")
 
@@ -597,22 +598,31 @@ class LilypondPngVideoGenerator:
         # set commands
         MP4Video._ffmpegCommand = self._ffmpegCommand
 
-        # intermediate file names
-        MP4Video._concatSpecificationFileName  = "temp-concat.txt"
-        MP4Video._intermediateFileNameTemplate = "temp%d.mp4"
-        MP4Video._pageFileNameTemplate         = \
-            self._pictureFileStem + "-page%d.png"
+        # intermediate file names or paths
+        MP4Video._concatSpecificationFileName   = \
+            self._makePath("temp-concat.txt")
+        MP4Video._intermediateFileNameTemplate  = \
+            self._makePath("temp%d.mp4")
+        MP4Video._pageFileNameTemplate = self._pictureFileStem + "-page%d.png"
 
         # technical parameters
         MP4Video._frameRate         = self._frameRate
         MP4Video._scaleFactor       = self._scaleFactor
-        MP4Video._generatorLogLevel = ffmpegLogLevel
+        MP4Video._generatorLogLevel = _ffmpegLogLevel
 
         # file parameters
         SubtitleFile.setName(self._targetSubtitleFileName)
         MP4Video.setName(self._targetMp4FileName)
 
         Logging.trace("<<")
+
+    #--------------------
+
+    def _makePath (self, fileName):
+        """makes path from <fileName> and _intermediateFilePath"""
+
+        return (self._intermediateFileDirectoryPath
+                + OperatingSystem.pathSeparator + fileName)
 
     #--------------------
 
@@ -643,8 +653,8 @@ class LilypondPngVideoGenerator:
 
         Logging.trace(">>: ffmpeg = '%s', lilypond = '%s'",
                       ffmpegCommand, lilypondCommand)
-        globals()['ffmpegCommand']   = ffmpegCommand
-        globals()['lilypondCommand'] = lilypondCommand
+        globals()['_ffmpegCommand']   = ffmpegCommand
+        globals()['_lilypondCommand'] = lilypondCommand
         Logging.trace("<<")
 
     #--------------------
@@ -667,12 +677,14 @@ class LilypondPngVideoGenerator:
                       intermediateFileDirectoryPath,
                       intermediateFilesAreKept)
 
-        self._ffmpegCommand                  = ffmpegCommand
-        self._lilypondCommand                = lilypondCommand
+        self._ffmpegCommand                  = _ffmpegCommand
+        self._lilypondCommand                = _lilypondCommand
 
         # files
+        self._intermediateFilesAreKept       = intermediateFilesAreKept
+        self._intermediateFileDirectoryPath  = intermediateFileDirectoryPath
         self._lilypondFileName               = lilypondFileName
-        self._pictureFileStem                = "temp_frame"
+        self._pictureFileStem                = self._makePath("temp_frame")
         self._postscriptFileName             = self._pictureFileStem + ".ps"
         self._targetMp4FileName              = targetMp4FileName
         self._targetSubtitleFileName         = targetSubtitleFileName
@@ -683,8 +695,6 @@ class LilypondPngVideoGenerator:
         self._frameRate                      = frameRate
         self._scaleFactor                    = scalingFactor
 
-        self._intermediateFilesAreKept      = intermediateFilesAreKept
-        self._intermediateFileDirectoryPath = intermediateFileDirectoryPath
 
         # -- initialize other modules
         self._initializeOtherModuleData()
@@ -718,17 +728,15 @@ class LilypondPngVideoGenerator:
 
     #--------------------
 
-    def cleanupOrMove (self):
+    def cleanup (self):
         """Deletes all intermediate files."""
 
         Logging.trace(">>")
 
         filesAreKept = self._intermediateFilesAreKept
-        targetPath   = self._intermediateFileDirectoryPath
-
-        _moveOrRemoveFile(self._postscriptFileName, filesAreKept, targetPath)
-        MP4Video.cleanupOrMove(filesAreKept, targetPath)
-        SubtitleFile.cleanupOrMove(filesAreKept, targetPath)
+        OperatingSystem.removeFile(self._postscriptFileName, filesAreKept)
+        MP4Video.cleanUpConditionally(filesAreKept)
+        SubtitleFile.cleanUpConditionally(filesAreKept)
         
         Logging.trace("<<")
 

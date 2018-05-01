@@ -3,7 +3,7 @@
 #                      several transformations on it (e.g. instrument
 #                      postprocessing and mixdown
 #
-# author: Dr. Thomas Tensi, 2006 - 2017
+# author: Dr. Thomas Tensi, 2006 - 2018
 
 #====================
 # IMPORTS
@@ -16,14 +16,15 @@ from ltbvc_businesstypes import humanReadableVoiceName
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import adaptToRange, iif, isInRange, MyRandom
+from utf8file import UTF8File 
 
 #====================
 
-processedAudioFileTemplate = "%s/%s-processed.wav"
-tempAudioFileTemplate = "%s/%s-temp%s.wav"
+_processedAudioFileTemplate = "%s/%s-processed.wav"
+_tempAudioFileTemplate = "%s/%s-temp%s.wav"
 
 # the log level for ffmpeg rendering
-ffmpegLogLevel = "error"
+_ffmpegLogLevel = "error"
 
 #====================
 
@@ -55,7 +56,7 @@ class AudioTrackManager:
 
         if cls._aacCommandLine == "":
             command = ( cls._ffmpegCommand,
-                        "-loglevel", ffmpegLogLevel,
+                        "-loglevel", _ffmpegLogLevel,
                         "-aac_tns", "0",                        
                         "-i", audioFilePath,
                         "-y", targetFilePath )
@@ -84,18 +85,21 @@ class AudioTrackManager:
 
         # prepare config file for fluidsynth
         fluidsynthSettingsFilePath = ("%s/%s"
-                                          % (self._audioDirectoryPath,
-                                            "fluidsynthsettings.txt"))
-        fluidsynthSettingsFile = open(fluidsynthSettingsFilePath, "w")
+                                      % (self._audioDirectoryPath,
+                                         "fluidsynthsettings.txt"))
+
         st = "rev_setlevel 0\nrev_setwidth 1.5\nrev_setroomsize 0.5"
+
+        fluidsynthSettingsFile = UTF8File(fluidsynthSettingsFilePath, "wt")
         fluidsynthSettingsFile.write(st)
         fluidsynthSettingsFile.close()
+
         Logging.trace("--: settings file '%s' generated",
                       fluidsynthSettingsFilePath)
 
         concatDirectoryProc = (lambda x: "%s/%s"
-                                         % (cls._soundFontDirectoryName, x))
-        soundFonts = map(concatDirectoryProc, cls._soundFontNameList)
+                               % (cls._soundFontDirectoryName, x))
+        soundFonts = list(map(concatDirectoryProc, cls._soundFontNameList))
 
         # processing midi file via fluidsynth
         OperatingSystem.showMessageOnConsole("== fluidsynth "
@@ -156,7 +160,7 @@ class AudioTrackManager:
                    + [ "--combine", "mix" ])
 
         for voiceName in voiceNameList:
-            audioFilePath = (processedAudioFileTemplate
+            audioFilePath = (_processedAudioFileTemplate
                              % (self._audioDirectoryPath, voiceName))
             volume = voiceNameToVolumeMap.get(voiceName, 1)
             command += [ "-v", str(volume), audioFilePath ]
@@ -185,11 +189,11 @@ class AudioTrackManager:
         powersetCardinality = 2 ** elementCount
         result = []
 
-        for i in xrange(powersetCardinality):
+        for i in range(powersetCardinality):
             currentSet = []
             bitmap = i
 
-            for j in xrange(elementCount):
+            for j in range(elementCount):
                 bitmap, remainder = divmod(bitmap, 2)
 
                 if remainder == 1:
@@ -414,7 +418,7 @@ class AudioTrackManager:
         message = "== overriding %s from file" % voiceName
         OperatingSystem.showMessageOnConsole(message)
 
-        targetFilePath = (processedAudioFileTemplate
+        targetFilePath = (_processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
         command = (cls._soxCommandLinePrefixList
                    + [ filePath, targetFilePath,
@@ -515,12 +519,12 @@ class AudioTrackManager:
         Logging.trace("--: parameterSeqList = %s", parameterSequenceList)
         commandCount = len(parameterSequenceList)
         sourceFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
-        targetFilePath = (processedAudioFileTemplate %
+        targetFilePath = (_processedAudioFileTemplate %
                           (self._audioDirectoryPath, voiceName))
         currentSource = sourceFilePath
 
         for i, parameterSequence in enumerate(parameterSequenceList):
-            tempFilePath = (tempAudioFileTemplate
+            tempFilePath = (_tempAudioFileTemplate
                             % (self._audioDirectoryPath, voiceName,
                                hex(i + 1).upper()))
             currentTarget = iif(i < commandCount - 1, tempFilePath,

@@ -15,8 +15,8 @@ import sys
 
 from ltbvc_businesstypes import humanReadableVoiceName
 from simplelogging import Logging
-from ttbase import iif, iif2, iif3
-from utf8file import UTF8File
+from ttbase import iif, iif2
+from utf8file import UTF8File 
 
 #-------------------------
 # configuration constants
@@ -71,8 +71,11 @@ class _LilypondIncludeFile:
         Logging.trace(">>: %s", includeFileName)
 
         result = set()
-        includeFile = open(includeFileName, "r")
+
+        includeFile = UTF8File(includeFileName, "rt")
         lineList = includeFile.readlines()
+        includeFile.close()
+
         definitionRegExp = re.compile(r" *([a-zA-Z]+) *=")
 
         for line in lineList:
@@ -407,7 +410,7 @@ class LilypondFile:
        
         # print tempo track
         self._printLine(+1, "tempoTrack = {")
-        measureList = songMeasureToTempoMap.keys()
+        measureList = list(songMeasureToTempoMap.keys())
         measureList.sort()
         previousMeasure = 0
 
@@ -656,7 +659,7 @@ class LilypondFile:
         
         cls = self.__class__
 
-        self._file                        = UTF8File.open(fileName, "w")
+        self._file                        = UTF8File(fileName, "wt")
         self._processedTextBuffer         = [ [], [] ]
         self._processingState             = cls._ProcessingState_beforeInclusion
         self._phase                       = ""

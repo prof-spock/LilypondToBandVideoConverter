@@ -8,13 +8,14 @@
 # IMPORTS
 #====================
 
-import sys
 import re
+import sys
 
 from mp4tagmanager import MP4TagManager
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
 from ttbase import convertStringToList, iif
+from utf8file import UTF8File 
 from validitychecker import ValidityChecker
 
 #====================
@@ -133,11 +134,11 @@ class VideoAudioCombiner:
             (audioFilePath, language, description) = element
             trackFilePathList.extend([ "-i", audioFilePath ])
             mapDefinitionList.extend([ "-map", "%d:a" % (i + 1) ])
-            metaDataTag = "-metadata:s:a:%d" % (i + 1)
+            metaDataTag = "-metadata:s:a:%d" % i
             metadataSettingsList.extend([ metaDataTag,
                                           "title=\"%s\"" % description,
                                           metaDataTag,
-                                          "language=\"%s\"" % language ])
+                                          "language=%s" % language ])
 
         if subtitleFilePath > "":
             i = len(audioTrackDataList)
@@ -305,13 +306,13 @@ class VideoAudioCombiner:
 
         ValidityChecker.isReadableFile(subtitleFilePath, "subtitle file")
 
-        subtitleFile = open(subtitleFilePath, "r")
+        subtitleFile = UTF8File(subtitleFilePath, "rt")
         lineList = subtitleFile.readlines()
         subtitleFile.close()
 
         lineList = _SubtitleShifter.applyShift(lineList, shiftOffset)
 
-        targetSubtitleFile = open(targetSubtitleFilePath, "w")
+        targetSubtitleFile = UTF8File(targetSubtitleFilePath, "wt")
         targetSubtitleFile.write("\n".join(lineList))
         targetSubtitleFile.close()
 

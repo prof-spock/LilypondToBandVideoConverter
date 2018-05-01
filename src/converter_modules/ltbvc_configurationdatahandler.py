@@ -97,7 +97,7 @@ class _ConfigDataGlobal:
         configData.soxCommandLinePrefix          = "sox"
         configData.targetDirectoryPath           = "generated"
         configData.tempAudioDirectoryPath        = "/temp"
-        configData.tempLilypondFilePath          = "temp.ly"
+        configData.tempLilypondFilePath          = "./temp.ly"
         configData.videoTargetMap                = {}
         configData.videoFileKindMap              = {}
 
@@ -298,7 +298,7 @@ class _ConfigDataMidiHumanization:
                       getValueProc("voiceNameToVariationFactorMap"))
 
         for voiceName, factors in tempMap.items():
-            scalingFactors = map(lambda x: float(x), factors.split("/"))
+            scalingFactors = list(map(lambda x: float(x), factors.split("/")))
             vntvfMap[voiceName] = scalingFactors
 
         configData.voiceNameToVariationFactorMap = vntvfMap
@@ -430,7 +430,7 @@ class _ConfigDataSong:
 
         configData.voiceNameToVoiceDataMap = {}
 
-        for i in xrange(len(configData.voiceNameList)):
+        for i in range(len(configData.voiceNameList)):
             voiceDescriptor = VoiceDescriptor()
             voiceName = configData.voiceNameList[i]
             voiceDescriptor.voiceName      = voiceName

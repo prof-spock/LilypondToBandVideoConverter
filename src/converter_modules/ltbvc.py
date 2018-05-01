@@ -20,7 +20,7 @@ from ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from miditransformer import MidiTransformer
 from operatingsystem import OperatingSystem
 from simplelogging import Logging
-from ttbase import adaptToRange, convertStringToList, iif
+from ttbase import convertStringToList, iif
 from validitychecker import ValidityChecker
 from videoaudiocombiner import VideoAudioCombiner
 
@@ -58,7 +58,7 @@ def makeMap (listA, listB):
 
     result = {}
 
-    for i in xrange(len(listA)):
+    for i in range(len(listA)):
         key   = listA[i]
         value = listB[i]
         result[key] = value
@@ -169,7 +169,7 @@ class _LilypondProcessor:
 
         result = {}
 
-        for i in xrange(len(configData.voiceNameList)):
+        for i in range(len(configData.voiceNameList)):
             voiceName       = configData.voiceNameList[i]
             voiceDescriptor = configData.voiceNameToVoiceDataMap[voiceName]
             Logging.trace("--: %s", voiceDescriptor)
@@ -233,7 +233,8 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def _makePdf (cls, processingPhase, targetFileNamePrefix, voiceNameList):
+    def _makePdf (cls, processingPhase, targetFileNamePrefix,
+                  voiceNameList):
         """Processes lilypond file and generates extract or score PDF
            file."""
 
@@ -390,9 +391,7 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
-        tempLilypondFilePath = (configData.intermediateFileDirectoryPath
-                                + cls._pathSeparator
-                                + configData.tempLilypondFilePath)
+        tempLilypondFilePath = configData.tempLilypondFilePath
         lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(configData.includeFilePath, "midi",
                               configData.midiVoiceNameList, configData.title,
@@ -536,8 +535,11 @@ class _LilypondProcessor:
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         intermediateFileDirectoryPath = \
             configData.intermediateFileDirectoryPath
-        targetSubtitleFileName = (subtitleFileNameTemplate
-                                  % configData.fileNamePrefix)
+        targetDirectoryPath = configData.targetDirectoryPath
+        targetSubtitleFileName = (targetDirectoryPath
+                                  + cls._pathSeparator
+                                  + (subtitleFileNameTemplate
+                                     % configData.fileNamePrefix))
         tempLilypondFilePath = configData.tempLilypondFilePath
 
         for name, videoFileKind in configData.videoFileKindMap.items():
@@ -573,9 +575,11 @@ class _LilypondProcessor:
                                     configData.voiceNameToScoreNameMap,
                                     configData.phaseAndVoiceNameToClefMap,
                                     configData.phaseAndVoiceNameToStaffListMap)
-                targetMp4FileName = (silentVideoFileNameTemplate
-                                     % (configData.fileNamePrefix,
-                                        videoFileKind.fileNameSuffix))
+                targetMp4FileName = (targetDirectoryPath
+                                     + cls._pathSeparator
+                                     + (silentVideoFileNameTemplate
+                                        % (configData.fileNamePrefix,
+                                           videoFileKind.fileNameSuffix)))
                 videoGenerator = \
                     LilypondPngVideoGenerator(tempLilypondFilePath,
                                               targetMp4FileName,
@@ -587,12 +591,12 @@ class _LilypondProcessor:
                                               intermediateFileDirectoryPath,
                                               intermediateFilesAreKept)
                 videoGenerator.process()
-                videoGenerator.cleanupOrMove()
+                videoGenerator.cleanup()
 
-                OperatingSystem.moveFile(targetMp4FileName,
-                                         configData.targetDirectoryPath)
-                OperatingSystem.moveFile(targetSubtitleFileName,
-                                         configData.targetDirectoryPath)
+                ##OperatingSystem.moveFile(targetMp4FileName,
+                ##                         configData.targetDirectoryPath)
+                ##OperatingSystem.moveFile(targetSubtitleFileName,
+                ##                         configData.targetDirectoryPath)
 
         OperatingSystem.removeFile(tempLilypondFilePath,
 	                           intermediateFilesAreKept)

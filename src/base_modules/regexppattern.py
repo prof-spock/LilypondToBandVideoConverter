@@ -88,7 +88,7 @@ class RegExpPattern:
         firstIndex = 0
         lastIndex  = -1
 
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             if firstIndex > 0 and cls._atomicGroupName(i) not in pattern:
                 break
             else:
@@ -105,7 +105,7 @@ class RegExpPattern:
            current first position to <firstGroupIndex>"""
 
         patternFirstIndex, patternLastIndex = cls._scanForGroups(pattern)
-        numberSequence = range(patternFirstIndex, patternLastIndex + 1)
+        numberSequence = list(range(patternFirstIndex, patternLastIndex + 1))
         offset = firstGroupIndex - patternFirstIndex
         result = pattern
 

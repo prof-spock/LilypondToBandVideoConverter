@@ -10,6 +10,7 @@ import os
 import re
 import sys
 
+import python2and3support
 from simplelogging import Logging
 from ttbase import iif
 
@@ -74,7 +75,7 @@ class ValidityChecker:
 
         Logging.trace(cls._checkTemplate("an integer", valueName, value))
         message = "'%s' must be an integer: %s" % (valueName, repr(value))
-        cls.isValid(isinstance(value, int) or isinstance(value, long), message)
+        cls.isValid(ttbase.isInteger(value), message)
 
     #--------------------
 
@@ -99,7 +100,7 @@ class ValidityChecker:
         typeName = "a " + iif(zeroIsIncluded, "", "positive ") + "natural"
         Logging.trace(cls._checkTemplate(typeName, valueName, value))
         message = ("'%s' must be %s: %s" % (valueName, typeName, repr(value)))
-        cls.isValid((isinstance(value, int) or isinstance(value, long))
+        cls.isValid(python2and3support.isInteger(value)
                     and (value > 0 or value == 0 and zeroIsIncluded),
                     message)
 
@@ -118,10 +119,7 @@ class ValidityChecker:
         floatRegexp   = re.compile(r"^[0-9]+(\.[0-9]*)?$")
         integerRegexp = re.compile(r"^[0-9]+$")
 
-        if (isinstance(value, int) or isinstance(value, long)
-            or isinstance(value, float)):
-            value = str(value)
-
+        value = str(value)
         isOkay = integerRegexp.match(value)
 
         if floatIsAllowed and not isOkay:
@@ -135,10 +133,10 @@ class ValidityChecker:
         else:
             if rangeKind == ">0":
                 errorTemplate = "positive"
-                isOkay = (value > 0)
+                isOkay = (float(value) > 0)
             elif rangeKind == ">=0":
                 errorTemplate = "positive or zero"
-                isOkay = (value >= 0)
+                isOkay = (float(value) >= 0)
 
             errorTemplate = "%s must be " + errorTemplate + " - %s"
 
@@ -166,9 +164,10 @@ class ValidityChecker:
         """Checks whether <value> of variable given by <valueName> is
            a unicode string, otherwise exists program with a message."""
 
-        Logging.trace(cls._checkTemplate("a unicode string", valueName, value))
+        Logging.trace(cls._checkTemplate("a (unicode) string",
+                                         valueName, value))
         message = "'%s' must be a string: %s" % (valueName, repr(value))
-        cls.isValid(isinstance(value, unicode), message)
+        cls.isValid(python2and3support.isString(value), message)
 
     #--------------------
 

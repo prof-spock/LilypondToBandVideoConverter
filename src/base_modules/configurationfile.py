@@ -6,12 +6,13 @@
 
 #====================
 
-import codecs
+import io
 import re
 
+from operatingsystem import OperatingSystem
+from python2and3support import isString
 from simplelogging import Logging
 from ttbase import iif, missingValue
-from operatingsystem import OperatingSystem
 
 #====================
 
@@ -51,7 +52,7 @@ class ConfigurationFile:
         if uppercasedValue in cls._validBooleanValues:
             result = (uppercasedValue == cls._trueBooleanValueName)
         elif cls._integerRegExp.match(value):
-            result = long(value)
+            result = int(value)
         elif cls._floatRegExp.match(value):
             result = float(value)
         else:
@@ -74,6 +75,7 @@ class ConfigurationFile:
         ParseState_inString     = 1
         ParseState_inEscape     = 2
         ParseState_inIdentifier = 3
+        parseStateToString = { 0 : "LIM", 1 : "STR", 2 : "ESC", 3 : "ID " }
 
         parseState = ParseState_inLimbo
         result = ""
@@ -82,7 +84,8 @@ class ConfigurationFile:
         for ch in value:
             # process finite state automaton with three states based
             # on next character in string
-            Logging.trace("--: (%d) character: %s", parseState, ch)
+            Logging.trace("--: (%s) character: %s",
+                          parseStateToString[parseState], ch)
 
             if parseState == ParseState_inLimbo:
                 if cls._identifierCharRegExp.search(ch):
@@ -133,7 +136,7 @@ class ConfigurationFile:
         else:
             result = self._keyToValueMap[identifier]
 
-            if not isinstance(result, basestring):
+            if not isString(result):
                 result = repr(result)
             else:
                 result = (cls._doubleQuoteCharacter + result
@@ -258,8 +261,8 @@ class ConfigurationFile:
     #--------------------
 
     def _readFile (self, fileName, lineList, visitedFileSet):
-        """Appends lines of configuration file with <fileName> to
-           <lineList>; also handles embedded imports of files; <visitedFileSet>
+        """Appends lines of configuration file with <fileName> to <lineList>;
+           also handles embedded imports of files; <visitedFileSet>
            tells which files have already been visited"""
 
         Logging.trace(">>: fileName = '%s', visitedFiles = %s",
@@ -276,38 +279,41 @@ class ConfigurationFile:
             Logging.trace("--: file already included '%s'", originalFileName)
         else:
             visitedFileSet.update(fileName)
-            configurationFile = codecs.open(fileName, "r", "utf-8")
-            configFileLineList = configurationFile.readlines()
-            configurationFile.close()
             isOkay = True
 
-            for currentLine in configFileLineList:
-                currentLine = currentLine.strip()
-                isImportLine = currentLine.startswith(cls._importCommandName)
+            with io.open(fileName, "rt",
+                         encoding="utf-8") as configurationFile:
+                configFileLineList = configurationFile.readlines()
 
-                if isImportLine:
-                    importedFileName = currentLine.split('"')[1]
-                    currentLine = cls._commentMarker + " " + currentLine
+                for currentLine in configFileLineList:
+                    currentLine = currentLine.strip()
+                    isImportLine = \
+                        currentLine.startswith(cls._importCommandName)
 
-                lineList.append(currentLine)
+                    if isImportLine:
+                        importedFileName = currentLine.split('"')[1]
+                        currentLine = cls._commentMarker + " " + currentLine
 
-                if isImportLine:
-                    isAbsolutePath = (importedFileName.startswith("/")
-                                      or importedFileName.startswith("\\")
-                                      or importedFileName[1] == ":")
+                    lineList.append(currentLine)
 
-                    if isAbsolutePath:
-                        directoryPrefix = ""
-                    else:
-                        directoryName = OperatingSystem.dirname(fileName)
-                        directoryPrefix = iif(directoryName == ".", "",
-                                              directoryName
-                                              + iif(directoryName > "",
-                                                    "/", ""))
+                    if isImportLine:
+                        isAbsolutePath = (importedFileName.startswith("/")
+                                          or importedFileName.startswith("\\")
+                                          or importedFileName[1] == ":")
 
-                    importedFileName = directoryPrefix + importedFileName
-                    Logging.trace("--: IMPORT '%s'", importedFileName)
-                    self._readFile(importedFileName, lineList, visitedFileSet)
+                        if isAbsolutePath:
+                            directoryPrefix = ""
+                        else:
+                            directoryName = OperatingSystem.dirname(fileName)
+                            directoryPrefix = iif(directoryName == ".", "",
+                                                  directoryName
+                                                  + iif(directoryName > "",
+                                                        "/", ""))
+
+                        importedFileName = directoryPrefix + importedFileName
+                        Logging.trace("--: IMPORT '%s'", importedFileName)
+                        self._readFile(importedFileName, lineList,
+                                       visitedFileSet)
 
         Logging.trace("<<: %s", isOkay)
         return isOkay

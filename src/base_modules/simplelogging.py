@@ -5,9 +5,10 @@
 #====================
 
 import atexit
-import codecs
+import io
 import sys
 
+from python2and3support import isPython2
 from ttbase import iif
 
 #====================
@@ -92,9 +93,9 @@ class Logging:
         elif cls._fileName == "STDERR":
             cls._file = sys.stderr
         else:
-            mode = iif(isNew, "w", "a")
-            cls._file = codecs.open(cls._fileName, mode, "utf-8",
-                                    errors='replace')
+            mode = iif(isNew, "wt", "at")
+            cls._file = io.open(cls._fileName, mode,
+                                encoding="utf-8", errors='replace')
 
         cls._fileIsOpen = (cls._file is not None)
   
@@ -118,10 +119,21 @@ class Logging:
                     # output file cannot be accessed => put line to buffer
                     cls._buffer.append(st)
                 else:
-                    cls._file.write(st)
+                    cls._writeStringDirectly(st)
 
                 if not cls._fileIsKeptOpen:
                     cls._file.close()
+
+    #--------------------
+
+    @classmethod
+    def _writeStringDirectly (cls, st):
+        """Writes <st> to logging file"""
+
+        if isPython2:
+            st = unicode(st)
+            
+        cls._file.write(st)
 
     #--------------------
     # EXPORTED FEATURES
@@ -168,7 +180,7 @@ class Logging:
                 cls._fileName = ""
             else:
                 for line in cls._buffer:
-                    cls._file.write(line)
+                    cls._writeStringDirectly(line)
 
                 cls._buffer = []
 

@@ -9,10 +9,10 @@
 
 from mutagen.mp4 import MP4, MP4Cover
 
-from python2and3support import isPython2
-from simplelogging import Logging
-from ttbase import convertStringToList, iif
-from utf8file import UTF8File 
+from basemodules.python2and3support import isPython2
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import convertStringToList, iif
+from basemodules.utf8file import UTF8File 
 
 #====================
 

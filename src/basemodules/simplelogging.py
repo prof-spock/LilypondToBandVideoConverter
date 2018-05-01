@@ -8,8 +8,8 @@ import atexit
 import io
 import sys
 
-from python2and3support import isPython2
-from ttbase import iif
+from basemodules.python2and3support import isPython2
+from basemodules.ttbase import iif
 
 #====================
 

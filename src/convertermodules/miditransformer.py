@@ -15,11 +15,11 @@ import random
 import re
 
 from midifilehandler import MidiFileHandler
-from operatingsystem import OperatingSystem
-from simpleassertion import Assertion
-from simplelogging import Logging
-from ttbase import adaptToRange, convertStringToMap, iif, iif2, \
-                   isInRange, MyRandom
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simpleassertion import Assertion
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import adaptToRange, convertStringToMap, \
+                               iif, iif2, isInRange, MyRandom
 
 #====================
 

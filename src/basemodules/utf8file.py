@@ -5,7 +5,7 @@
 
 import io
 
-from python2and3support import toUnicodeString
+from basemodules.python2and3support import toUnicodeString
 
 #============================================================
 

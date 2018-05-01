@@ -3110,7 +3110,7 @@ lilypond macro structure is similar for different voices.
   gtrTonPhrase  = \relative c { e,8 b' fs' b, b' fs b, fs }
   gtrSubDPhrase = \relative c { a8 e' b' e, e' b e, b }
   gtrDomPhrase  = \relative c { b8 fs' cs' fs, fs' cs fs, cs }
-  gtrDoubleTonPhrase  = { \repeat percent 2 { \gtrTonPhrase } }
+  gtrDoubleTonPhrase = { \repeat percent 2 { \gtrTonPhrase } }
   gtrOutroPhrase = \relative c { b4 fs' a, e | <e b'>1 | }
 
   gtrIntro = { \repeat percent 2 { \gtrDomPhrase } }
@@ -3142,8 +3142,8 @@ is a predefined name in lilypond.
   drmPhrase = \drummode { <bd hhc>8 hhc <sn hhc> hhc }
   drmOstinato = { \repeat unfold 2 { \drmPhrase } }
   drmFill = \drummode { \drmPhrase tomh8 tommh toml tomfl }
-
   drmIntro = { \drmOstinato  \drmFill }
+  drmOutro = \drummode { \repeat percent 6 { \drmPhrase } | <sn cymc>1 | }
   drmVersePrefix = {
     \repeat percent 3 { \drmOstinato }  \drmFill
     \repeat percent 2 { \drmOstinato  \drmFill }
@@ -3231,16 +3231,16 @@ video.
   "}"
 
   phaseAndVoiceNameToStaffListMap = "{"      \
-      "extract :" _voiceNameToStaffListMap ","  \
-      "midi    :" _voiceNameToStaffListMap ","  \
-      "score   :" _voiceNameToStaffListMap ","  \
-      "video   :" _voiceNameToStaffListMap "}"
+    "extract :" _voiceNameToStaffListMap ","  \
+    "midi    :" _voiceNameToStaffListMap ","  \
+    "score   :" _voiceNameToStaffListMap ","  \
+    "video   :" _voiceNameToStaffListMap "}"
 
   phaseAndVoiceNameToClefMap = "{"      \
-      "extract :" _voiceNameToClefMap ","  \
-      "midi    :" _voiceNameToClefMap ","  \
-      "score   :" _voiceNameToClefMap ","  \
-      "video   :" _voiceNameToClefMap "}"
+    "extract :" _voiceNameToClefMap ","  \
+    "midi    :" _voiceNameToClefMap ","  \
+    "score   :" _voiceNameToClefMap ","  \
+    "video   :" _voiceNameToClefMap "}"
 
   voiceNameToChordsMap = "{" \
     "vocals : s/v, bass : e, guitar : e" \
@@ -3260,12 +3260,13 @@ instrument; hence all humanized instruments have similar variations in
 timing and velocity.
 
 \begin{configurationFileCode}
+  countInMeasureCount = 2
+
   humanizationStyleRockHard  = \
-      "{ countIn : 2, "                               \
-       " timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
-                   " S:B0.15, OTHER:B0.2 },"          \
-       " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
-                   " S:0.9, OTHER:0.85, SLACK:0.1 } }"
+    "{ timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
+                 " S:B0.15, OTHER:B0.2 },"          \
+     " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
+                 " S:0.9, OTHER:0.85, SLACK:0.1 } }"
 \end{configurationFileCode}
 
 The video generation is just done for a single video target called
@@ -3277,9 +3278,7 @@ And the videos show both vocals and guitar and are characterized as
 
 \begin{configurationFileCode}
   videoTargetMap = "{" \
-      "tablet: { fileNameSuffix: '-tblt'," \
-               " targetVideoDirectoryPath: '~/videos' ," \
-               " resolution: 132," \
+      "tablet: { resolution: 132," \
                " height: 1024," \
                " width: 768," \
                " topBottomMargin: 5," \
@@ -3372,6 +3371,8 @@ properties:
   year = 2017
   composerText = "arranged by Fred, 2017"
   trackNumber = 99
+  artistName = "Fred"
+  albumName = "Best of Fred"
 \end{configurationFileCode}
 
 The main information about a song is given in the table of voices with
@@ -3399,11 +3400,13 @@ one (serialized) line in the video.
 
 Humanization relies on the humanization style defined
 in~\ref{section:exampleGlobalConfiguration}.  It applies to all voices
-except vocals.
+except vocals and starts in measure 1.
 
 \begin{configurationFileCode}
   styleHumanizationKind = "humanizationStyleRockHard"
   humanizedVoiceNameSet = "bass, guitar, drums"
+  measureToHumanizationStyleNameMap = \
+      "{ 1 : humanizationStyleRockHard }"
 \end{configurationFileCode}
 
 The overall tempo is 85bpm throughout the song.

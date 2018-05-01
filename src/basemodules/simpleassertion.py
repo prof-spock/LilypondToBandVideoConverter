@@ -4,8 +4,9 @@
 #====================
 
 import os.path
-from simplelogging import Logging
 import sys
+
+from basemodules.simplelogging import Logging
 
 #====================
 

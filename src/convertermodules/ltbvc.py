@@ -12,16 +12,17 @@
 
 import argparse
 
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import convertStringToList, iif
+from basemodules.validitychecker import ValidityChecker
+
 from audiotrackmanager import AudioTrackManager
 from lilypondfilegenerator import LilypondFile
 from lilypondpngvideogenerator import LilypondPngVideoGenerator
 from ltbvc_businesstypes import TrackSettings
 from ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from miditransformer import MidiTransformer
-from operatingsystem import OperatingSystem
-from simplelogging import Logging
-from ttbase import convertStringToList, iif
-from validitychecker import ValidityChecker
 from videoaudiocombiner import VideoAudioCombiner
 
 #====================

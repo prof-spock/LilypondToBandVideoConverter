@@ -9,14 +9,15 @@
 # IMPORTS
 #====================
 
-from configurationfile import ConfigurationFile
+from basemodules.configurationfile import ConfigurationFile
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import adaptToRange, iif, isInRange, MyRandom
+from basemodules.utf8file import UTF8File 
+
+from ltbvc_businesstypes import humanReadableVoiceName
 from miditransformer import MidiTransformer
 from mp4tagmanager import MP4TagManager
-from ltbvc_businesstypes import humanReadableVoiceName
-from operatingsystem import OperatingSystem
-from simplelogging import Logging
-from ttbase import adaptToRange, iif, isInRange, MyRandom
-from utf8file import UTF8File 
 
 #====================
 

@@ -18,11 +18,11 @@
 
 from copy import deepcopy
 
-from regexppattern import RegExpPattern
-from simplelogging import Logging
-from ttbase import adaptToRange, convertStringToList, \
-                   convertStringToMap, iif2
-from validitychecker import ValidityChecker
+from basemodules.regexppattern import RegExpPattern
+from basemodules.simplelogging import Logging
+from basemodules.ttbase import adaptToRange, convertStringToList, \
+                               convertStringToMap, iif2
+from basemodules.validitychecker import ValidityChecker
 
 #====================
 

@@ -34,3 +34,10 @@ def isString (value):
         isOkay = isinstance(value, unicode)
 
     return isOkay
+
+#--------------------
+
+def toUnicodeString (st):
+    """Converts plain string <st> to unicode string and returns it"""
+
+    return st if (isPython3 or isinstance(st, unicode)) else unicode(st)

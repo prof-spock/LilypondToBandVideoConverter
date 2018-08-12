@@ -434,6 +434,7 @@ class MP4Video:
         # concatenate silent video fragments into single file
         cls._pageCount = page
         command = (cls._ffmpegCommand,
+                   "-safe", "0",
                    "-y",
                    "-loglevel", cls._generatorLogLevel,
                    "-f", "concat",

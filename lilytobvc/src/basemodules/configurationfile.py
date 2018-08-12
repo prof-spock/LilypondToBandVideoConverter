@@ -310,10 +310,15 @@ class ConfigurationFile:
                                                   + iif(directoryName > "",
                                                         "/", ""))
 
-                        importedFileName = directoryPrefix + importedFileName
+                        #importedFileName = directoryPrefix + importedFileName
                         Logging.trace("--: IMPORT '%s'", importedFileName)
-                        self._readFile(importedFileName, lineList,
-                                       visitedFileSet)
+                        isOkay = self._readFile(importedFileName, lineList,
+                                                visitedFileSet)
+                        if not isOkay:
+                            Logging.trace("--: import failed for '%s' in %s",
+                                          importedFileName,
+                                          cls._searchPathList)
+                            break
 
         Logging.trace("<<: %s", isOkay)
         return isOkay

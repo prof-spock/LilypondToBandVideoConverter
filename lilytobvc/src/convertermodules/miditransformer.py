@@ -14,12 +14,13 @@ import math
 import random
 import re
 
-from midifilehandler import MidiFileHandler
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simpleassertion import Assertion
 from basemodules.simplelogging import Logging
 from basemodules.ttbase import adaptToRange, convertStringToMap, \
                                iif, iif2, isInRange, MyRandom
+
+from .midifilehandler import MidiFileHandler
 
 #====================
 

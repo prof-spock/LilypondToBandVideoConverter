@@ -19,10 +19,10 @@ from basemodules.ttbase import convertStringToList, convertStringToMap, \
                                iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
-from ltbvc_businesstypes import generateObjectListFromString, \
-                                generateObjectMapFromString, \
-                                AudioTrack, TempoTrack, \
-                                VideoFileKind, VideoTarget, VoiceDescriptor
+from .ltbvc_businesstypes import generateObjectListFromString, \
+                                 generateObjectMapFromString, \
+                                 AudioTrack, TempoTrack, \
+                                 VideoFileKind, VideoTarget, VoiceDescriptor
 
 #====================
 
@@ -1219,14 +1219,21 @@ class LTBVC_ConfigurationData:
         Logging.trace(">>: '%s'", configurationFilePath)
 
         separator = OperatingSystem.pathSeparator
+
+        homeDirectoryPath = OperatingSystem.homeDirectoryPath()
         scriptFilePath = OperatingSystem.scriptFilePath()
         scriptDirectoryPath = OperatingSystem.dirname(scriptFilePath)
+        Logging.trace("--: scriptFilePath = '%s', scriptDirectory = '%s',"
+                      + " homeDirectory = '%s'",
+                      scriptFilePath, scriptDirectoryPath, homeDirectoryPath)
+
         configSuffix = separator + "config"
         searchPathList = \
-          [ OperatingSystem.homeDirectoryPath() + separator + ".ltbvc",
-            scriptDirectoryPath + configSuffix,
-            OperatingSystem.dirname(scriptDirectoryPath) + configSuffix ]
+          [ homeDirectoryPath + separator + ".ltbvc" + configSuffix,
+            scriptDirectoryPath + "/../.." + configSuffix ]
         ConfigurationFile.setSearchPaths(searchPathList)
-        self._configurationFile = ConfigurationFile(configurationFilePath)
+        file = ConfigurationFile(configurationFilePath)
+        self._configurationFile = file
 
         Logging.trace("<<")
+        return file

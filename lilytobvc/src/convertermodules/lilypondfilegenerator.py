@@ -17,7 +17,7 @@ from basemodules.simplelogging import Logging
 from basemodules.ttbase import iif, iif2
 from basemodules.utf8file import UTF8File 
 
-from ltbvc_businesstypes import humanReadableVoiceName
+from .ltbvc_businesstypes import humanReadableVoiceName
 
 #-------------------------
 # configuration constants

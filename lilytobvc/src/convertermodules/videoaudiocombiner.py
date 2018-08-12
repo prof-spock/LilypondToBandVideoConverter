@@ -17,7 +17,7 @@ from basemodules.ttbase import convertStringToList, iif
 from basemodules.utf8file import UTF8File 
 from basemodules.validitychecker import ValidityChecker
 
-from mp4tagmanager import MP4TagManager
+from .mp4tagmanager import MP4TagManager
 
 #====================
 

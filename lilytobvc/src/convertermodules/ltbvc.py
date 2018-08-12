@@ -4,26 +4,27 @@
 #          video files based on a configuration file from a lilypond
 #          music fragment file
 
-# author: Dr. Thomas Tensi, 2006 - 2017
+# author: Dr. Thomas Tensi, 2006 - 2018
 
 #====================
 # IMPORTS
 #====================
 
 import argparse
+import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
 from basemodules.ttbase import convertStringToList, iif
 from basemodules.validitychecker import ValidityChecker
 
-from audiotrackmanager import AudioTrackManager
-from lilypondfilegenerator import LilypondFile
-from lilypondpngvideogenerator import LilypondPngVideoGenerator
-from ltbvc_businesstypes import TrackSettings
-from ltbvc_configurationdatahandler import LTBVC_ConfigurationData
-from miditransformer import MidiTransformer
-from videoaudiocombiner import VideoAudioCombiner
+from .audiotrackmanager import AudioTrackManager
+from .lilypondfilegenerator import LilypondFile
+from .lilypondpngvideogenerator import LilypondPngVideoGenerator
+from .ltbvc_businesstypes import TrackSettings
+from .ltbvc_configurationdatahandler import LTBVC_ConfigurationData
+from .miditransformer import MidiTransformer
+from .videoaudiocombiner import VideoAudioCombiner
 
 #====================
 # TYPE DEFINITIONS
@@ -637,34 +638,43 @@ def initialize ():
     _CommandLineOptions.check(argumentList)
 
     configData = LTBVC_ConfigurationData()
-    configData.readFile(argumentList.configurationFilePath)
-    loggingFilePath = configData.get("loggingFilePath")
-    Logging.setFileName(loggingFilePath)
-    configData.checkAndSetDerivedVariables(selectedVoiceNameSet)
+    configurationFilePath = argumentList.configurationFilePath
+    configurationFile = configData.readFile(configurationFilePath)
 
-    # override config file setting from command line option
-    if intermediateFilesAreKept:
-        configData.intermediateFilesAreKept = True
+    if configurationFile is None:
+        message = ("cannot open configuration file '%s'"
+                   % configurationFilePath)
+        OperatingSystem.showMessageOnConsole(message)
+    else:
+        loggingFilePath = configData.get("loggingFilePath")
+        loggingFilePath = iif(loggingFilePath is None,
+                              "STDERR", loggingFilePath)
+        Logging.setFileName(loggingFilePath)
+        configData.checkAndSetDerivedVariables(selectedVoiceNameSet)
 
-    # initialize all the submodules with configuration information
-    _LilypondProcessor._lilypondCommand = configData.lilypondCommand
-    LilypondPngVideoGenerator.initialize(configData.ffmpegCommand,
-                                         configData.lilypondCommand)
-    VideoAudioCombiner.initialize(configData.ffmpegCommand,
-                                  configData.mp4boxCommand)
+        # override config file setting from command line option
+        if intermediateFilesAreKept:
+            configData.intermediateFilesAreKept = True
 
-    LilypondFile.initialize(configData.measureToTempoMap)
-    AudioTrackManager.initialize(configData.aacCommandLine,
-                                 configData.ffmpegCommand,
-                                 configData.fluidsynthCommand,
-                                 configData.soxCommandLinePrefix,
-                                 configData.soundFontDirectoryPath,
-                                 configData.soundFontNameList,
-                                 configData.soundStyleNameToTextMap,
-                                 configData.intermediateFilesAreKept)
-    MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,
-                               configData.humanizationStyleNameToTextMap,
-                               configData.humanizedVoiceNameSet)
+        # initialize all the submodules with configuration information
+        _LilypondProcessor._lilypondCommand = configData.lilypondCommand
+        LilypondPngVideoGenerator.initialize(configData.ffmpegCommand,
+                                             configData.lilypondCommand)
+        VideoAudioCombiner.initialize(configData.ffmpegCommand,
+                                      configData.mp4boxCommand)
+
+        LilypondFile.initialize(configData.measureToTempoMap)
+        AudioTrackManager.initialize(configData.aacCommandLine,
+                                     configData.ffmpegCommand,
+                                     configData.fluidsynthCommand,
+                                     configData.soxCommandLinePrefix,
+                                     configData.soundFontDirectoryPath,
+                                     configData.soundFontNameList,
+                                     configData.soundStyleNameToTextMap,
+                                     configData.intermediateFilesAreKept)
+        MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,
+                                   configData.humanizationStyleNameToTextMap,
+                                   configData.humanizedVoiceNameSet)
 
     Logging.trace("<<")
 
@@ -698,4 +708,5 @@ def main ():
 
 #--------------------
 
-main()
+if __name__ == "__main__":
+    main()

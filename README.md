@@ -78,7 +78,7 @@ The detailed manual is available [here] and [there].
 [ffmpeg]: http://ffmpeg.org/
 [fluidsynth]: http://www.fluidsynth.org/
 [here]: https://github.com/prof-spock/LilypondToBandVideoConverter/blob/master/lilypondToBandVideoConverter.pdf
-[there]: (lilypondToBandVideoConverter.pdf)
+[there]: lilypondToBandVideoConverter.pdf
 [lilypond]: http://lilypond.org/
 [lilypondFileSyntax]: http://tensi.eu/thomas
 [mp4box]: https://gpac.wp.imt.fr/mp4box/mp4box-documentation/

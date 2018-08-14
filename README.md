@@ -73,14 +73,14 @@ Installation is done from the PyPi repository via
 
 ## Further Information
 
-The detailed manual is available [here].
+The detailed manual is available [here] and [there].
 
-[lilypondFileSyntax]: http://tensi.eu/thomas
 [ffmpeg]: http://ffmpeg.org/
 [fluidsynth]: http://www.fluidsynth.org/
-[lilypond]: http://lilypond.org/
-[overallConfigurationFileSyntax]: http://tensi.eu/thomas
-[qaac]: https://sites.google.com/site/qaacpage/
-[songConfigurationFileSyntax]: http://tensi.eu/thomas
-[sox]: http://sox.sourceforge.net/
 [here]: https://github.com/prof-spock/LilypondToBandVideoConverter/blob/master/lilypondToBandVideoConverter.pdf
+[there]: (lilypondToBandVideoConverter.pdf)
+[lilypond]: http://lilypond.org/
+[lilypondFileSyntax]: http://tensi.eu/thomas
+[mp4box]: https://gpac.wp.imt.fr/mp4box/mp4box-documentation/
+[qaac]: https://sites.google.com/site/qaacpage/
+[sox]: http://sox.sourceforge.net/

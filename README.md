@@ -22,17 +22,15 @@ to convert a music piece written in the lilypond notation to
 
 For processing a piece one must have
 
-- a *lilypond include file* with the score information
-  containing specific lilypond identifiers (cf. [lilypond
-  fragment file syntax][lilypondFileSyntax]), and
+- a *lilypond fragment file* with the score information
+  containing specific lilypond identifiers, and
 
 - a *configuration file* giving details like the voices
   occuring in the piece, their associated midi instrument,
   target audio volume, list of mutable voices for the audio
-  tracks etc. (cf. [song configuration file
-  syntax][songConfigurationFileSyntax])
+  tracks etc.
 
-Based on that files the python scripts -- together with some
+Based on those files the python scripts -- together with some
 open-source command-line software like ffmpeg -- produce all
 the target files either incrementally or altogether.
 
@@ -40,7 +38,7 @@ the target files either incrementally or altogether.
 
 All the scripts are written in python and can be installed
 as a python package (to be specified).  The package requires
-Python&nbsp;2.7.
+either Python&nbsp;2.7 or Python&nbsp;3.3 or later.
 
 Additionally the following software has to be available:
 
@@ -58,13 +56,24 @@ Additionally the following software has to be available:
    files for the target mix files as well as the mixdown,
    and
 
+Optionally the following software is also used:
+
 - *[qaac][]*: the AAC-encoder for the final audio mix file
    compression.
 
+- *[mp4box][]*: the MP4 container packaging software
+
 The location of all those commands as well as a few other
 settings has to be defined in a global configuration file
-for the LilypondToBandVideoConverter (cf. [overall
-configuration file syntax][overallConfigurationFileSyntax])
+for the LilypondToBandVideoConverter.
+
+Installation is done from the PyPi repository via
+
+    pip install lilypondToBVC
+
+## Further Information
+
+The detailed manual is available [here].
 
 [lilypondFileSyntax]: http://tensi.eu/thomas
 [ffmpeg]: http://ffmpeg.org/
@@ -74,3 +83,4 @@ configuration file syntax][overallConfigurationFileSyntax])
 [qaac]: https://sites.google.com/site/qaacpage/
 [songConfigurationFileSyntax]: http://tensi.eu/thomas
 [sox]: http://sox.sourceforge.net/
+[here]: https://github.com/prof-spock/LilypondToBandVideoConverter/blob/master/lilypondToBandVideoConverter.pdf

@@ -269,17 +269,19 @@ class ConfigurationFile:
                       fileName, visitedFileSet)
 
         cls = self.__class__
+        errorMessage = ""
+        isOkay = True
+
         originalFileName = fileName
         fileName = self._lookupFileName(originalFileName)
 
         if fileName is None:
-            Logging.trace("--: cannot find '%s'", originalFileName)
+            errorMessage = "cannot find '%s'" % originalFileName
             isOkay = False
         elif fileName in visitedFileSet:
             Logging.trace("--: file already included '%s'", originalFileName)
         else:
             visitedFileSet.update(fileName)
-            isOkay = True
 
             with io.open(fileName, "rt",
                          encoding="utf-8") as configurationFile:
@@ -312,17 +314,25 @@ class ConfigurationFile:
 
                         #importedFileName = directoryPrefix + importedFileName
                         Logging.trace("--: IMPORT '%s'", importedFileName)
-                        isOkay = self._readFile(importedFileName, lineList,
-                                                visitedFileSet)
-                        if not isOkay:
-                            Logging.trace("--: import failed for '%s' in %s",
-                                          importedFileName,
-                                          cls._searchPathList)
+
+                        try:
+                            self._readFile(importedFileName, lineList,
+                                           visitedFileSet)
+                        except FileNotFoundError as exception:
+                            errorMessage = ("import failed for '%s' in %s"
+                                            % (importedFileName,
+                                               cls._searchPathList))
+                            subMessage = exception.args[0]
+                            errorMessage = ("%s\n%s" %
+                                            (errorMessage, subMessage))
+                            isOkay = False
                             break
 
-        Logging.trace("<<: %s", isOkay)
-        return isOkay
-            
+        Logging.trace("<<: %s, '%s'", isOkay, errorMessage)
+
+        if not isOkay:
+            raise FileNotFoundError(errorMessage)
+
     #--------------------
 
     def _lookupFileName (self, originalFileName):

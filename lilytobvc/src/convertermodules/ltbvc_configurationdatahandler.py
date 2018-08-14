@@ -1074,6 +1074,12 @@ class LTBVC_ConfigurationData:
     # LOCAL FEATURES
     #--------------------
 
+    _homeDirectoryPath   = OperatingSystem.homeDirectoryPath()
+    _scriptFilePath      = OperatingSystem.scriptFilePath()
+    _scriptDirectoryPath = OperatingSystem.dirname(_scriptFilePath)
+
+    #--------------------
+
     def _checkStringLists (self, voiceNames, midiChannels, midiInstruments,
                            midiVolumes, panPositions, audioLevels,
                            reverbLevels, soundVariants):
@@ -1218,22 +1224,26 @@ class LTBVC_ConfigurationData:
 
         Logging.trace(">>: '%s'", configurationFilePath)
 
-        separator = OperatingSystem.pathSeparator
+        cls = self.__class__
 
-        homeDirectoryPath = OperatingSystem.homeDirectoryPath()
-        scriptFilePath = OperatingSystem.scriptFilePath()
-        scriptDirectoryPath = OperatingSystem.dirname(scriptFilePath)
+        separator = OperatingSystem.pathSeparator
+        configSuffix = separator + "config"
+
         Logging.trace("--: scriptFilePath = '%s', scriptDirectory = '%s',"
                       + " homeDirectory = '%s'",
-                      scriptFilePath, scriptDirectoryPath, homeDirectoryPath)
+                      cls._scriptFilePath, cls._scriptDirectoryPath,
+                      cls._homeDirectoryPath)
 
-        configSuffix = separator + "config"
         searchPathList = \
-          [ homeDirectoryPath + separator + ".ltbvc" + configSuffix,
-            scriptDirectoryPath + "/../.." + configSuffix ]
+          [ cls._homeDirectoryPath + separator + ".ltbvc" + configSuffix,
+            cls._scriptDirectoryPath + "/../.." + configSuffix ]
         ConfigurationFile.setSearchPaths(searchPathList)
-        file = ConfigurationFile(configurationFilePath)
-        self._configurationFile = file
 
-        Logging.trace("<<")
-        return file
+        try:
+            file = ConfigurationFile(configurationFilePath)
+        except FileNotFoundError as exception:
+            file = None
+            raise
+        finally:
+            self._configurationFile = file
+            Logging.trace("<<")

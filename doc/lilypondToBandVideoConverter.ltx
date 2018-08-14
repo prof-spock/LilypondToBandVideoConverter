@@ -68,7 +68,7 @@
   \fancyfoot[LE]{\thepage}
   \fancyfoot[CE]{~}
   \fancyfoot[RE]{Dr.~Thomas Tensi}
-  \fancyfoot[LO]{LTBVC}
+  \fancyfoot[LO]{LilypondToBVC}
   \fancyfoot[CO]{~}
   \fancyfoot[RO]{\thepage}
 
@@ -128,7 +128,7 @@
   \newcommand{\glossaryLink}[1]{\(\rightarrow\)\textit{#1}}
   \newcommand{\hyperlink}[1]{\textsf{\color{blue}#1}}
   \newcommand{\ltbvc}{LilypondToBandVideoConverter}
-  \newcommand{\ltbvcCommand}{makelilypondall.py~}
+  \newcommand{\ltbvcCommand}{lilypondToBVC}
   \newcommand{\macro}[1]{\textbackslash #1}
   \newcommand{\meta}[1]{\guillemotleft #1\guillemotright}
   \newcommand{\TODO}[1]{\emph{\color{red}\textbf{TODO:} #1}}
@@ -475,7 +475,7 @@
 
 \newcommand{\DESCsoundFontNames}{%
   comma-separated list of soundfont names (all located in soundfont
-  directory)
+  directory, .sf2 and .sf3 file names are possible)
 }
 
 \newcommand{\DESCsoundStyleXXX}{%
@@ -629,7 +629,7 @@
 \title{\ltbvc\ - Automated Generation of Notation Videos with Backing
        Tracks}
 \author{Dr.~Thomas Tensi}
-\date{2017-06-12}
+\date{2018-06-12}
 \maketitle
 
 \tableofcontents
@@ -765,8 +765,8 @@ an associated configuration file for processing with \ltbvc.
 %---------------------
 
 All the scripts are written in python and can be installed as a python
-package.  The package requires Python 2.7 and relies on the python
-package mutagen.
+package.  The package requires either Python 2.7 or Python 3.3 or
+later and relies on the python package mutagen.
 
 Additionally the following software must be available:
 \begin{ttDescription}
@@ -800,14 +800,28 @@ The location of all those commands as well as a few other settings has
 to be defined in a global configuration file for the \ltbvc\
 (cf. overall configuration file syntax)
 
-%------------------------
-\section{Terminology}
-%------------------------
+%---------------------------
+\section{Installation}
+\label{section:installation}
+%---------------------------
+
+The program is available via the Python platform PyPi, the Python
+package index.
+
+\begin{commandLine}
+  pip install lilypondToBVC
+\end{commandLine}
+
+Once installed the program is ready for use.
+
+%===========================
+\chapter{Terminology}
+%===========================
 
 Because the different programs do not completely agree in their
 terminology, a single terminology defined here is used throughout the
 document.  Appendix~\ref{section:glossary} gives a detailed
-description of the terms used in this document.
+description of the all terms used in this document.
 
 The most important terms are:
 \begin{ttDescription}
@@ -836,7 +850,7 @@ The most important terms are:
 
 The \ltbvc\ is a commandline program with the following syntax:
 \begin{commandLine}
-  ltbvc.py [-h] [-k] --phases PHASELIST [--voices VOICELIST]
+  lilypondToBVC [-h] [-k] --phases PHASELIST [--voices VOICELIST]
                 configurationFilePath
 \end{commandLine}
 
@@ -963,8 +977,8 @@ There are also some combining phase available as follows:
 
 So for example
 \begin{commandLine}
-  ltbvc --phases voice/score
-        --voices vocals/strings/drums config.txt
+  lilypondToBVC --phases voice/score
+                --voices vocals/strings/drums config.txt
 \end{commandLine}
 
 will generate the voice extracts for vocals, strings and drums as well
@@ -972,9 +986,6 @@ as a song score with those three voices specified in file
 \embeddedCode{config.txt}.  The vertical order within the score as
 well as other layout parameters are given by the order of voice
 descriptions and specific variables in the configuration file.
-
-\TODO{implement proper exception handling: stop on failure with
-      message, check for missing inputs}
 
 %========================================
 \chapter{Configuration File Overview}
@@ -1345,6 +1356,32 @@ an existing \embeddedCode{vocalsLyricsB} is used.  Additionally for
 the first line the suffix may be totally omitted, so
 \embeddedCode{vocalsLyricsScoreA} can be replaced by
 \embeddedCode{vocalsLyricsScore} or even \embeddedCode{vocalsLyrics}.
+
+%--------------------------------------------------------
+\section{Things Not to Put in the Lilypond Fragment File}
+%--------------------------------------------------------
+
+Because the different phases add their own boilerplate code, the
+following lilypond code must not occur in the lilypond fragment:
+
+\begin{itemize}
+  \item a \embeddedCode{\macro{score}} block, and
+  \item staff definitions
+\end{itemize}
+
+The following should not occur in the fragment, unless you want to
+override the presets from the program:
+
+\begin{itemize}
+  \item a \embeddedCode{\macro{header}} block,
+  \item a \embeddedCode{\macro{paper}} block, and
+  \item a setting of the \embeddedCode{global-staff-size}
+\end{itemize}
+
+Note that settings overriding presets above might interfere with some
+phases: e.g. the videos use their own paper and resolution settings
+and those would be shadowed by conflicting definitions in the
+fragment.
 
 %========================================
 \chapter{Configuration File Settings}
@@ -2459,8 +2496,8 @@ voice name set and converts the humanized midi stream into a wave file
 using \embeddedCode{fluidsynth}.  It relies on the soundfont files
 given by the variables \embeddedCode{soundFontDirectoryPath} and
 \embeddedCode{soundFontNameList}.  The name order of the soundfonts
-give the order of matching a given midi instrument number: the first
-match is accepted.
+(of type sf2 or sf3) give the order of matching a given midi
+instrument number: the first match is accepted.
 
 Note that the midi volume is not used by this phase: any midi volume
 changes are suppressed and only the velocity is used.
@@ -3136,14 +3173,16 @@ lilypond macro structure is similar for different voices.
 
 Finally the drums do some monotonic blues accompaniment.  We have to
 use the \embeddedCode{myDrums} name here, because \embeddedCode{drums}
-is a predefined name in lilypond.
+is a predefined name in lilypond.  There is no preprocessing of the
+lilypond file: it is just included into some boilerplate code.
 
 \begin{lilypondFileCode}
   drmPhrase = \drummode { <bd hhc>8 hhc <sn hhc> hhc }
   drmOstinato = { \repeat unfold 2 { \drmPhrase } }
   drmFill = \drummode { \drmPhrase tomh8 tommh toml tomfl }
   drmIntro = { \drmOstinato  \drmFill }
-  drmOutro = \drummode { \repeat percent 6 { \drmPhrase } | <sn cymc>1 | }
+  drmOutro = \drummode {
+    \repeat percent 6 { \drmPhrase } | <sn cymc>1 | }
   drmVersePrefix = {
     \repeat percent 3 { \drmOstinato }  \drmFill
     \repeat percent 2 { \drmOstinato  \drmFill }
@@ -3425,7 +3464,7 @@ lilypond stuff is in ``wonderful\_song-music.ly'', the command to
 produce everything is
 
 \begin{commandLine}
-  python ltbvc.py wonderful_song-config.txt
+  lilypondToBVC --phases all wonderful_song-config.txt
 \end{commandLine}
 
 and it produces the following target files
@@ -3565,61 +3604,6 @@ planned for future versions:
         sound styles for different parts in a song (like, for example,
         for an instrument solo part).
   
-\end{itemize}
-
-
-%########################################
-\chapter{DONE}
-
-\begin{itemize}
-  \item provide a mechanism against multiple includes of the
-        same file or circular includes
-  \item implement that location search
-  \item rename phase ``voices'' to ``voice'' in program;
-        rename phase ``voice'' to ``extract'' in program
-  \item rename keepIntermediateFiles into keepIntermediateFiles
-  \item implement search for variables in lilypond file
-  \item implement chord and lyrics maps
-  \item implement chordedVoiceMap
-  \item implement lyricsToVoiceMap
-  \item implement the replacement logic for lyrics suffix "A"
-  \item implement measureToHumanizationStyleNameMap
-  \item add audioVoiceNameSet variable
-  \item rename aacCommand to aacCommandLine and add parameters
-  \item move humanization style and sound style configuration
-        into standard configuration file
-  \item rename style to humanizationStyle and also use soundStyle
-  \item allow midi banks for midi instruments
-  \item remove the percentage scaling and use decimals instead, allow B
-        and A indicators, adapt description in style file
-  \item change name of variation factors and make it a map
-  \item introduce voiceNameToOverrideFileNameMap in program and
-        changes.txt
-  \item implement sanitizing of strings in convertStringToMap
-  \item implement audio grouping logic
-  \item add videoscaling, framerate and subtitlesAreHardcoded to video
-        device definition
-  \item rename ``video device'' to ``video target''
-  \item rename targetVideoDirectory to targetVideoDirectoryPath
-  \item remove guitar and drums specific logic for voice classification
-  \item add generated lilypond macro to tell current processing phase
-  \item add generated lilypond macro to tell current video device
-  \item strengthen initial checks of configuration variables by
-        regular expression matching
-  \item convert configuration file number variable to string in a
-    string context
-  \item implement multiple staffs
-  \item improve mapping logic for voice names: drums to myDrums,
-        xxxSimple to xxx, xxxExtended to xxx
-  \item make mediaType customizable (per target)
-  \item define and implement mandatory and optional attribute values
-        for types AudioTrack and VideoTarget
-  \item introduce intermediateFileDirectoryPath variable and move files
-        there
-  \item REJECTED: clarify category of config var names like title to
-        songTitle
-  \item REJECTED: introduce raw tagging in mp4tagmanager (with
-        arbitrary tags)
 \end{itemize}
 
 \newpage

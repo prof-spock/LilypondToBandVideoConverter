@@ -71,6 +71,9 @@ Installation is done from the PyPi repository via
 
     pip install lilypondToBVC
 
+Make sure that the scripts directory of python is in the path for
+executables on your platform.
+
 ## Further Information
 
 The detailed manual is available [here].

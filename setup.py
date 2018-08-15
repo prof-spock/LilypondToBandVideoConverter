@@ -60,5 +60,6 @@ setup(
               "demo/wonderful_song-config.cfg"])
     ],
     entry_points = { "console_scripts":
-                     [ "lilyToBVC=lilytobvc.src.convertermodules.ltbvc:main" ] }
+        [ "lilypondToBVC=lilypondtobvc.src.convertermodules.ltbvc:main" ]
+    }
 )

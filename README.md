@@ -31,14 +31,14 @@ For processing a piece one must have
   tracks etc.
 
 Based on those files the python scripts -- together with some
-open-source command-line software like ffmpeg -- produce all
-the target files either incrementally or altogether.
+open-source command-line software like ffmpeg or fluidsynth -- produce
+all the target files either incrementally or altogether.
 
 ## Installation and Requirements
 
-All the scripts are written in python and can be installed
-as a python package (to be specified).  The package requires
-either Python&nbsp;2.7 or Python&nbsp;3.3 or later.
+All the scripts are written in python and can be installed as a python
+package.  The package requires either Python&nbsp;2.7 or
+Python&nbsp;3.3 or later.
 
 Additionally the following software has to be available:
 
@@ -73,12 +73,11 @@ Installation is done from the PyPi repository via
 
 ## Further Information
 
-The detailed manual is available [here] and [there].
+The detailed manual is available [here].
 
 [ffmpeg]: http://ffmpeg.org/
 [fluidsynth]: http://www.fluidsynth.org/
-[here]: https://github.com/prof-spock/LilypondToBandVideoConverter/blob/master/lilypondToBandVideoConverter.pdf
-[there]: lilypondToBandVideoConverter.pdf
+[here]: lilypondToBandVideoConverter.pdf
 [lilypond]: http://lilypond.org/
 [lilypondFileSyntax]: http://tensi.eu/thomas
 [mp4box]: https://gpac.wp.imt.fr/mp4box/mp4box-documentation/

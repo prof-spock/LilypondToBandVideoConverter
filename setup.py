@@ -17,10 +17,10 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name = "LilypondToBandVideoConverter",
-    version = "1.0rc1",
+    version = "1.0rc2",
     description = "Generator for Notation Videos from Lilypond Text",
     long_description = long_description,
-    #long_description_content_type = "text/markdown",
+    long_description_content_type = "text/markdown",
     url = "https://github.com/prof-spock/LilypondToBandVideoConverter",
     author = "Dr. Thomas Tensi",
     author_email = "t.tensi@gmx.de",

@@ -642,13 +642,17 @@ def initialize ():
     configurationFile = configData.readFile(configurationFilePath)
 
     if configurationFile is None:
-        message = ("cannot open configuration file '%s'"
-                   % configurationFilePath)
-        OperatingSystem.showMessageOnConsole(message)
+        Logging.trace("--: cannot process configuration file '%s'",
+                      configurationFilePath)
+        isOkay = False
     else:
+        isOkay = True
         loggingFilePath = configData.get("loggingFilePath")
-        loggingFilePath = iif(loggingFilePath is None,
-                              "STDERR", loggingFilePath)
+
+        if loggingFilePath is None:
+            Logging.setFileName("STDERR")
+            ValidityChecker.isValid(False, "loggingFilePath not set")
+
         Logging.setFileName(loggingFilePath)
         configData.checkAndSetDerivedVariables(selectedVoiceNameSet)
 
@@ -676,33 +680,35 @@ def initialize ():
                                    configData.humanizationStyleNameToTextMap,
                                    configData.humanizedVoiceNameSet)
 
-    Logging.trace("<<")
+    Logging.trace("<<: %s", isOkay)
+    return isOkay
 
 #--------------------
 
 def main ():
     Logging.initialize()
     Logging.setLevel(Logging.Level_verbose)
-    # Logging.setFileName("/temp/logs/test.log")
+    #Logging.setFileName("/temp/logs/test.log")
     Logging.trace(">>")
 
-    initialize()
+    isOkay = initialize()
 
-    Logging.trace("--: processingPhaseSet = %s", processingPhaseSet)
+    if isOkay:
+        Logging.trace("--: processingPhaseSet = %s", processingPhaseSet)
 
-    actionList = \
-        (("extract",      True,  _LilypondProcessor.processExtract),
-         ("score",        True,  _LilypondProcessor.processScore),
-         ("midi",         True,  _LilypondProcessor.processMidi),
-         ("silentvideo",  True,  _LilypondProcessor.processSilentVideo),
-         ("rawaudio",     False, _LilypondProcessor.processRawAudio),
-         ("refinedaudio", False, _LilypondProcessor.processRefinedAudio),
-         ("mixdown",      False, _LilypondProcessor.processMixdown),
-         ("finalvideo",   False, _LilypondProcessor.processFinalVideo))
+        actionList = \
+            (("extract",      True,  _LilypondProcessor.processExtract),
+             ("score",        True,  _LilypondProcessor.processScore),
+             ("midi",         True,  _LilypondProcessor.processMidi),
+             ("silentvideo",  True,  _LilypondProcessor.processSilentVideo),
+             ("rawaudio",     False, _LilypondProcessor.processRawAudio),
+             ("refinedaudio", False, _LilypondProcessor.processRefinedAudio),
+             ("mixdown",      False, _LilypondProcessor.processMixdown),
+             ("finalvideo",   False, _LilypondProcessor.processFinalVideo))
 
-    for processingPhase, isPreprocessing, handlerProc in actionList:
-        conditionalExecuteHandlerProc(processingPhase, processingPhaseSet,
-                                      isPreprocessing, handlerProc)
+        for processingPhase, isPreprocessing, handlerProc in actionList:
+            conditionalExecuteHandlerProc(processingPhase, processingPhaseSet,
+                                          isPreprocessing, handlerProc)
 
     Logging.trace("<<")
 

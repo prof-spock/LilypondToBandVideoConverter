@@ -1,7 +1,6 @@
 """Setup File for Lilypond To Band Video Converter."""
 
 from setuptools import setup, find_packages
-from codecs import open
 from os import path
 
 here = path.abspath(path.dirname(__file__))
@@ -56,8 +55,8 @@ setup(
         (installationRootDirectory + "/demo",
              ["demo/demo.jpg",
               "demo/wonderful_song-music.ly",
-              "demo/global-config.cfg",
-              "demo/wonderful_song-config.cfg"])
+              "demo/global-config.txt",
+              "demo/wonderful_song-config.txt"])
     ],
     entry_points = { "console_scripts":
                      [ "lilyToBVC=lilytobvc.src.convertermodules.ltbvc:main" ] }

@@ -127,11 +127,13 @@ class ConfigurationFile:
            for <identifier>; if not found in current key to value map, the
            identifier itself is returned"""
 
+        Logging.trace(">>: %s", identifier)
         cls = self.__class__
 
         if identifier not in self._keyToValueMap:
             # leave identifier as is (it might be some value name like
             # wahr or false
+            Logging.trace("--: no expansion found")
             result = identifier
         else:
             result = self._keyToValueMap[identifier]
@@ -142,7 +144,7 @@ class ConfigurationFile:
                 result = (cls._doubleQuoteCharacter + result
                           + cls._doubleQuoteCharacter)
 
-        Logging.trace("--: expanded %s into %s", identifier, result)
+        Logging.trace("<<: expanded %s into %s", identifier, result)
         return result
 
     #--------------------
@@ -269,17 +271,19 @@ class ConfigurationFile:
                       fileName, visitedFileSet)
 
         cls = self.__class__
+        errorMessage = ""
+        isOkay = True
+
         originalFileName = fileName
         fileName = self._lookupFileName(originalFileName)
 
         if fileName is None:
-            Logging.trace("--: cannot find '%s'", originalFileName)
+            errorMessage = "cannot find '%s'" % originalFileName
             isOkay = False
         elif fileName in visitedFileSet:
             Logging.trace("--: file already included '%s'", originalFileName)
         else:
             visitedFileSet.update(fileName)
-            isOkay = True
 
             with io.open(fileName, "rt",
                          encoding="utf-8") as configurationFile:
@@ -312,17 +316,19 @@ class ConfigurationFile:
 
                         #importedFileName = directoryPrefix + importedFileName
                         Logging.trace("--: IMPORT '%s'", importedFileName)
+
                         isOkay = self._readFile(importedFileName, lineList,
                                                 visitedFileSet)
                         if not isOkay:
-                            Logging.trace("--: import failed for '%s' in %s",
+                            Logging.trace("--:import failed for '%s' in %s",
                                           importedFileName,
                                           cls._searchPathList)
+                            isOkay = False
                             break
 
-        Logging.trace("<<: %s", isOkay)
+        Logging.trace("<<: %s, '%s'", isOkay, errorMessage)
         return isOkay
-            
+
     #--------------------
 
     def _lookupFileName (self, originalFileName):

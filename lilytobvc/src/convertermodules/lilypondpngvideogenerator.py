@@ -116,15 +116,17 @@ class DurationManager:
         duration = cls.measureDuration(tempo, measureLength)
         firstMeasureOffset = duration * countInMeasures
         result = {}
+        measureList = range(firstMeasureNumber, lastMeasureNumber + 1)
 
-        for measureNumber in range(firstMeasureNumber, lastMeasureNumber + 1):
+        for measureNumber in measureList:
             if measureNumber in measureToTempoMap:
                 (tempo, measureLength) = measureToTempoMap[measureNumber]
                 duration = cls.measureDuration(tempo, measureLength)
 
+            isNormalMeasureNumber = (measureNumber > firstMeasureNumber)
             currentMeasureDuration = (duration +
-                                      iif(measureNumber > firstMeasureNumber,
-                                           0, firstMeasureOffset))
+                                      iif(isNormalMeasureNumber, 0,
+                                          firstMeasureOffset))
             result[measureNumber] = currentMeasureDuration
 
         Logging.trace("<<: %s", result)
@@ -757,6 +759,7 @@ class LilypondPngVideoGenerator:
             # measure
             PostscriptFile.setName(self._postscriptFileName)
             pageToMeasureMap = PostscriptFile.pageToMeasureMap()
+
             lastMeasureNumber = max(pageToMeasureMap.values())
             Logging.trace("--: lastMeasureNumber = %d ", lastMeasureNumber)
 

@@ -351,13 +351,13 @@
   humanized midi file
 }
 
-\newcommand{\DESCchordedVoiceMap}{%
-  mapping from voice names to phase abbreviations where chords are
-  shown for that voice system
-}
-
 \newcommand{\DESCcomposerText}{%
   composer text to be shown in voice extracts and score
+}
+
+\newcommand{\DESCcountInMeasureCount}{%
+  number of count-in measures for the song (which defines the time
+  before the first measure)
 }
 
 \newcommand{\DESCintermediateFileDirectoryPath}{%
@@ -403,12 +403,6 @@
   path of file containing the processing log
 }
 
-\newcommand{\DESClyricsVoiceMap}{%
-  mapping from voice name to a count of parallel lyrics lines directly
-  following the target letter (``e'' for the extract, ``s'' for the
-  score and ``v'' for the video)
-}
-
 \newcommand{\DESCmeasureToHumanizationStyleNameMap}{%
   map of measure number to humanization style name used from this
   position onward for humanized voices
@@ -416,7 +410,8 @@
 
 \newcommand{\DESCmeasureToTempoMap}{%
   map defining the tempo for measure in bpm until another tempo
-  setting is given
+  setting is given; the measure length in quarters may be appended
+  after a slash (4 is default)
 }
 
 \newcommand{\DESCmidiChannelList}{%
@@ -519,6 +514,17 @@
 
 \newcommand{\DESCtrackNumber}{%
   track number within album
+}
+
+\newcommand{\DESCvoiceNameToChordsMap}{%
+  mapping from voice names to phase abbreviations where chords are
+  shown for that voice system
+}
+
+\newcommand{\DESCvoiceNameToLyricsMap}{%
+  mapping from voice name to a count of parallel lyrics lines directly
+  following the target letter (``e'' for the extract, ``s'' for the
+  score and ``v'' for the video)
 }
 
 \newcommand{\DESCvoiceNameToScoreNameMap}{%
@@ -1262,8 +1268,8 @@ processing target, because the voice formatting may be different per
 target.
 
 The configuration file variable responsible for chords is
-\embeddedCode{chordedVoiceMap} and tells where chords are shown and
-for which voices.
+\embeddedCode{voiceNameToChordsMap} and tells where chords are shown
+and for which voices.
 
 All voices with chords are mentioned as keys and mapped onto a slash
 separated list of single character abbreviations for the targets.  We
@@ -1273,7 +1279,7 @@ video.  There are no chords for the midi file.
 So for the configuration file line
 
 \begin{configurationFileCode}
-  chordedVoiceMap = "{ vocals: v/s, guitar: e }"
+  voiceNameToChordsMap = "{ vocals: v/s, guitar: e }"
 \end{configurationFileCode}
 
 the chords are shown for the vocals in video and score and for guitar
@@ -1309,14 +1315,14 @@ in the voice, hence you have to provide appropriate padding (at least
 leading padding).
 
 The syntax is similar to chords, hence we have a
-\embeddedCode{lyricsVoiceMap}, but it also contains a count of
+\embeddedCode{voiceNameToLyricsMap}, but it also contains a count of
 parallel lyrics lines directly following the target letter (``e'' for
 the extract, ``s'' for the score and ``v'' for the video).
 
 So for the configuration file line
 
 \begin{configurationFileCode}
-  lyricsVoiceMap = "{ vocals: e2/s2/v, bgVocals: e3 }"
+  voiceNameToLyricsMap = "{ vocals: e2/s2/v, bgVocals: e3 }"
 \end{configurationFileCode}
 
 the lyrics are shown for the vocals in extract, video and score and
@@ -1566,7 +1572,7 @@ be missing and are set to some reasonable default.
 
     \varDescriptionLong{measureToTempoMap}
                {\DESCmeasureToTempoMap}
-               {"\{\}"}
+               {"\{ 1 : 60/3, 20 : 100 \}"}
 
     \varDescriptionLong{keepIntermediateFiles}
                {\DESCkeepIntermediateFiles}
@@ -1769,14 +1775,6 @@ related configuration variables discussed in the current section.
 
     \varDescriptionHeaderLong
 
-    \varDescriptionLong{chordedVoiceMap}
-                       {\DESCchordedVoiceMap}
-                       {"\{vocals: v/s, guitar: e\}"}
-
-    \varDescriptionLong{lyricsVoiceMap}
-                       {\DESClyricsVoiceMap}
-                       {"\{vocals: e2/s2/v\}"}
-
     \varDescriptionLong{phaseAndVoiceName\-ToClefMap}
                        {\DESCphaseAndVoiceNameToClefMap}
                        {see text}
@@ -1784,6 +1782,14 @@ related configuration variables discussed in the current section.
     \varDescriptionLong{phaseAndVoiceName\-ToStaffListMap}
                        {\DESCphaseAndVoiceNameToStaffListMap}
                        {see text}
+
+    \varDescriptionLong{voiceNameToChordsMap}
+                       {\DESCvoiceNameToChordsMap}
+                       {"\{vocals: v/s, guitar: e\}"}
+
+    \varDescriptionLong{voiceNameToLyricsMap}
+                       {\DESCvoiceNameToLyricsMap}
+                       {"\{vocals: e2/s2/v\}"}
 
   \end{variableDescriptionTableLong}
 
@@ -2083,7 +2089,6 @@ in a measure.  For example, a rock style would favour the 2 and 4, a
 march the 1.  Timing may be varied or even be dragged or hurried.
 
 So altogether a single style definition is a map telling about the
-number of count-in measures (where the drum counts the beats), the
 timing and the velocity.  The latter two are themselves maps from (an
 encoded) position within measure to decimal values.
 
@@ -2093,8 +2098,7 @@ configuration file it might look like
 
 \begin{configurationFileCode}
   humanizationStyleRockHard  = \
-      "{ countIn : 2, "                               \
-       " timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
+      "{ timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
                    " S:B0.15, OTHER:B0.2 },"          \
        " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
                    " S:0.9, OTHER:0.85, SLACK:0.1 } }"
@@ -2134,21 +2138,25 @@ table in figure~\ref{figure:configFileHumanizationVariables}.
 
     \varDescriptionHeaderLong
 
+    \varDescriptionLong{countInMeasureCount}
+                       {\DESCcountInMeasureCount}
+                       {2}
+
     \varDescriptionLong{humanizedVoiceNameSet}
-               {\DESChumanizedVoiceNameSet}
-               {"vocals, drums, keyboard"}
+                       {\DESChumanizedVoiceNameSet}
+                       {"vocals, drums, keyboard"}
 
     \varDescriptionLong{measureToHumaniza\-tionStyleNameMap}
-               {\DESCmeasureToHumanizationStyleNameMap}
-               {"{ 1: styleXXX, 5: styleYYY }"}
+                       {\DESCmeasureToHumanizationStyleNameMap}
+                       {"{ 1: styleXXX, 5: styleYYY }"}
 
     \varDescriptionLong{humanizationStyle\-\meta{name}}
-               {\DESChumanizationStyleXXX}
-               {see text}
+                       {\DESChumanizationStyleXXX}
+                       {see text}
 
     \varDescriptionLong{voiceNameToVaria\-tionFactorMap}
-               {\DESCvoiceNameToVariationFactorMap}
-               {see text}
+                       {\DESCvoiceNameToVariationFactorMap}
+                       {see text}
   \end{variableDescriptionTableLong}
 
   \caption{Midi Humanization Related Configuration File Variables}
@@ -3068,7 +3076,8 @@ measure, the lyrics have to be juggled around.
 
   vocalsLyricsB = \lyricmode {
     _ _ _ _ _ _ \vocalsLyricsBSuffix }
-  vocalsLyrics = { \vocalsLyricsA \vocalsLyricsBSuffix}
+  vocalsLyrics = { \vocalsLyricsA \vocalsLyricsBSuffix }
+  vocalsLyricsVideo = { \vocalsLyrics }
 \end{lilypondFileCode}
 
 The bass simply hammers out eighth notes.  As before there is an
@@ -3294,7 +3303,7 @@ And the videos show both vocals and guitar and are characterized as
   videoFileKindMap = "{" \
       "tabletVocGtr: { target:         tablet,"      \
                      " fileNameSuffix: '-tblt-vg',"     \
-                     " directoryPath:  '~/videos' ," \
+                     " directoryPath:  './mediaFiles' ," \
                      " voiceNameList:  'vocals, guitar' } }"
 \end{configurationFileCode}
 
@@ -3324,16 +3333,16 @@ the other one with missing vocals and background vocals (the ``karaoke
 version'').  The song and album names have the appropriate info in
 brackets.
 
-All songs will go to the ``musicFiles'' subdirectory of HOME and have
-a jpeg-file as their embedded album art.  Audio and video files have
-``test-'' as their prefix before the song name.  So, for example, the
-audio file for ``Wonderful Song'' with all voices has path
-``~/musicFiles/test-wonderful\_song.m4a''.
+All songs and the video will go to the ``mediaFiles'' subdirectory of
+HOME and have a jpeg-file as their embedded album art.  Audio and
+video files have ``test-'' as their prefix before the song name.  So,
+for example, the audio file for ``Wonderful Song'' with all voices has
+path ``./mediaFiles/test-wonderful\_song.m4a''.
 
 \begin{configurationFileCode}
   targetFileNamePrefix = "test-"
-  audioTargetDirectoryPath = "~/musicFiles"
-  albumArtFilePath = "~/musicFiles/demo.jpg"
+  audioTargetDirectoryPath = "./mediaFiles"
+  albumArtFilePath = "./mediaFiles/demo.jpg"
 
   audioGroupToVoicesMap = "{" \
       " base : bass/keyboard/strings/drums/percussion," \
@@ -3485,7 +3494,7 @@ least the commandlines to call them.  This would not be helpful in
 itself, because typically those programs work on generated
 intermediate files.  But you can tell ltbvc to keep the intermediate
 files by setting \embeddedCode{keepIntermediateFiles} to true or
-alternatively calling the program with the ``-d'' flag.  This only
+alternatively calling the program with the ``-k'' flag.  This only
 applies to the preprocessing phases, because in the postprocessing
 phases all files are kept as they serve as input for other phases
 \footnote{The silent videos and the subtitle file also go into the
@@ -3718,15 +3727,15 @@ been mentioned first in the current document.
                         {voiceNameList}
                         {Audio}
 
-    \varDescriptionFinal{chordedVoiceMap}
-                        {\DESCchordedVoiceMap}
-                        {empty}
-                        {Notation}
-
     \varDescriptionFinal{composerText}
                         {\DESCcomposerText}
                         {empty}
                         {SongRelated}
+
+    \varDescriptionFinal{countInMeasureCount}
+                        {\DESCcountInMeasureCount}
+                        {0}
+                        {Humanization}
 
     \varDescriptionFinal{extractVoiceNameSet}
                         {\DESCextractVoiceNameSet}
@@ -3760,7 +3769,7 @@ been mentioned first in the current document.
 
     \varDescriptionFinal{intermediateFileDirectoryPath}
                         {\DESCintermediateFileDirectoryPath}
-                        {"temp"}
+                        {current directory}
                         {Path}
 
     \varDescriptionFinal{keepIntermediateFiles}
@@ -3777,11 +3786,6 @@ been mentioned first in the current document.
                         {\DESCloggingFilePath}
                         {\mandatory}
                         {Path}
-
-    \varDescriptionFinal{lyricsVoiceMap}
-                        {\DESClyricsVoiceMap}
-                        {empty}
-                        {Notation}
 
     \varDescriptionFinal{measureToHumanization\-StyleNameMap}
                         {\DESCmeasureToHumanizationStyleNameMap}
@@ -3880,7 +3884,7 @@ been mentioned first in the current document.
 
     \varDescriptionFinal{tempLilypondFilePath}
                         {\DESCtempLilypondFilePath}
-                        {current directory}
+                        {temp.ly in current directory}
                         {Path}
 
     \varDescriptionFinal{title}
@@ -3977,6 +3981,16 @@ been mentioned first in the current document.
                         {\DESCvideoTargetMap}
                         {\mandatory}
                         {Video}
+
+    \varDescriptionFinal{voiceNameToChordsMap}
+                        {\DESCvoiceNameToChordsMap}
+                        {empty}
+                        {Notation}
+
+    \varDescriptionFinal{voiceNameToLyricsMap}
+                        {\DESCvoiceNameToLyricsMap}
+                        {empty}
+                        {Notation}
 
     \varDescriptionFinal{voiceNameToOverride\-FileNameMap}
                         {\DESCvoiceNameToOverrideFileNameMap}

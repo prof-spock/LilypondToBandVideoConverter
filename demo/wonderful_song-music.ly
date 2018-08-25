@@ -78,6 +78,7 @@ vocalsLyricsB = \lyricmode {
 }
 
 vocalsLyrics = { \vocalsLyricsA \vocalsLyricsBSuffix }
+vocalsLyricsVideo = { \vocalsLyrics }
 
 %====================
 % BASS

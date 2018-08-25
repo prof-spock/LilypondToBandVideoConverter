@@ -26,10 +26,6 @@ from .ltbvc_businesstypes import humanReadableVoiceName
 songMeasureToTempoMap = None
 
 # lilypond articulation: use articulate.ly
-# tabulature tag: name of tabulature tag (data is removed from standard
-#                 guitar staff)
-
-tabulatureTag = "tabulature"
 lilypondArticulationIsUsed = False
 
 indentationPerLevel = (" " * 2)
@@ -354,7 +350,8 @@ class LilypondFile:
         """writes the header of a lilypond file also including the
            music-file to <self>"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: lilypondFile = %s, map = %s",
+                      self, songMeasureToTempoMap)
 
         cls = self.__class__
 

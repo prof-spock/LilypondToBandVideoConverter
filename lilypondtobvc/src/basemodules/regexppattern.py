@@ -62,6 +62,14 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
+    def _makeOptionalPattern (cls, pattern):
+        """Constructs a regexp pattern for <pattern> making it optional"""
+
+        return "(?:%s|)" % pattern
+
+    #--------------------
+
+    @classmethod
     def _makeMapPattern (cls, keyPattern, valuePattern, firstGroupIndex=1):
         """Constructs a regexp pattern for map of key-value-pairs with
            <keyPattern> for keys and <valuePattern> for values with
@@ -73,7 +81,8 @@ class RegExpPattern:
                                                      firstGroupIndex + 1)
 
         elementPattern = r"%s\s*:\s*%s" % (keyPattern, valuePattern)
-        pattern = r"\{\s*%s\s*\}" % cls._makeListPattern(elementPattern)
+        listPattern = cls._makeListPattern(elementPattern)
+        pattern = r"\{\s*%s\s*\}" % cls._makeOptionalPattern(listPattern)
         result = cls._makeAtomicPattern(pattern, firstGroupIndex)
         return result
 

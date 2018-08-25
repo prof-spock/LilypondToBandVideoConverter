@@ -1,4 +1,4 @@
-INCLUDE "global-config.cfg"
+INCLUDE "global-config.txt"
 
 -- overall song settings
 
@@ -11,15 +11,14 @@ artistName = "Fred"
 albumName = "Best of Fred"
 
 -- voice settings
-
-voiceNameList      =  "vocals,    bass,  guitar,   drums"
-midiChannelList    =  "     2,       3,       4,      10"
-midiInstrumentList =  "    54,      35,      29,      18"
-midiVolumeList     =  "   100,     120,      70,     110"
-panPositionList    =  "     C,    0.3R,    0.8R,    0.1L"
-audioLevelList     =  "   1.0,    0.83,    0.33,    1.48"
-reverbLevelList    =  "   0.3,     0.2,     0.0,     0.4"
-soundVariantList   =  "  COPY, EXTREME,  CRUNCH,    COPY"
+voiceNameList      = "vocals,    bass,  guitar,   drums"
+midiChannelList    = "     2,       3,       4,      10"
+midiInstrumentList = "    54,      35,      29,      18"
+midiVolumeList     = "   100,     120,      70,     110"
+panPositionList    = "     C,    0.3R,    0.8R,    0.1L"
+audioLevelList     = "   1.0,    0.83,    0.33,    1.48"
+reverbLevelList    = "   0.3,     0.2,     0.0,     0.4"
+soundVariantList   = "  COPY, EXTREME,  CRUNCH,    COPY"
 
 -- preprocessing
 voiceNameToLyricsMap = "{ vocals : e2/s2/v }"

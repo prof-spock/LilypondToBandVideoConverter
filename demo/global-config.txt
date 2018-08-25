@@ -77,7 +77,7 @@ videoTargetMap = "{" \
 videoFileKindMap = "{" \
     "tabletVocGtr: { target:         tablet,"      \
 		   " fileNameSuffix: '-tblt-vg',"     \
-		   " directoryPath:  '~/videos' ," \
+		   " directoryPath:  './mediaFiles' ," \
 		   " voiceNameList:  'vocals, guitar' } }"
 
 --====================
@@ -99,7 +99,7 @@ soundStyleGuitarCrunch = \
 --====================
 
 targetFileNamePrefix = "test-"
-audioTargetDirectoryPath = "~/musicFiles"
+audioTargetDirectoryPath = "~/mediaFiles"
 albumArtFilePath = "demo.jpg"
 
 audioGroupToVoicesMap = "{" \

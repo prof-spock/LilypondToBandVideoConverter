@@ -639,18 +639,20 @@ def initialize ():
 
     configData = LTBVC_ConfigurationData()
     configurationFilePath = argumentList.configurationFilePath
+    configurationFile = configData.readFile(configurationFilePath)
 
-    try:
-        configurationFile = configData.readFile(configurationFilePath)
-    except FileNotFoundError as exception:
-        errorMessage = ("cannot process configuration file '%s'\n%s"
-                        % (configurationFilePath, exception.args[0]))
-        exception.args = [ errorMessage ]
-        raise
+    if configurationFile is None:
+        Logging.trace("--: cannot process configuration file '%s'",
+                      configurationFilePath)
+        isOkay = False
     else:
+        isOkay = True
         loggingFilePath = configData.get("loggingFilePath")
-        loggingFilePath = iif(loggingFilePath is None,
-                              "STDERR", loggingFilePath)
+
+        if loggingFilePath is None:
+            Logging.setFileName("STDERR")
+            ValidityChecker.isValid(False, "loggingFilePath not set")
+
         Logging.setFileName(loggingFilePath)
         configData.checkAndSetDerivedVariables(selectedVoiceNameSet)
 
@@ -677,27 +679,21 @@ def initialize ():
         MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,
                                    configData.humanizationStyleNameToTextMap,
                                    configData.humanizedVoiceNameSet)
-    finally:
-        Logging.trace("<<")
+
+    Logging.trace("<<: %s", isOkay)
+    return isOkay
 
 #--------------------
 
 def main ():
     Logging.initialize()
     Logging.setLevel(Logging.Level_verbose)
+    #Logging.setFileName("/temp/logs/test.log")
     Logging.trace(">>")
 
-    try:
-        isOkay = True
-        errorMessage = ""
-        initialize()
-    except Exception as exception:
-        isOkay = False
-        errorMessage = exception.args[0]
+    isOkay = initialize()
 
-    if not isOkay:
-        OperatingSystem.showMessageOnConsole(errorMessage)
-    else:
+    if isOkay:
         Logging.trace("--: processingPhaseSet = %s", processingPhaseSet)
 
         actionList = \

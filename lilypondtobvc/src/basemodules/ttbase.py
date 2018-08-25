@@ -284,6 +284,21 @@ def _convertStringToMap (st, startPosition, separator):
             
 #--------------------
 
+def adaptToKind (st, kind):
+    """Returns converted value for given string <st> with type given by
+       <kind>."""
+
+    if kind == "I":
+        result = int(st)
+    elif kind == "F":
+        result = float(st)
+    else:
+        result = st
+
+    return result
+
+#--------------------
+
 def convertStringToList (st, separator=",", kind="S"):
     """Splits <st> with parts separated by <separator> into list with
        all parts having leading and trailing whitespace removed; if
@@ -291,12 +306,7 @@ def convertStringToList (st, separator=",", kind="S"):
        floats"""
 
     position, result = _convertStringToList("[" + st + "]", 0, separator)
-
-    if kind == "I":
-        result = list(map(lambda x: int(x), result))
-    elif kind == "F":
-        result = list(map(lambda x: float(x), result))
-
+    result = list(map(lambda x: adaptToKind(x, kind), result))
     return result
 
 #--------------------

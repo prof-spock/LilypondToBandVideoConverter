@@ -127,11 +127,13 @@ class ConfigurationFile:
            for <identifier>; if not found in current key to value map, the
            identifier itself is returned"""
 
+        Logging.trace(">>: %s", identifier)
         cls = self.__class__
 
         if identifier not in self._keyToValueMap:
             # leave identifier as is (it might be some value name like
             # wahr or false
+            Logging.trace("--: no expansion found")
             result = identifier
         else:
             result = self._keyToValueMap[identifier]
@@ -142,7 +144,7 @@ class ConfigurationFile:
                 result = (cls._doubleQuoteCharacter + result
                           + cls._doubleQuoteCharacter)
 
-        Logging.trace("--: expanded %s into %s", identifier, result)
+        Logging.trace("<<: expanded %s into %s", identifier, result)
         return result
 
     #--------------------
@@ -315,23 +317,17 @@ class ConfigurationFile:
                         #importedFileName = directoryPrefix + importedFileName
                         Logging.trace("--: IMPORT '%s'", importedFileName)
 
-                        try:
-                            self._readFile(importedFileName, lineList,
-                                           visitedFileSet)
-                        except FileNotFoundError as exception:
-                            errorMessage = ("import failed for '%s' in %s"
-                                            % (importedFileName,
-                                               cls._searchPathList))
-                            subMessage = exception.args[0]
-                            errorMessage = ("%s\n%s" %
-                                            (errorMessage, subMessage))
+                        isOkay = self._readFile(importedFileName, lineList,
+                                                visitedFileSet)
+                        if not isOkay:
+                            Logging.trace("--:import failed for '%s' in %s",
+                                          importedFileName,
+                                          cls._searchPathList)
                             isOkay = False
                             break
 
         Logging.trace("<<: %s, '%s'", isOkay, errorMessage)
-
-        if not isOkay:
-            raise FileNotFoundError(errorMessage)
+        return isOkay
 
     #--------------------
 

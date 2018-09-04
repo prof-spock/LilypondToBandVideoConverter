@@ -1,4 +1,4 @@
-\documentclass[titlepage,twoside,12pt,a4paper]{report}
+\documentclass[titlepage,twoside,12pt,a4paper]{book}
   \usepackage[utf8]{inputenc}
   \usepackage[T1]{fontenc}
 
@@ -360,6 +360,12 @@
   before the first measure)
 }
 
+\newcommand{\DESCincludeFilePath}{%
+  path for the music include file containing all fragments for
+  lilypond processing; if unset, defaults to
+  \embeddedCode{fileNamePrefix} plus ``-music.ly''
+}
+
 \newcommand{\DESCintermediateFileDirectoryPath}{%
   path of directory where intermediate files go that are either used
   for processing within a phase or as information between phases
@@ -558,6 +564,11 @@
   mapping from video file kind name to video file kind descriptor with
   several parameters for specific video file generation referencing
   a video target that gives overall video parameters
+}
+
+\newcommand{\DESCvideoTargetFFMpegPresetName}{%
+  a specific ffmpeg preset for the current video target device (a string,
+  a missing value defaults to a baseline level 3 profile)
 }
 
 \newcommand{\DESCvideoTargetFrameRate}{%
@@ -785,7 +796,9 @@ Additionally the following software must be available:
         \cite{reference:ffmpegDocumentation},
 
   \item [fluidsynth:] for generation of voice audio files from a midi
-        file \cite{reference:fluidsynthDocumentation}, and
+        file \cite{reference:fluidsynthDocumentation} plus some
+        soundfont (e.g. FluidR3\_GM.sf3 at
+        \cite{reference:fluidSoundfont}), and
 
   \item [sox:] for instrument-specific postprocessing of audio files
         for the target mix files as well as the mixdown
@@ -1584,47 +1597,52 @@ important variable is \embeddedCode{fileNamePrefix} because it is used
 in the file names of the generated files; all the other variables may
 be missing and are set to some reasonable default.
 
+The lilypond include file containing all fragments can be specified
+via \embeddedCode{includeFilePath}, but if unset defaults to
+\embeddedCode{fileNamePrefix} plus ``-music.ly''.
+
 \begin{centeredFigure}
   \begin{variableDescriptionTableLong}
 
     \varDescriptionHeaderLong
 
-    \varDescriptionLong{title}
-               {\DESCtitle}
-               {"Wonderful Song"}
+    \varDescriptionLong{composerText}
+               {\DESCcomposerText}
+               {"arranged by Fred, 2017"}
 
     \varDescriptionLong{fileNamePrefix}
                {\DESCfileNamePrefix}
                {"wonderful\_song"}
 
-    \varDescriptionLong{year}
-               {\DESCyear}
-               {2017}
+    \varDescriptionLong{includeFilePath}
+               {\DESCincludeFilePath}
+               {"wonderful\_song-music.ly"}
 
-    \varDescriptionLong{composerText}
-               {\DESCcomposerText}
-               {"arranged by Fred, 2017"}
-
-    \varDescriptionLong{trackNumber}
-               {\DESCtrackNumber}
-               {22}
+    \varDescriptionLong{keepIntermediateFiles}
+               {\DESCkeepIntermediateFiles}
+               {False}
 
     \varDescriptionLong{measureToTempoMap}
                {\DESCmeasureToTempoMap}
                {"\{ 1 : 60/3, 20 : 100 \}"}
 
-    \varDescriptionLong{keepIntermediateFiles}
-               {\DESCkeepIntermediateFiles}
-               {False}
+    \varDescriptionLong{trackNumber}
+               {\DESCtrackNumber}
+               {22}
+
+    \varDescriptionLong{title}
+               {\DESCtitle}
+               {"Wonderful Song"}
+
+    \varDescriptionLong{year}
+               {\DESCyear}
+               {2017}
 
   \end{variableDescriptionTableLong}
 
   \caption{Song Related Configuration File Variables}
   \label{figure:configFileSongRelatedVariables}
 \end{centeredFigure}
-
-Note: the lilypond include file containing the fragments must be
-called called \embeddedCode{fileNamePrefix} plus ``-music.ly''.
 
 %-----------------------------------------------
 \section{Configuration of the Processing Phases}
@@ -2252,6 +2270,9 @@ voices.
     \varDescriptionShort{frameRate}
                         {\DESCvideoTargetFrameRate}
 
+    \varDescriptionShort{ffmpegPresetName}
+                        {\DESCvideoTargetFFMpegPresetName}
+
     \varDescriptionShort{mediaType}
                         {\DESCvideoTargetMediaType}
 
@@ -2348,6 +2369,7 @@ could look like this:
           " topBottomMargin:          5,"                \
           " leftRightMargin:          10,"               \
           " systemSize:               25,"               \
+          " ffmpegPresetName:         'mydevice',"       \
           " scalingFactor:            4,"                \
           " frameRate:                10,"               \
           " mediaType:                'TV Show',"        \
@@ -2361,13 +2383,14 @@ The above defines a target called ``tablet'' having a video with
 1024x768~pixels, a resolution of 132dpi, a margin of 5mm at top and
 bottom, a margin of 10mm left and right, slightly enlarged systems
 (lilypond standard system size is 20), a yellow semi-transparent
-subtitle with size 20~pixels.  The video runs at a frame rate of 10fps
-(which is ample for a more or less static video and ensures that the
-time resolution for page turning and subtitle changes is 0.1s) and
-lilypond produces images 4~times wider and higher than needed to be
-downscaled by the video renderer for better video image quality.  The
-quicktime media type is ``TV Show'' and subtitles in the final video
-are on a separate track.
+subtitle with size 20~pixels.  The video is encoded by ffmpeg with an
+ffmpeg preset called ``mydevice'' at a frame rate of 10fps (which is
+ample for a more or less static video and ensures that the time
+resolution for page turning and subtitle changes is 0.1s) and lilypond
+produces images 4~times wider and higher than needed to be downscaled
+by the video renderer for better video image quality.  The quicktime
+media type is ``TV Show'' and subtitles in the final video are on a
+separate track.
 
 Based on the video target definition given above a video file kind
 definition could look like this:
@@ -3618,7 +3641,13 @@ planned for future versions:
         each voice) shall be replaced by map from voice to a map from
         measure to sound variant.  This allows to have individual
         sound styles for different parts in a song (like, for example,
-        for an instrument solo part).
+        for an instrument solo part where special sounds are required).
+
+  \item The algorithm for finding the measures for the page breaks for
+        the video is quite naive and fragile.  The page breaks are
+        currently found by scanning the Postscript file, because
+        Lilypond currently has no means for finding those breaks
+        programmatically.  Some better solution must be found.
   
 \end{itemize}
 
@@ -3757,6 +3786,11 @@ been mentioned first in the current document.
                         {\DESChumanizedVoiceNameSet}
                         {empty}
                         {Humanization}
+
+    \varDescriptionFinal{includeFilePath}
+                        {\DESCincludeFilePath}
+                        {\embeddedCode{fileNamePrefix} plus ``-music.ly''}
+                        {Path}
 
     \varDescriptionFinal{intermediateFileDirectoryPath}
                         {\DESCintermediateFileDirectoryPath}
@@ -3908,6 +3942,12 @@ been mentioned first in the current document.
                         {voiceNameList}
                         {VideoFileKind}
 
+
+    \varDescriptionFinal{videoTarget\bdot ffmpegPresetName}
+                        {\DESCvideoTargetFFMpegPresetName}
+                        {``''}
+                        {VideoTarget}
+
     \varDescriptionFinal{videoTarget\bdot frameRate}
                         {\DESCvideoTargetFrameRate}
                         {10}
@@ -4020,9 +4060,9 @@ been mentioned first in the current document.
         \glossaryLink{postprocess}
 
     \item [audio group]
-        a group of \glossaryLink{voice} audio tracks to be mixed into
-        a target audio file or into a single audio track in the target
-        video files
+        a group of \glossaryLink{voice} \glossaryLink{audio track}s to
+        be mixed into a target audio file or into a single audio track
+        in the target video files
 
     \item [audio track]
         the audio rendering of a subset of all song voices (typically
@@ -4041,6 +4081,12 @@ been mentioned first in the current document.
         a \glossaryLink{processing phase} producing the extract PDF
         notation files for single \glossaryLink{voice}s
 
+    \item [ffmpeg]
+        a command-line program for producing videos from notation page
+        images, inserting hard subtitles into them and possibly
+        combining those silent videos with audio tracks (when
+        \glossaryLink{mp4box} is not used for that)
+
     \item [finalvideo (phase)]
         a \glossaryLink{processing phase} generating final video files
         for each \glossaryLink{video file kind} with all submixes as
@@ -4048,7 +4094,9 @@ been mentioned first in the current document.
         subtitle
 
     \item [fluidsynth]
-        a program for conversion of MIDI files into WAV audio files
+        a command-line program for conversion of MIDI files into WAV
+        audio files (representing \glossaryLink{audio track}s) using
+        \glossaryLink{sound font}s
 
     \item [humanization]
         a part of the \glossaryLink{midi} phase applying algorithmic
@@ -4084,6 +4132,12 @@ been mentioned first in the current document.
         \glossaryLink{voice}s based on the refined audio files with
         specified volume balance (where the submix variants are
         configurable)
+
+    \item [mp4box]
+        a command-line program for combining the silent notation
+        videos with \glossaryLink{audio track}s; used optionally instead
+        of \glossaryLink{ffmpeg} for a better compatibility with Apple
+        devices
 
     \item [override (of a voice audio)]
         a replacement of the refined audio file for some
@@ -4124,10 +4178,16 @@ been mentioned first in the current document.
         ``silentvideo'', ``rawaudio'', ``refinedaudio'', ``mixdown'',
         ``finalvideo''
 
+    \item [qaac]
+        a command-line program for converting WAV audio files into aac
+        encoded audio files (representing \glossaryLink{audio groups});
+        used optionally instead of \glossaryLink{ffmpeg} for a better
+        encoding quality
+
     \item [rawaudio (phase)]
-        a \glossaryLink{processing phase} producing unprocessed (intermediate)
-        audio files for all the instrument \glossaryLink{voice}s from
-        the midi tracks
+        a \glossaryLink{processing phase} producing unprocessed
+        (intermediate) audio files for all the instrument
+        \glossaryLink{voice}s from the midi tracks
 
     \item [refinedaudio (phase)]
         a \glossaryLink{processing phase} producing (intermediate)
@@ -4221,6 +4281,10 @@ been mentioned first in the current document.
   \bibitem[MP4BOX]{reference:mp4boxDocumentation}
     \textit{GPAC - General Documentation MP4Box}.\\
     \hyperlink{https://gpac.wp.imt.fr/mp4box/mp4box-documentation/}
+
+  \bibitem[SOUNDFONT]{reference:fluidSoundfont}
+    \textit{FluidR3\_GM.sf3 SoundFont at musescore.org}.\\
+    \hyperlink{https://github.com/musescore/MuseScore/raw/2.1/share/sound/FluidR3Mono\_GM.sf3}
 
   \bibitem[SOX]{reference:soxDocumentation}
     Chris Bagwell, Lance Norskog et al.:

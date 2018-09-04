@@ -5,7 +5,8 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-# root directories for installation and sources
+# version and root directories for installation and sources
+installationVersion = "0.1.2"
 installationRootDirectory = "Lib/site-packages/lilypondToBVC"
 sourceRootDirectory = "lilypondtobvc/src"
 
@@ -16,7 +17,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name = "LilypondToBandVideoConverter",
-    version = "1.0rc2",
+    version = installationVersion,
     description = "Generator for Notation Videos from Lilypond Text",
     long_description = long_description,
     long_description_content_type = "text/markdown",
@@ -47,11 +48,6 @@ setup(
     data_files = [
         (installationRootDirectory, ["LICENSE.txt",
                                      "lilypondToBandVideoConverter.pdf"]),
-        (installationRootDirectory + "/config",
-             ["config/ltbvc-global.cfg",
-              "config/notationSettings.cfg",
-              "config/soundProcessorCommands.cfg",
-              "config/styleHumanization.cfg"]),
         (installationRootDirectory + "/demo",
              ["demo/demo.jpg",
               "demo/wonderful_song-music.ly",

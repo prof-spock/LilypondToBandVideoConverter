@@ -292,6 +292,8 @@ def adaptToKind (st, kind):
         result = int(st)
     elif kind == "F":
         result = float(st)
+    elif kind == "B":
+        result = (st.upper() == "TRUE")
     else:
         result = st
 

@@ -26,20 +26,6 @@ from .ltbvc_businesstypes import generateObjectListFromString, \
 
 #====================
 
-def adaptMap (map, keyKind='S', valueKind='S'):
-    """Changes in place the keys and values of <map>; <keyKind> tells the
-       target kind of the keys, <valueKind> those of the values"""
-
-    otherMap = dict(map)
-    map.clear()
-
-    for key, value in otherMap.items():
-        newKey   = adaptToKind(key,   keyKind)
-        newValue = adaptToKind(value, valueKind)
-        map[newKey] = newValue
-
-#--------------------
-
 def _checkVariableList (variableNameList, configurationFile):
     """Checks all variables in <variableNameList> to be read from
        <configurationFile>"""
@@ -479,15 +465,40 @@ class _ConfigDataSong:
 
     _attributeNameList = \
       [ "attenuationLevel", "audioVoiceNameSet",
-        "countInMeasureCount", "extractVoiceNameSet",
-        "fileNamePrefix", "intermediateFilesAreKept",
+        "countInMeasureCount", "extractVoiceNameSet", "fileNamePrefix",
+        "includeFilePath", "intermediateFilesAreKept",
         "measureToHumanizationStyleNameMap", "measureToTempoMap",
         "midiVoiceNameList", "scoreVoiceNameList", "title",
         "trackNumber", "voiceNameToChordsMap", "voiceNameToLyricsMap",
         "voiceNameToOverrideFileNameMap" ]
 
+    _voiceAttributeNameList = [
+        "audioLevelList", "midiChannelList", "midiInstrumentList",
+        "midiVolumeList", "panPositionList", "reverbLevelList",
+        "soundVariantList", "voiceNameList"]
+
     #--------------------
     # LOCAL FEATURES
+    #--------------------
+
+    @classmethod
+    def _adaptMap (cls, map, keyKind='S', valueKind='S'):
+        """Changes in place the keys and values of <map>; <keyKind> tells the
+           target kind of the keys, <valueKind> those of the values"""
+
+        Logging.trace(">>: map = %s, keyKind = %s, valueKind = %s",
+                      map, keyKind, valueKind)
+
+        otherMap = dict(map)
+        map.clear()
+
+        for key, value in otherMap.items():
+            newKey   = adaptToKind(key,   keyKind)
+            newValue = adaptToKind(value, valueKind)
+            map[newKey] = newValue
+
+        Logging.trace("<<: %s", map)
+
     #--------------------
 
     @classmethod
@@ -507,10 +518,11 @@ class _ConfigDataSong:
 
         elementsInString = lambda st: len(st.strip().split(","))
 
-        def checkForRequiredLength(st, valueName, elementCount):
+        checkForRequiredLength = (lambda st, valueName, elementCount:
             ValidityChecker.isValid(elementsInString(st) == elementCount,
-                                    "'%s' must contain %d elements"
-                                    % (valueName, elementCount))
+                                    ("'%s' must contain %d elements"
+                                     + " to match 'voiceNameList'")
+                                    % (valueName, elementCount)))
 
         ValidityChecker.isString(voiceNames, "voiceNameList")
         ValidityChecker.isString(midiChannels, "midiChannelList")
@@ -603,7 +615,8 @@ class _ConfigDataSong:
             for voiceName, value in map.items():
                 entry = iif(isLyricsMap, {}, set())
                 targetList = value.split("/")
-                Logging.trace("--: targetList(%s) = %s", voiceName, targetList)
+                Logging.trace("--: targetList(%s) = %s",
+                              voiceName, targetList)
 
                 for targetSpec in targetList:
                     targetSpec = targetSpec.strip()
@@ -679,7 +692,7 @@ class _ConfigDataSong:
         configData.parallelTrackFilePath             = ""
         configData.parallelTrackVolume               = 1.0
         configData.scoreVoiceNameList                = ""
-        configData.shiftOffset                       = None
+        configData.shiftOffset                       = 0.0
         configData.songComposerText                  = None
         configData.songYear                          = None
         configData.title                             = "%title%"
@@ -743,30 +756,22 @@ class _ConfigDataSong:
         Logging.trace(">>")
 
         _checkVariableList(cls._attributeNameList, configurationFile)
-
-        voiceAttributeNameList = [
-            "audioLevelList", "midiChannelList", "midiInstrumentList",
-            "midiVolumeList", "panPositionList", "reverbLevelList",
-            "soundVariantList", "voiceNameList"]
-
-        _checkVariableList(voiceAttributeNameList, configurationFile)
+        _checkVariableList(cls._voiceAttributeNameList, configurationFile)
         
         getValueProc = \
             lambda name : _LocalValidator.get(name,
                                               configurationFile.getValue)
 
-        #("includeFilePath", "RFILE")
-        # "parallelTrackVolume")
-        # "shiftOffset")
-
-        # if configData.parallelTrackFilePath != "":
-        #    ValidityChecker.isReadableFile(configData.parallelTrackFilePath,
-        #                                   "parallelTrackFilePath")
-
         # additional rules
         fileNamePrefix = getValueProc("fileNamePrefix")
         ValidityChecker.isValid(" " not in fileNamePrefix,
                                 "'fileNamePrefix' must not contain blanks")
+
+        includeFilePath = getValueProc("includeFilePath")
+        includeFilePath  = iif(includeFilePath != "", includeFilePath,
+                               fileNamePrefix + "-music.ly")
+        ValidityChecker.isReadableFile(includeFilePath, "includeFilePath")
+
         year = getValueProc("year")
         ValidityChecker.isValid(isInRange(year, 1900, 2100),
                                 "'year' must be in a reasonable range")
@@ -798,7 +803,7 @@ class _ConfigDataSong:
           set(cstl(configData.extractVoiceNameSet))
         configData.measureToHumanizationStyleNameMap = \
             convertStringToMap(configData.measureToHumanizationStyleNameMap)
-        adaptMap(configData.measureToHumanizationStyleNameMap, 'F')
+        cls._adaptMap(configData.measureToHumanizationStyleNameMap, 'F')
         configData.midiVoiceNameList  = cstl(configData.midiVoiceNameList)
         configData.scoreVoiceNameList = cstl(configData.scoreVoiceNameList)
         configData.voiceNameToChordsMap = \
@@ -816,7 +821,7 @@ class _ConfigDataSong:
         # the tempo map maps the measure into a pair of tempo and
         # measure length in quarters
         tempoMap = convertStringToMap(configData.measureToTempoMap)
-        adaptMap(tempoMap, 'F')
+        cls._adaptMap(tempoMap, 'F')
 
         for key, value in tempoMap.items():
             if "/" not in value:
@@ -833,10 +838,11 @@ class _ConfigDataSong:
 
         # the voice data map is synthesized from several lists
         c = configData.voiceNameToVoiceDataMap
-        cls._convertToVoiceMap(configData, c["voiceNames"], c["midiChannels"],
-                               c["midiInstruments"], c["midiVolumes"],
-                               c["panPositions"], c["audioLevels"],
-                               c["reverbLevels"], c["soundVariants"])
+        cls._convertToVoiceMap(configData,
+                               c["voiceNameList"], c["midiChannelList"],
+                               c["midiInstrumentList"], c["midiVolumeList"],
+                               c["panPositionList"], c["audioLevelList"],
+                               c["reverbLevelList"], c["soundVariantList"])
 
         # adapt the different lists (when empty)
         if len(configData.extractVoiceNameSet) == 0:
@@ -869,20 +875,19 @@ class _ConfigDataSong:
             lambda name : _LocalValidator.get(name,
                                               configurationFile.getValue)
 
-        configData.includeFilePath = configData.fileNamePrefix + "-music.ly"
+        if configData.includeFilePath == "":
+            configData.includeFilePath = (configData.fileNamePrefix
+                                          + "-music.ly")
+
         configData.parallelTrackInfo = getValueProc("parallelTrack")
         configData.songComposerText = getValueProc("composerText")
         configData.songYear = getValueProc("year")
 
-        configData.voiceNameToVoiceDataMap = {
-            "voiceNames" : getValueProc("voiceNameList"),
-            "midiChannels" : getValueProc("midiChannelList"),
-            "midiInstruments" : getValueProc("midiInstrumentList"),
-            "midiVolumes" : getValueProc("midiVolumeList"),
-            "panPositions" : getValueProc("panPositionList"),
-            "audioLevels" : getValueProc("audioLevelList"),
-            "reverbLevels" : getValueProc("reverbLevelList"),
-            "soundVariants" : getValueProc("soundVariantList") }
+        configData.voiceNameToVoiceDataMap = {}
+
+        for voiceAttributeName in cls._voiceAttributeNameList:
+            configData.voiceNameToVoiceDataMap[voiceAttributeName] = \
+                getValueProc(voiceAttributeName)
 
         # set to float values for correct output
         configData.parallelTrackVolume = 0.0
@@ -1050,7 +1055,7 @@ class _LocalValidator:
         # common element patterns
         noCommaPattern    = r"(?:'[^']*'|[^,'\s]+)"
 
-        fileNamePattern   = r"[/\w_\.]+"
+        fileNamePattern   = r"[/\w\-_\.]+"
         identifierPattern = RegExpPattern.identifierPattern
         integerPattern    = RegExpPattern.integerPattern
         floatPattern      = RegExpPattern.floatPattern
@@ -1104,6 +1109,7 @@ class _LocalValidator:
         cls._setMap("composerText", "", "STRING")
         cls._setMap("countInMeasureCount", 0, "NATURAL")
         cls._setMap("fileNamePrefix", None, "STRING")
+        cls._setMap("includeFilePath", "", "STRING")
         cls._setMap("title", None, "STRING")
         cls._setMap("trackNumber", 0, "NATURAL")
         cls._setMap("voiceNameList", None, "REGEXP", identifierListRegExp)

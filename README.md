@@ -50,7 +50,7 @@ Additionally the following software has to be available:
    postprocessing,
 
 - *[fluidsynth][]*: for generation of voice audio files from
-   a midi file,
+   a midi file plus some soundfont (e.g. [FluidR3_GM.sf3][]),
 
 - *[sox][]*: for instrument-specific postprocessing of audio
    files for the target mix files as well as the mixdown,
@@ -76,13 +76,16 @@ executables on your platform.
 
 ## Further Information
 
-The detailed manual is available [here].
+A longer description is available [here][notation-video] and the
+detailed manual is available [here].
 
 [ffmpeg]: http://ffmpeg.org/
+[FluidR3_GM.sf3]: https://github.com/musescore/MuseScore/raw/2.1/share/sound/FluidR3Mono_GM.sf3
 [fluidsynth]: http://www.fluidsynth.org/
-[here]: lilypondToBandVideoConverter.pdf
+[here]: http://www.tensi.eu/thomas/iPod/lilypondToBandVideoConverter.pdf
 [lilypond]: http://lilypond.org/
 [lilypondFileSyntax]: http://tensi.eu/thomas
 [mp4box]: https://gpac.wp.imt.fr/mp4box/mp4box-documentation/
+[notation-video]: http://www.tensi.eu/thomas/iPod/notation-video.html
 [qaac]: https://sites.google.com/site/qaacpage/
 [sox]: http://sox.sourceforge.net/

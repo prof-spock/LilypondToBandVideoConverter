@@ -277,7 +277,7 @@ class _LilypondProcessor:
         command = (cls._lilypondCommand,
                    "--output", targetFileNamePrefix,
                    lilypondFilePath)
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -349,7 +349,8 @@ class _LilypondProcessor:
                                             videoFilePath,
                                             configData.shiftOffset,
                                             videoTarget.subtitleColor,
-                                            videoTarget.subtitleFontSize)
+                                            videoTarget.subtitleFontSize,
+                                            videoTarget.ffmpegPresetName)
 
                 targetDirectoryPath = videoFileKind.directoryPath
                 ValidityChecker.isDirectory(targetDirectoryPath,
@@ -590,6 +591,7 @@ class _LilypondProcessor:
                                               countInMeasures,
                                               videoTarget.frameRate,
                                               videoTarget.scalingFactor,
+                                              videoTarget.ffmpegPresetName,
                                               intermediateFileDirectoryPath,
                                               intermediateFilesAreKept)
                 videoGenerator.process()

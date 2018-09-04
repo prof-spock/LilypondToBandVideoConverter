@@ -43,17 +43,26 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def executeCommand (cls, command, commandIsShownOnly=False,
+    def executeCommand (cls, command, abortOnFailure=False,
                         stdin=None, stdout=None, stderr=None):
         """Processes <command> (specified as list) in operating
-          system. When <commandIsShownOnly> is set, there is only logging,
-          no execution."""
+          system. When <abortOnFailure> is set, any non-zero
+          return code aborts the program at once."""
 
-        Logging.trace("--: executing '%s'", repr(command))
+        Logging.trace(">>: %s", repr(command))
 
-        if not commandIsShownOnly:
-            subprocess.call(command,
-                            stdin=stdin, stdout=stdout, stderr=stderr)
+        completionCode = subprocess.call(command,
+                                         stdin=stdin, stdout=stdout,
+                                         stderr=stderr)
+
+        if abortOnFailure and completionCode != 0:
+            message = ("ERROR: return code %d for %s"
+                       % (completionCode, " ".join(command)))
+            Logging.log(message)
+            sys.exit(message)
+
+        Logging.trace("<<")
+        return completionCode
 
     #--------------------
 

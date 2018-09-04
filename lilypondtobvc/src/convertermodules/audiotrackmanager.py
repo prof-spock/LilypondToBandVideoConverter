@@ -69,7 +69,7 @@ class AudioTrackManager:
 
         OperatingSystem.showMessageOnConsole("== convert to AAC: "
                                              + songTitle)
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -112,7 +112,7 @@ class AudioTrackManager:
                      "-F", targetFilePath ]
                    + soundFonts
                    + [ voiceMidiFilePath ])
-        OperatingSystem.executeCommand(command, False,
+        OperatingSystem.executeCommand(command, True,
                                        stdout=OperatingSystem.nullDevice)
 
         # cleanup
@@ -174,7 +174,7 @@ class AudioTrackManager:
 
         OperatingSystem.showMessageOnConsole("== make mix file: %s"
                                              % songTitle)
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -221,7 +221,7 @@ class AudioTrackManager:
         command = (cls._soxCommandLinePrefixList
                    + [ audioFilePath, shiftedFilePath,
                        "pad", ("%7.3f" % shiftOffset) ])
-        OperatingSystem.executeCommand(command, False,
+        OperatingSystem.executeCommand(command, True,
                                        stdout=OperatingSystem.nullDevice)
         
         Logging.trace("<<")
@@ -424,7 +424,7 @@ class AudioTrackManager:
         command = (cls._soxCommandLinePrefixList
                    + [ filePath, targetFilePath,
                        "pad", ("%7.3f" % shiftOffset) ])
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -534,7 +534,7 @@ class AudioTrackManager:
             command = (cls._soxCommandLinePrefixList
                        + [ currentSource, currentTarget ]
                        + parameterList)
-            OperatingSystem.executeCommand(command, False)
+            OperatingSystem.executeCommand(command, True)
             currentSource = currentTarget
                        
         Logging.trace("<<")

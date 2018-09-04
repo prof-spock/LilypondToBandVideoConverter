@@ -18,6 +18,7 @@
 
 from copy import deepcopy
 
+from basemodules.attributemanager import AttributeManager
 from basemodules.regexppattern import RegExpPattern
 from basemodules.simplelogging import Logging
 from basemodules.ttbase import adaptToRange, convertStringToList, \
@@ -29,39 +30,6 @@ from basemodules.validitychecker import ValidityChecker
 _noCommaPattern    = r"(?:'[^']*'|[^,'\s]+)"
 
 #====================
-
-def _checkForTypesAndCompleteness (objectName, objectKind,
-                                   attributeNameToValueMap,
-                                   attributeNameToKindMap):
-    """Checks for object with <objectName> and kind <objectKind>
-       whether elements in <attributeNameToValueMap> occur in
-       <attributeNameToKindMap> and have correct types"""
-
-    Logging.trace(">>: name = '%s', kind = '%s', attributeMap = %s"
-                  + " referenceMap = %s",
-                  objectName, objectKind,
-                  attributeNameToValueMap, attributeNameToKindMap)
-
-    for attributeName in attributeNameToKindMap.keys():
-        ValidityChecker.isValid(\
-            attributeNameToValueMap.get(attributeName) is not None,
-            "no value for %s in %s %s"
-                                % (attributeName, objectKind, objectName))
-        kind  = attributeNameToKindMap[attributeName]
-        value = attributeNameToValueMap[attributeName]
-        errorMessage = ("bad kind for %s in %s %s: %s"
-                        % (attributeName, objectKind, objectName, value))
-
-        if kind in [ "I", "F" ]:
-            isFloat = (kind == "F")
-            ValidityChecker.isNumberString(value, errorMessage, isFloat)
-        elif kind == "B":
-            ValidityChecker.isValid(value.upper() in ["TRUE", "FALSE"],
-                                    errorMessage)
-
-    Logging.trace("<<")
-
-#--------------------
 
 def _setToDefault (currentMap, key, defaultValue):
     """sets entry <key> in <map> to <defaultValue> if undefined"""
@@ -194,18 +162,12 @@ class AudioTrack:
 
         # check and set object values
         name = attributeNameToValueMap["name"]
-        _checkForTypesAndCompleteness(name, "audio track",
-                                      attributeNameToValueMap,
-                                      cls._attributeNameToTypeMap)
+        AttributeManager.checkForTypesAndCompleteness(name, "audio track",
+                                                attributeNameToValueMap,
+                                                cls._attributeNameToTypeMap)
 
-        self.name              = name
-        st                     = attributeNameToValueMap["audioGroupList"]
-        self.audioGroupList    = convertStringToList(st, "/")
-        self.audioFileTemplate = attributeNameToValueMap["audioFileTemplate"]
-        self.songNameTemplate  = attributeNameToValueMap["songNameTemplate"]
-        self.albumName         = attributeNameToValueMap["albumName"]
-        self.description       = attributeNameToValueMap["description"]
-        self.languageCode      = attributeNameToValueMap["languageCode"]
+        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
+        self.audioGroupList = convertStringToList(self.audioGroupList, "/")
 
     #--------------------
 
@@ -349,16 +311,13 @@ class VideoFileKind:
 
         # check and set object values
         targetName = attributeNameToValueMap["name"]
-        _checkForTypesAndCompleteness(targetName, "video file kind",
-                                      attributeNameToValueMap,
-                                      cls._attributeNameToTypeMap)
+        AttributeManager.checkForTypesAndCompleteness(targetName,
+                                                "video file kind",
+                                                attributeNameToValueMap,
+                                                cls._attributeNameToTypeMap)
 
-        self.name             = targetName
-        self.target           = attributeNameToValueMap["target"]
-        self.fileNameSuffix   = attributeNameToValueMap["fileNameSuffix"]
-        self.directoryPath    = attributeNameToValueMap["directoryPath"]
-        self.voiceNameList    = \
-            convertStringToList(attributeNameToValueMap["voiceNameList"])
+        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
+        self.voiceNameList = convertStringToList(self.voiceNameList)
 
     #--------------------
 
@@ -391,6 +350,7 @@ class VideoTarget:
         "subtitleFontSize"         : "F",
         "scalingFactor"            : "I",
         "frameRate"                : "F",
+        "ffmpegPresetName"         : "S",
         "subtitlesAreHardcoded"    : "B"
     }
 
@@ -407,6 +367,7 @@ class VideoTarget:
         self.leftRightMargin          = None
         self.scalingFactor            = None
         self.frameRate                = None
+        self.ffmpegPresetName         = None
         self.systemSize               = None
         self.mediaType                = None
         self.subtitleColor            = None
@@ -426,7 +387,7 @@ class VideoTarget:
                + " resolution = %s, height = %s, width = %s,"
                + " topBottomMargin = %s, leftRightMargin = %s,"
                + " systemSize = %s, scalingFactor = %s,"
-               + " mediaType = '%s', frameRate = %s,"
+               + " mediaType = '%s', frameRate = %s, ffmpegPresetName = %s,"
                + " subtitleColor = %s, subtitleFontSize = %s,"
                + " subtitlesAreHardcoded = %s")
                % (clsName,
@@ -434,7 +395,7 @@ class VideoTarget:
                   self.resolution, self.height, self.width,
                   self.topBottomMargin, self.leftRightMargin,
                   self.systemSize, self.scalingFactor,
-                  self.mediaType, self.frameRate,
+                  self.mediaType, self.frameRate, self.ffmpegPresetName,
                   self.subtitleColor, self.subtitleFontSize,
                   self.subtitlesAreHardcoded))
         return st
@@ -451,30 +412,20 @@ class VideoTarget:
         # set optional attributes to default values
         _setToDefault(attributeNameToValueMap, "systemSize", 20)
         _setToDefault(attributeNameToValueMap, "scalingFactor", 1)
+        _setToDefault(attributeNameToValueMap, "ffmpegPresetName", "")
         _setToDefault(attributeNameToValueMap, "mediaType", "Normal")
         _setToDefault(attributeNameToValueMap, "subtitlesAreHardcoded",
                       "true")
 
         # check and set object values
         targetName = attributeNameToValueMap["name"]
-        _checkForTypesAndCompleteness(targetName, "video target",
-                                      attributeNameToValueMap,
-                                      cls._attributeNameToTypeMap)
+        AttributeManager.checkForTypesAndCompleteness(targetName,
+                                                "video target",
+                                                attributeNameToValueMap,
+                                                cls._attributeNameToTypeMap)
 
-        self.name             = targetName
-        self.resolution       = int(attributeNameToValueMap["resolution"])
-        self.height           = int(attributeNameToValueMap["height"])
-        self.width            = int(attributeNameToValueMap["width"])
-        self.topBottomMargin  = int(attributeNameToValueMap["topBottomMargin"])
-        self.leftRightMargin  = int(attributeNameToValueMap["leftRightMargin"])
-        self.systemSize       = int(attributeNameToValueMap["systemSize"])
-        self.scalingFactor    = int(attributeNameToValueMap["scalingFactor"])
-        self.frameRate        = float(attributeNameToValueMap["frameRate"])
-        self.mediaType        = attributeNameToValueMap["mediaType"]
-        self.subtitleColor    = int(attributeNameToValueMap["subtitleColor"])
-        self.subtitleFontSize = int(attributeNameToValueMap["subtitleFontSize"])
-        self.subtitlesAreHardcoded = \
-            attributeNameToValueMap["subtitlesAreHardcoded"].upper() == "TRUE"
+        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap,
+                                              cls._attributeNameToTypeMap)
 
     #--------------------
 

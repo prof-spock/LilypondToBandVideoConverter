@@ -3,10 +3,14 @@
 --====================
 
 _programDirectory = "/usr/local"
+_soundFonts = _programDirectory "/soundfonts/FluidR3_GM.SF2"
+
 aacCommandLine = _programDirectory "/qaac -V100 -i $1 -o $2"
 ffmpegCommand = _programDirectory "/ffmpeg"
-fluidsynthCommand = _programDirectory "/fluidsynth"
 lilypondCommand = _programDirectory "/lilypond"
+midiToWavRenderingCommandLine = \
+  _programDirectory "/fluidsynth.exe -n -i -g 1 -R 0" \
+  " -F ${outfile} " _soundFonts " ${infile}"
 soxCommandLinePrefix = _programDirectory "/sox"
 
 --====================
@@ -14,10 +18,8 @@ soxCommandLinePrefix = _programDirectory "/sox"
 --====================
 
 loggingFilePath = "/tmp/logs/ltbvc.log"
-soundFontDirectoryPath = _programDirectory "/soundfonts"
 targetDirectoryPath = "generated"
 tempAudioDirectoryPath = "/tmp/audiofiles"
-soundFontNames = "FluidR3_GM.SF2"
 
 --====================
 -- PREPROCESSING
@@ -51,10 +53,10 @@ voiceNameToChordsMap = "{" \
 countInMeasureCount = 2
 
 humanizationStyleRockHard  = \
-    "{ timing:   { 1:0.1, 2:0,    3:0.1,  4:0,"     \
-		 " S:B0.15, OTHER:B0.2 },"          \
-     " velocity: { 1:1.0, 2:1.15, 3:0.95, 4:1.1,"   \
-		 " S:0.9, OTHER:0.85, SLACK:0.1 } }"
+    "{ 0.00:    1/0.2, 0.25: 1.15/0," \
+    "  0.50: 0.95/0.2, 0.75:  1.1/0," \
+    "  OTHER: 0.9/B0.25," \
+    "  RASTER : 0.03125, SLACK : 0.1 }"
 
 --====================
 -- VIDEO OUTPUT

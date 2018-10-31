@@ -135,9 +135,12 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def showMessageOnConsole (cls, message):
-        """Shows <message> on console (stderr) for giving a trace
-           information to user"""
+    def showMessageOnConsole (cls, message, newlineIsAppended=True):
+        """Shows <message> on console (stderr) for giving a trace information
+           to user; <newlineIsAppended> tells whether a newline is added at
+           the end of the message"""
 
         Logging.trace("--: %s", message)
-        sys.stderr.write(message + "\n")
+        st = message + ("\n" if newlineIsAppended else "")
+        sys.stderr.write(st)
+        sys.stderr.flush()

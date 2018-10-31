@@ -13,7 +13,8 @@ import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import convertStringToList, iif
+from basemodules.stringutil import convertStringToList
+from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File 
 from basemodules.validitychecker import ValidityChecker
 
@@ -106,6 +107,7 @@ class VideoAudioCombiner:
 
     _ffmpegCommand = None
     _mp4boxCommand = None
+    _defaultMp4BaselineLevel = "3.0"
 
     #--------------------
     # LOCAL FEATURES
@@ -248,7 +250,7 @@ class VideoAudioCombiner:
                                              subtitleFilePath,
                                              targetVideoFilePath)
 
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
         Logging.trace("<<")
 
     #--------------------
@@ -256,19 +258,23 @@ class VideoAudioCombiner:
     @classmethod
     def insertHardSubtitles (cls, sourceVideoFilePath, subtitleFilePath,
                              targetVideoFilePath, shiftOffset,
-                             subtitleColor, subtitleFontSize):
+                             subtitleColor, subtitleFontSize,
+                             ffmpegPresetName):
         """Inserts hard subtitles specified by an SRT file with
            <subtitleFilePath> into video given by
            <sourceVideoFilePath> resulting in video with
            <targetVideoFilePath>; <shiftOffset> tells the amount of
-           empty time to be inserted before the video, <subtitleColor>
-           the RGB color of the subtitle, <subtitleFontSize> the size
-           in pixels"""
+           empty time to be inserted before the video, <ffmpegPresetName>
+           tells the ffmpeg preset used for the newly generated video,
+           <subtitleColor> the RGB color of the subtitle,
+           <subtitleFontSize> the size in pixels"""
 
         Logging.trace(">>: sourceVideo = '%s', subtitleFile = '%s',"
-                      + " targetVideo = '%s', subtitleFontSize = %d",
+                      + " targetVideo = '%s', subtitleFontSize = %d,"
+                      + " subtitleColor = %d, ffmpegPreset = %s",
                       sourceVideoFilePath, subtitleFilePath,
-                      targetVideoFilePath, subtitleFontSize)
+                      targetVideoFilePath, subtitleFontSize,
+                      subtitleColor, ffmpegPresetName)
 
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
@@ -281,16 +287,19 @@ class VideoAudioCombiner:
                           % (subtitleFilePath, subtitleColor,
                              subtitleFontSize))
 
-        command = (cls._ffmpegCommand,
-                   "-loglevel", "error",
-                   "-itsoffset", str(shiftOffset),
-                   "-i", sourceVideoFilePath,
-                   "-vf", subtitleOption,
-                   "-pix_fmt", "yuv420p",
-                   "-profile:v", "baseline", "-level", "3.0",
-                   "-y", targetVideoFilePath)
-        OperatingSystem.executeCommand(command, False)
+        command = ((cls._ffmpegCommand,
+                    "-loglevel", "error",
+                    "-itsoffset", str(shiftOffset),
+                    "-i", sourceVideoFilePath,
+                    "-vf", subtitleOption)
+                   + iif(ffmpegPresetName != "",
+                         ("-fpre", ffmpegPresetName),
+                         ("-pix_fmt", "yuv420p",
+                          "-profile:v", "baseline",
+                          "-level", cls._defaultMp4BaselineLevel))
+                   + ("-y", targetVideoFilePath))
 
+        OperatingSystem.executeCommand(command, True)
         Logging.trace("<<")
 
     #--------------------
@@ -298,8 +307,8 @@ class VideoAudioCombiner:
     @classmethod
     def shiftSubtitleFile (cls, subtitleFilePath, targetSubtitleFilePath,
                            shiftOffset):
-        """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and
-           stores result in file with <targetSubtitleFilePath>"""
+        """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and stores
+           result in file with <targetSubtitleFilePath>"""
 
         Logging.trace(">>: subtitleFilePath = '%s', shiftOffset = %7.3f,"
                       + " targetSubtitleFilePath ='%s'",

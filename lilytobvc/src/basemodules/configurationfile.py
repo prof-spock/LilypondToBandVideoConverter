@@ -9,10 +9,10 @@
 import io
 import re
 
-from basemodules.operatingsystem import OperatingSystem
-from basemodules.python2and3support import isString
-from basemodules.simplelogging import Logging
-from basemodules.ttbase import iif, missingValue
+from .operatingsystem import OperatingSystem
+from .python2and3support import isString
+from .simplelogging import Logging
+from .ttbase import iif, missingValue
 
 #====================
 

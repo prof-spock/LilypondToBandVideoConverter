@@ -15,7 +15,8 @@ import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import convertStringToList, iif
+from basemodules.stringutil import convertStringToList
+from basemodules.ttbase import iif
 from basemodules.validitychecker import ValidityChecker
 
 from .audiotrackmanager import AudioTrackManager
@@ -669,11 +670,10 @@ def initialize ():
 
         LilypondFile.initialize(configData.measureToTempoMap)
         AudioTrackManager.initialize(configData.aacCommandLine,
+                                     configData.audioRefinementCommandLine,
                                      configData.ffmpegCommand,
-                                     configData.fluidsynthCommand,
+                                     configData.midiToWavRenderingCommandLine,
                                      configData.soxCommandLinePrefix,
-                                     configData.soundFontDirectoryPath,
-                                     configData.soundFontNameList,
                                      configData.soundStyleNameToTextMap,
                                      configData.intermediateFilesAreKept)
         MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,
@@ -688,6 +688,7 @@ def initialize ():
 def main ():
     Logging.initialize()
     Logging.setLevel(Logging.Level_verbose)
+    Logging.setTracingWithTime(True)
     #Logging.setFileName("/temp/logs/test.log")
     Logging.trace(">>")
 

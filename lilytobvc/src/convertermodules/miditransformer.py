@@ -10,15 +10,15 @@
 #====================
 
 from datetime import datetime
-import math
 import random
 import re
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simpleassertion import Assertion
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import adaptToRange, convertStringToMap, \
-                               iif, iif2, isInRange, MyRandom
+from basemodules.stringutil import convertStringToMap
+from basemodules.ttbase import adaptToRange, iif, iif2, isInRange, MyRandom
+from basemodules.validitychecker import ValidityChecker
 
 from .midifilehandler import MidiFileHandler
 
@@ -123,9 +123,14 @@ class _MusicTime:
     _quartersPerMeasure = None
     _separator = ":"
     _ticksPerQuarterNote = None
-    sixteenthDuration = None
+
+    semibreveDuration    = None
+    quarterDuration      = None
+    sixteenthDuration    = None
     thirtysecondDuration = None
 
+    firstPosition = None
+    
     #--------------------
 
     @classmethod
@@ -133,14 +138,19 @@ class _MusicTime:
         """Sets values for <ticksPerQuarterNote> and
            <quartersPerMeasure>"""
 
-        Logging.trace(">>: tpq = %d, qpm = %d",
+        Logging.trace(">>: tpq = %d, qpm = %s",
                       ticksPerQuarterNote, quartersPerMeasure)
  
         cls._quartersPerMeasure   = quartersPerMeasure
         cls._ticksPerQuarterNote  = ticksPerQuarterNote
-        cls.sixteenthDuration = _MusicTime("0:0:1:0", True)
-        st = "0:0:0:" + str(ticksPerQuarterNote // 8)
-        cls.thirtysecondDuration = _MusicTime(st, True)
+
+        cls.measureDuration      = _MusicTime("1:0:0:0", True)
+        cls.semibreveDuration    = _MusicTime("0:4:0:0", True)
+        cls.quarterDuration      = cls.semibreveDuration.multiply(0.25)
+        cls.sixteenthDuration    = cls.quarterDuration.multiply(0.25)
+        cls.thirtysecondDuration = cls.quarterDuration.multiply(0.125)
+
+        cls.firstPosition = _MusicTime("1:1:1:1", False)
 
         Logging.trace("<<")
     
@@ -150,12 +160,12 @@ class _MusicTime:
         """Creates a music time object, which is either a time or a
            duration"""
 
-        self._data       = value
         self._isDuration = isDuration
+        self._data       = value
 
     #--------------------
 
-    def __repr__ (self):
+    def __str__ (self):
         """Returns the string representation of a music time object"""
 
         return ("MusicTime(%s/%s)"
@@ -180,16 +190,18 @@ class _MusicTime:
     def add (self, duration):
         """Returns sum of <self> and <duration>"""
 
-        Logging.trace(">>: time = %s, duration = %s", str(self), duration)
+        Logging.trace(">>: time = %s, duration = %s", self, duration)
 
         Assertion.pre(not self._isDuration and duration._isDuration,
                       "bad parameters for add")
 
         cls = self.__class__
-        midiTime     = self.toMidiTime()
-        midiDuration = duration.toMidiTime()
-        resultTime   = midiTime + midiDuration
-        result       = cls.fromMidiTime(resultTime, False)
+
+        midiTime       = self.toMidiTime()
+        midiDuration   = duration.toMidiTime()
+        midiResultTime = midiTime + midiDuration
+
+        result = cls.fromMidiTime(midiResultTime, False)
 
         Logging.trace("<<: %s", result)
         return result
@@ -209,7 +221,7 @@ class _MusicTime:
         ##              midiTime, isDuration)
 
         isNegative = (midiTime < 0)
-        remainingMidiTime = abs(midiTime)
+        remainingMidiTime = round(abs(midiTime))
         ticksPerQuarterNote = cls._ticksPerQuarterNote
 
         factorList = [ ticksPerQuarterNote * cls._quartersPerMeasure,
@@ -217,9 +229,9 @@ class _MusicTime:
         partList = []
 
         for factor in factorList:
-            part = remainingMidiTime // factor
+            part = round(remainingMidiTime / factor)
             remainingMidiTime -= factor * part
-            partList.append(int(part))
+            partList.append(part)
         
         measure, quarter, sixteenth, remainder = partList
 
@@ -229,11 +241,12 @@ class _MusicTime:
             sixteenth += 1
             remainder += 1
 
-        st = (iif(isNegative, "-", "")
-              + str(measure) + cls._separator
-              + str(quarter) + cls._separator
-              + str(sixteenth) + cls._separator
-              + str(remainder))
+        st = ("%s%s%s%s%s%s%s%s"
+              % (iif(isNegative, "-", ""),
+                 measure, cls._separator,
+                 quarter, cls._separator,
+                 sixteenth, cls._separator,
+                 remainder))
         result = _MusicTime(st, isDuration)
 
         ##Logging.trace("<<: %s", str(result))
@@ -241,41 +254,68 @@ class _MusicTime:
 
     #--------------------
 
-    def isAt (self, timeWithinMeasure):
-        """Tells whether <self> is near <timeWithinMeasure> for some
-           measure where <timeWithinMeasure> is given as a position in
-           the first measure without measure indication; allows a
-           maximum deviation of 1/32nd"""
+    def isAt (self, reference, rasterSize):
+        """Tells whether <self> is near <reference> for some measure where
+           <reference> is given as float factor of a semibreve; must
+           be within a symmetric interval of <rasterSize>; a
+           wraparound at the measure boundary is accounted for"""
 
-        ##Logging.trace(">>: %s, reference = %s",
-        ##              str(self), str(timeWithinMeasure))
-        Assertion.pre(not self._isDuration, "parameter must be a time")
+        Logging.trace(">>: %s, reference = %s, rasterSize = %s",
+                      self, reference, rasterSize)
+        Assertion.pre(not self._isDuration, "first parameter must be a time")
 
         cls = self.__class__
 
-        # shift <time> into first measure replacing measure by 1
-        measure, relativeTime = self._data.split(cls._separator, 1)
-        st = "1" + cls._separator + relativeTime
-        time = _MusicTime(st, False)
+        tpqn = cls._ticksPerQuarterNote
 
-        st = "1" + cls._separator + timeWithinMeasure._data
-        referenceTime = _MusicTime(st, False)
-        
-        midiTimeA = time.toMidiTime()
-        midiTimeB = referenceTime.toMidiTime()
-        maxDeviation = cls._ticksPerQuarterNote // 8
-        difference = abs(midiTimeA - midiTimeB)
-        result = (maxDeviation >= difference)
+        # find relative position in midi ticks
+        measure, _ = self._data.split(cls._separator, 1)
+        measure = int(measure)
 
-        ##Logging.trace("<<: %s", result)
+        midiMeasureDuration = round(cls._quartersPerMeasure * tpqn)
+        midiTime = (self.toMidiTime() - (measure - 1) * midiMeasureDuration)
+
+        # check whether relative position is near <referenceTime>
+        midiReferenceTime   = round(4 * tpqn * reference)
+        midiHalfRasterSize  = round(4 * tpqn * rasterSize / 2.0)
+
+        Logging.trace("--: midiTime = %d, midiReferenceTime = %d,"
+                      + " midiHalfRaster = %d, midiMeasure = %d,"
+                      + " qpm = %s, tpqn = %d",
+                      midiTime, midiReferenceTime,
+                      midiHalfRasterSize, midiMeasureDuration,
+                      cls._quartersPerMeasure, tpqn)
+
+        # check positive range
+        midiOtherTime = midiReferenceTime + midiHalfRasterSize
+        isNear = isInRange(midiTime, midiReferenceTime, midiOtherTime)
+        Logging.trace("--: midiOtherTimeA = %d, isNear = %s",
+                      midiOtherTime, isNear)
+
+        if not isNear and midiOtherTime > midiMeasureDuration:
+            # wraparound
+            midiOtherTime -= midiMeasureDuration
+            isNear = isInRange(midiTime, 0, midiOtherTime)
+            Logging.trace("--: midiOtherTimeB = %d, isNear = %s",
+                          midiOtherTime, isNear)
+            
+        # check negative range
+        if not isNear:
+            midiOtherTime = midiReferenceTime - midiHalfRasterSize
+            isNear = isInRange(midiTime, midiOtherTime, midiReferenceTime)
+            Logging.trace("--: midiOtherTimeC = %d, isNear = %s",
+                          midiOtherTime, isNear)
+            
+            if not isNear and midiOtherTime < 0:
+                # wraparound
+                midiOtherTime += midiMeasureDuration
+                isNear = isInRange(midiTime, midiOtherTime, midiMeasureDuration)
+                Logging.trace("--: midiOtherTimeD = %d, isNear = %s",
+                              midiOtherTime, isNear)
+            
+        result = isNear
+        Logging.trace("<<: %s", result)
         return result
-
-    #--------------------
-
-    def isLess (self, otherTime):
-        """Tells whether <self> is less than <otherTime>"""
-
-        return (self.toMidiTime() < otherTime.toMidiTime())
 
     #--------------------
 
@@ -291,7 +331,7 @@ class _MusicTime:
     #--------------------
 
     def normalize (self):
-        """Calculates a standard representation of <time> and returns
+        """Calculates a standard representation of <self> and returns
            it"""
 
         Assertion.pre(not self._isDuration, "parameter must be a time")
@@ -301,35 +341,35 @@ class _MusicTime:
 
     #--------------------
 
-    def scalarMultiply (self, factor):
+    def multiply (self, factor):
         """Does a scalar multiplication of duration <self> by <factor>
            and returns scaled duration"""
 
-        Logging.trace(">>: duration = %s, factor = %f", str(self), factor)
+        Logging.trace(">>: duration = %s, factor = %f", self, factor)
         Assertion.pre(self._isDuration, "parameter must be a duration")
 
         cls = self.__class__
         midiDuration = self.toMidiTime()
-        result = cls.fromMidiTime(int(midiDuration * factor), True)
+        result = cls.fromMidiTime(round(midiDuration * factor), True)
 
         Logging.trace("<<: %s", str(result))
         return result
 
     #--------------------
 
-    def subtract (self, otherTime):
-        """Calculates difference of <self> and <otherTime> and returns a
+    def subtract (self, other):
+        """Calculates difference of <self> and <other> and returns a
            duration"""
 
-        Logging.trace(">>: %s, %s", str(self), str(otherTime))
+        Logging.trace(">>: %s, %s", self, other)
 
         cls = self.__class__
         midiTimeA = self.toMidiTime()
-        midiTimeB = otherTime.toMidiTime()
+        midiTimeB = other.toMidiTime()
         midiDuration = midiTimeA - midiTimeB
         result = cls.fromMidiTime(midiDuration, True)
 
-        Logging.trace("<<: %s", str(result))
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
@@ -357,7 +397,7 @@ class _MusicTime:
                      + int(timePartList[1])) * 4
                     + int(timePartList[2])) * cls._ticksPerQuarterNote // 4)
                   + int(timePartList[3]))
-        result = iif(isNegative, -result, result)
+        result = round(iif(isNegative, -result, result))
 
         ##Logging.trace("<<: %d", result)
         return result
@@ -372,9 +412,10 @@ class _HumanizationStyle:
 
     defaultStyleName = "humanizationStyleDefault"
     _defaultStyleAsString = \
-        ("{  timing:   { 1:0, 2:0.25, 3:0.1, 4:0.25,  S:0.05, OTHER:0.35 },"
-         + " velocity: { 1:1.15, 2:1.0, 3:1.1, 4:1.0, S:1.05, OTHER:0.85,"
-         + "             SLACK:0.1 } }")
+        ("{ 0.00: 1.15/0, 0.25: 1/0.2, 0.50: 1.1/0.2, 0.75: 1/0.2,"
+         + "  OTHER: 0.85/B0.25,"
+         + "  RASTER: 0.03125, SLACK:0.1 }")
+    _velocityAndTimingSeparator = "/"
 
     #--------------------
     # EXPORTED FEATURES
@@ -416,69 +457,87 @@ class _HumanizationStyle:
 
         style = convertStringToMap(styleAsString)
         Logging.trace("--: style = %s", style)
-                
-        if len(style.keys()) != 2:
-            Logging.trace("--: ERROR: bad humanization style string - %s",
-                          style)
-        else:
-            self._name                       = styleName
-            self._beatToDirectionMap         = {}
-            self._beatToTimeVariationMap     = {}
-            self._beatToVelocityVariationMap = {}
-            
-            for tagName, tagValue in style.items():
-                Logging.trace("--: tagName = %s, tagValue = %s",
-                              tagName, tagValue)
 
-                # timing or velocity definition
-                entryMap = tagValue
+        rasterSize = style.get("RASTER", "0.03125")
+        ValidityChecker.isNumberString(rasterSize,
+                                       "raster invalid in '%s'" % styleName,
+                                       True)
+        rasterSize = float(rasterSize)
 
-                for key, value in entryMap.items():
-                    Logging.trace("--: %s -> %s", key, value)
-                    direction = ""
+        slackValue = style.get("SLACK")
+        ValidityChecker.isNumberString(slackValue,
+                                       "slack invalid in '%s'" % styleName,
+                                       True)
+        slackValue = float(slackValue)
+        
+        self._name                           = styleName
+        self._rasterSize                     = rasterSize
+        self._slack                          = slackValue
+        self._positionToDirectionMap         = {}
+        self._positionToTimeVariationMap     = {}
+        self._positionToVelocityVariationMap = {}
+        self._validPositions                 = []
 
-                    if tagName == "velocity":
-                        value = float(value)
-                        self._beatToVelocityVariationMap[key] = value
-                    else:
-                        # timing may contain a direction indicator
-                        direction = value[0]
+        keyList = style.keys()
+        separator = cls._velocityAndTimingSeparator
 
-                        if direction not in "AB":
-                            direction = ""
-                        else:
-                            value = value[1:]
+        # velocity and timing definition
+        for positionKey in keyList:
+            velocityAndTiming = style[positionKey]
 
-                        value = float(value)
-                        self._beatToDirectionMap[key] = direction
-                        self._beatToTimeVariationMap[key] = value
+            if positionKey in ["RASTER", "SLACK"]:
+                continue
+            elif positionKey != "OTHER":
+                positionKey = float(positionKey)
+                self._validPositions.append(positionKey)
 
-                    Logging.trace("--: %s|%s -> %s%4.2f",
-                                  tagName, key, direction, value)
+            Logging.trace("--: position = %s, value = %s",
+                          positionKey, velocityAndTiming)
+            Assertion.check(separator in velocityAndTiming,
+                            "bad value for %s in %s"
+                            % (positionKey, styleName))
+            velocity, timing = velocityAndTiming.split(separator)
+            direction = timing[0]
 
-        Logging.trace("<<")
+            if direction not in "AB":
+                direction = ""
+            else:
+                timing = timing[1:]
+
+            velocity = float(velocity)
+            timing   = float(timing)
+
+            self._positionToVelocityVariationMap[positionKey] = velocity
+            self._positionToDirectionMap[positionKey]         = direction
+            self._positionToTimeVariationMap[positionKey]     = timing
+            Logging.trace("--: %s -> %4.2f/%s%4.2f",
+                          positionKey, velocity, direction, timing)
+
+        Logging.trace("<<: %s", self)
 
     #--------------------
 
-    def __repr__ (self):
+    def __str__ (self):
         """Returns the string representation of <self>"""
 
         st = ("_HumanizationStyle(%s,"
+              + " RASTER = %s, SLACK = %s,"
               + " VELOCITY = %s, DIRECTIONS = %s, TIMING = %s)")
         result = st % (self._name,
-                       repr(self._beatToVelocityVariationMap),
-                       repr(self._beatToDirectionMap),
-                       repr(self._beatToTimeVariationMap))
+                       self._rasterSize, self._slack,
+                       self._positionToVelocityVariationMap,
+                       self._positionToDirectionMap,
+                       self._positionToTimeVariationMap)
         return result
     
     #--------------------
 
-    def hasDirectionalShiftAt (self, eventPositionKind):
+    def hasDirectionalShiftAt (self, eventPositionInMeasure):
         """Tells whether there is a directional timing shift at
-           <eventPositionKind> and returns it"""
+           <eventPositionInMeasure> and returns it"""
 
-        Logging.trace(">>: %s", eventPositionKind)
-        result = self._beatToDirectionMap[eventPositionKind]
+        Logging.trace(">>: %s", eventPositionInMeasure)
+        result = self._positionToDirectionMap[eventPositionInMeasure]
         Logging.trace("<<: %s", result)
         return result
 
@@ -497,35 +556,52 @@ class _HumanizationStyle:
 
     #--------------------
 
-    def timingVariationFactor (self, eventPositionKind):
-        """Returns the associated timing variation factor (in percent)
-           for the <eventPositionKind>"""
+    def keys (self):
+        """Returns all time positions"""
 
-        Logging.trace(">>: %s", eventPositionKind)
-        result = self._beatToTimeVariationMap.get(eventPositionKind, 0)
-        Logging.trace("<<: %d", result)
+        return self._validPositions
+
+    #--------------------
+
+    def timingVariationFactor (self, eventPositionInMeasure):
+        """Returns the associated timing variation factor (in percent)
+           for the <eventPositionInMeasure>"""
+
+        Logging.trace(">>: %s", eventPositionInMeasure)
+        result = self._positionToTimeVariationMap.get(eventPositionInMeasure, 0)
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
 
-    def velocityFactor (self, eventPositionKind):
-        """Returns the associated velocity factor (in percent) for the
-           <eventPositionKind>"""
+    def raster (self):
+        """Returns the raster of current style"""
 
-        Logging.trace(">>: %s", eventPositionKind)
-        result = self._beatToVelocityVariationMap.get(eventPositionKind, 0)
-        Logging.trace("<<: %d", result)
+        Logging.trace(">>")
+        result = self._rasterSize
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    def velocityFactor (self, eventPositionInMeasure):
+        """Returns the associated velocity factor (in percent) for the
+           <eventPositionInMeasure>"""
+
+        Logging.trace(">>: %s", eventPositionInMeasure)
+        result = self._positionToVelocityVariationMap \
+                     .get(eventPositionInMeasure, 0)
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
 
     def velocitySlack (self):
-        """Returns the associated delta slack (in percent) for the
-           <eventPositionKind>"""
+        """Returns the associated slack (in percent)"""
 
         Logging.trace(">>")
-        result = self._beatToVelocityVariationMap.get("SLACK", 0)
-        Logging.trace("<<: %d", result)
+        result = self._slack
+        Logging.trace("<<: %s", result)
         return result
 
 #====================
@@ -556,7 +632,7 @@ class _Humanizer:
     
         #--------------------
 
-        def __repr__ (self):
+        def __str__ (self):
             st = ("_HumanizerEvent(midiTime = %s, text = '%s', kind = %s,"
                   + " channel = %s, note = %s, velocity = %s, partner = %s)")
             return (st % (self.midiTime, self.text, self.kind, self.channel,
@@ -566,35 +642,36 @@ class _Humanizer:
     # LOCAL FEATURES
     #--------------------
 
-    def _adjustTiming (self, eventIndex, time, eventPositionKind,
+    def _adjustTiming (self, eventIndex, musicTime, eventPositionInMeasure,
                        instrumentTimingVariationFactor):
         """Adjusts timing of note event given at <eventIndex> with
-           parameters <time> and <noteKind>;
+           parameters <musicTime> and <noteKind>;
            <instrumentTimingVariationFactor> gives an instrument
            specific factor"""
 
-        Logging.trace(">>: index = %d, time = %s, positionKind = %s,"
+        Logging.trace(">>: index = %d, time = %s, positionInMeasure = %s,"
                       + " instrumentTimingVariation = %4.3f",
-                      eventIndex, str(time), eventPositionKind,
+                      eventIndex, musicTime, eventPositionInMeasure,
                       instrumentTimingVariationFactor)
 
         cls = self.__class__
         result = None
-        timeAsString = str(time)
-        effectiveMeasureIndex = time.measure() - cls._countInMeasureCount
-        style = self._styleForMeasure(effectiveMeasureIndex)
+        timeAsString = str(musicTime)
+        style = self._styleForTime(musicTime)
+        effectiveMeasureIndex = musicTime.measure() - cls._countInMeasureCount
 
         if effectiveMeasureIndex <= 0:
             # leave as is, because those measures are count-ins
-            result = time
+            result = musicTime
         elif timeAsString in self._timeToAdjustedTimeMap:
+            # we already have seen this event time => reuse cached value
             result = self._timeToAdjustedTimeMap[timeAsString]
         else:
-            direction = style.hasDirectionalShiftAt(eventPositionKind)
+            direction = style.hasDirectionalShiftAt(eventPositionInMeasure)
             variationFactor = \
-                style.timingVariationFactor(eventPositionKind)
+                style.timingVariationFactor(eventPositionInMeasure)
             variationDuration = \
-                _MusicTime.thirtysecondDuration.scalarMultiply(variationFactor)
+                _MusicTime.thirtysecondDuration.multiply(variationFactor)
 
             # do a random variation with a square distribution
             randomFactor = cls._squaredrand() * 2 - 1
@@ -606,8 +683,8 @@ class _Humanizer:
 
             # adjust by instrument
             randomFactor *= instrumentTimingVariationFactor
-            variationDuration = variationDuration.scalarMultiply(randomFactor)
-            result = time.add(variationDuration)
+            variationDuration = variationDuration.multiply(randomFactor)
+            result = musicTime.add(variationDuration)
             self._timeToAdjustedTimeMap[timeAsString] = result
 
         Logging.trace("<<: %s", str(result))
@@ -615,29 +692,30 @@ class _Humanizer:
 
     #--------------------
 
-    def _adjustVelocity (self, eventIndex, time, velocity, eventPositionKind,
+    def _adjustVelocity (self, eventIndex, musicTime, velocity,
+                         eventPositionInMeasure,
                          instrumentVelocityVariationFactor):
         """Adjusts velocity of note event given at <eventIndex> with
-           parameters <time> and <noteKind>;
+           parameters <musicTime> and <noteKind>;
            <instrumentTimingVariationFactor> gives an instrument
            specific factor"""
 
         Logging.trace(">>: index = %d, time = %s, velocity = %d,"
-                      + " positionKind = %s,"
+                      + " positionInMeasure = %s,"
                       + " instrumentVelocityVariation = %4.3f",
-                      eventIndex, str(time), velocity, eventPositionKind,
+                      eventIndex, musicTime, velocity, eventPositionInMeasure,
                       instrumentVelocityVariationFactor)
 
         cls = self.__class__
         result = None
-        effectiveMeasureIndex = time.measure() - cls._countInMeasureCount
-        style = self._styleForMeasure(effectiveMeasureIndex)
+        style = self._styleForTime(musicTime)
+        effectiveMeasureIndex = musicTime.measure() - cls._countInMeasureCount
 
         if effectiveMeasureIndex <= 0:
             # leave as is, because those measures are count-ins
             result = velocity
         else:
-            factor = style.velocityFactor(eventPositionKind)
+            factor = style.velocityFactor(eventPositionInMeasure)
             slack  = style.velocitySlack()
 
             # randomFactor shall be between -1 and 1
@@ -759,26 +837,22 @@ class _Humanizer:
 
     #--------------------
 
-    def _findEventPositionKind (self, time):
+    def _findEventPositionInMeasure (self, musicTime):
         """Finds position of event within measure and returns it as
-           full quarter number, 'S' for off beat sixteenth and 'OTHER'
-           for all the other positions"""
+           a float value"""
 
-        Logging.trace(">>: %s", str(time))
+        Logging.trace(">>: %s", musicTime)
 
         cls = self.__class__
         result = None
+        style = self._styleForTime(musicTime)
+        rasterSize = style.raster()
 
-        # traverse all quarter beats and the sixteenth notes and
-        # check for match
-        for i in range(1, cls._quartersPerMeasure + 1):
-            if result is None:
-                for j in range(1, 9):
-                    referenceTime = _MusicTime("%d:%d:1" % (i, j), False)
-
-                    if time.isAt(referenceTime):
-                        result = iif(j == 1, str(i), "S")
-                        break
+        # traverse all time positions
+        for position in style.keys():
+            if musicTime.isAt(position, rasterSize):
+                result = position
+                break
 
         result = iif(result is None, "OTHER", result)
         Logging.trace("<<: %s", result)
@@ -853,20 +927,22 @@ class _Humanizer:
                       midiDuration, instrumentVelocityVariation,
                       instrumentTimingVariation)
 
-        time              = _MusicTime.fromMidiTime(midiTime, False)
-        eventPositionKind = self._findEventPositionKind(time)
-        velocity          = self._adjustVelocity(eventIndex, time, velocity,
-                                                 eventPositionKind,
+        musicTime  = _MusicTime.fromMidiTime(midiTime, False)
+        style = self._styleForTime(musicTime)
+        eventPositionInMeasure = self._findEventPositionInMeasure(musicTime)
+
+        velocity          = self._adjustVelocity(eventIndex, musicTime, velocity,
+                                                 eventPositionInMeasure,
                                                  instrumentVelocityVariation)
-        time              = self._adjustTiming(eventIndex, time,
-                                               eventPositionKind,
+        musicTime         = self._adjustTiming(eventIndex, musicTime,
+                                               eventPositionInMeasure,
                                                instrumentTimingVariation)
 
         event = self._eventList[eventIndex]
-        event.midiTime = time.toMidiTime()
+        event.midiTime = musicTime.toMidiTime()
         event.velocity = velocity
 
-        Logging.trace("<<")
+        Logging.trace("<<: %s", event)
 
     #--------------------
 
@@ -912,10 +988,24 @@ class _Humanizer:
                 result = self._styleForMeasure(measureIndex - 1)
             else:
                 styleName = _HumanizationStyle.defaultStyleName
-                result = _HumanizationStyle(styleName)
+                result    = _HumanizationStyle(styleName)
 
             self._measureToHumanizationStyleMap[measureIndex] = result
 
+        return result
+
+    #--------------------
+
+    def _styleForTime (self, musicTime):
+        """Returns style that is valid at given <musicTime>"""
+
+        Logging.trace(">>: %s", musicTime)
+
+        cls = self.__class__
+        effectiveMeasureIndex = musicTime.measure() - cls._countInMeasureCount
+        result = self._styleForMeasure(effectiveMeasureIndex)
+
+        Logging.trace("<<: %s", result._name)
         return result
 
     #--------------------
@@ -926,10 +1016,13 @@ class _Humanizer:
     def initialize (cls, quartersPerMeasure, countInMeasureCount):
         """Sets value for <quartersPerMeasure> and <countInMeasureCount>"""
 
-        Logging.trace(">>: qpm = %d", quartersPerMeasure)
+        Logging.trace(">>: qpm = %s, countIn = %d",
+                      quartersPerMeasure, countInMeasureCount)
+
         cls._quartersPerMeasure  = quartersPerMeasure
         cls._countInMeasureCount = countInMeasureCount
         MyRandom.initialize()
+
         Logging.trace("<<")
     
     #--------------------
@@ -1451,7 +1544,7 @@ class MidiTransformer:
 
             # TODO: algorithm can only cope with a single time signature
             fileBeginRegExp     = re.compile(r"MFile\W+(\w+)\W+(\w+)\W+(\w+)")
-            timeSignatureRegExp = re.compile(r"TimeSig\W+(\w+)")
+            timeSignatureRegExp = re.compile(r"TimeSig\W+(\w+)/(\w+)")
 
             lineList = []
             lineBuffer = _LineBuffer(lineList)
@@ -1476,8 +1569,11 @@ class MidiTransformer:
                         _MusicTime.initialize(ticksPerQuarterNote, 4)
                     elif timeSignatureRegExp.search(currentLine):
                         matchResult = timeSignatureRegExp.search(currentLine)
-                        quartersPerMeasure = int(matchResult.group(1)[0:1])
-                        Logging.trace("--: qpm = %d", quartersPerMeasure)
+                        numerator   = int(matchResult.group(1))
+                        denominator = int(matchResult.group(2))
+                        quartersPerMeasure = round(numerator / denominator * 4,
+                                                   3)
+                        Logging.trace("--: qpm = %s", quartersPerMeasure)
                         _MusicTime.initialize(ticksPerQuarterNote,
                                               quartersPerMeasure)
                         _Humanizer.initialize(quartersPerMeasure,

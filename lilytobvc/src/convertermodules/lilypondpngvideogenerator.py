@@ -332,9 +332,11 @@ class MP4Video:
     _pageFileNameTemplate = None
 
     # video parameters
+    _ffmpegPresetName = None
     _frameRate = None
     _scaleFactor = None
     _generatorLogLevel = None
+    _defaultMp4BaselineLevel = "3.0"
 
     _pageCount = None
 
@@ -417,19 +419,22 @@ class MP4Video:
             concatSpecificationFile.write(st)
 
             # make silent video from single lilypond page
-            command = (cls._ffmpegCommand,
+            command = ((cls._ffmpegCommand,
+                       "-loglevel", cls._generatorLogLevel,
                        "-framerate", "1/" + str(requiredNumberOfFrames),
                        "-i", str(pageFileName),
                        "-vf", "scale=iw/%d:ih/%d" % (cls._scaleFactor,
                                                      cls._scaleFactor),
                        "-r", str(cls._frameRate),
-                       "-t", "%02.2f" % pageDuration,
-                       "-pix_fmt", "yuv420p",
-                       "-loglevel", cls._generatorLogLevel,
-                       "-profile:v", "baseline", "-level", "3.0",
-                       "-y",
-                       intermediateFileName)
-            OperatingSystem.executeCommand(command, False)
+                       "-t", "%02.2f" % pageDuration)
+                       + iif(cls._ffmpegPresetName != "",
+                             ("-fpre", cls._ffmpegPresetName),
+                             ("-pix_fmt", "yuv420p",
+                              "-profile:v", "baseline",
+                              "-level", cls._defaultMp4BaselineLevel))
+                       + ("-y", intermediateFileName))
+
+            OperatingSystem.executeCommand(command, True)
 
         concatSpecificationFile.close()
 
@@ -443,7 +448,7 @@ class MP4Video:
                    "-i", cls._concatSpecificationFileName,
                    "-codec", "copy",
                    cls.fileName)
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -613,6 +618,7 @@ class LilypondPngVideoGenerator:
         # technical parameters
         MP4Video._frameRate         = self._frameRate
         MP4Video._scaleFactor       = self._scaleFactor
+        MP4Video._ffmpegPresetName  = self._ffmpegPresetName
         MP4Video._generatorLogLevel = _ffmpegLogLevel
 
         # file parameters
@@ -644,7 +650,7 @@ class LilypondPngVideoGenerator:
                    "--png",
                    "--output=" + self._pictureFileStem,
                    self._lilypondFileName)
-        OperatingSystem.executeCommand(command, False)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -666,7 +672,8 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self, lilypondFileName, targetMp4FileName,
                   targetSubtitleFileName, measureToTempoMap, countInMeasures,
-                  frameRate, scalingFactor, intermediateFileDirectoryPath,
+                  frameRate, scalingFactor, ffmpegPresetName,
+                  intermediateFileDirectoryPath,
                   intermediateFilesAreKept=False):
         """Initializes generator"""
 
@@ -674,12 +681,13 @@ class LilypondPngVideoGenerator:
                       + " targetSubtitleFileName = '%s',"
                       + " measureToTempoMap = %s, countInMeasures = %s,"
                       + " frameRate = %s, scalingFactor = %d,"
+                      + " ffmpegPresetName = %s,"
                       + " intermediateFileDirectoryPath = %s,"
                       + " intermediateFilesAreKept = %s",
                       lilypondFileName, targetMp4FileName,
                       targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
-                      intermediateFileDirectoryPath,
+                      ffmpegPresetName, intermediateFileDirectoryPath,
                       intermediateFilesAreKept)
 
         self._ffmpegCommand                  = _ffmpegCommand
@@ -699,7 +707,7 @@ class LilypondPngVideoGenerator:
         self._countInMeasures                = countInMeasures
         self._frameRate                      = frameRate
         self._scaleFactor                    = scalingFactor
-
+        self._ffmpegPresetName               = ffmpegPresetName
 
         # -- initialize other modules
         self._initializeOtherModuleData()
@@ -720,13 +728,16 @@ class LilypondPngVideoGenerator:
                    + " postscriptFileName = '%s', targetMp4FileName = '%s',"
                    + " targetSubtitleFileName = '%s',"
                    + " measureToTempoMap = %s, countInMeasures = %s,"
-                   + " frameRate = %s, intermediateFileDirectoryPath = %s,"
+                   + " frameRate = %s, scaleFactor = %s,"
+                   + " ffmpegPresetName = %s,"
+                   + " intermediateFileDirectoryPath = %s,"
                    + " intermediateFilesAreKept = %s)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
                    self._postscriptFileName, self._targetMp4FileName,
                    self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
+                   self._scaleFactor, self._ffmpegPresetName,
                    self._intermediateFileDirectoryPath,
                    self._intermediateFilesAreKept))
         return result

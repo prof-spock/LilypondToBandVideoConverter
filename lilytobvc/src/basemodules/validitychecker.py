@@ -122,10 +122,10 @@ class ValidityChecker:
         integerRegexp = re.compile(r"^[0-9]+$")
 
         value = str(value)
-        isOkay = integerRegexp.match(value)
+        isOkay = (integerRegexp.match(value) is not None)
 
         if floatIsAllowed and not isOkay:
-            isOkay = floatRegexp.match(value)
+            isOkay = (floatRegexp.match(value) is not None)
 
         if not isOkay:
             errorTemplate = iif(floatIsAllowed, "a number", "an integer")

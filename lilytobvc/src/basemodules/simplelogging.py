@@ -7,6 +7,7 @@
 import atexit
 import io
 import sys
+import time
 
 from basemodules.python2and3support import isPython2
 from basemodules.ttbase import iif
@@ -21,12 +22,15 @@ class Logging:
     Level_standard = 2
     Level_verbose  = 3
     
-    _referenceLevel = Level_none
-    _fileName       = ""
-    _fileIsOpen     = None
-    _fileIsKeptOpen = None
-    _file           = None
-    _isEnabled      = True
+    _referenceLevel    = Level_none
+    _fileName          = ""
+    _fileIsOpen        = None
+    _fileIsKeptOpen    = None
+    _file              = None
+    _isEnabled         = True
+    _timeIsLogged      = True
+    _previousTimestamp = 0
+    _timeOfDayString   = ""
 
     _buffer = []
     # buffers log data before log file is opened, otherwise a
@@ -80,6 +84,20 @@ class Logging:
     def _closeFileConditionally (cls):
         if cls._fileIsOpen:
             cls._file.close()
+        
+    #--------------------
+
+    @classmethod
+    def _currentTimeOfDay (cls):
+        """Returns current time of day in seconds as string"""
+
+        currentTimestamp = time.time()
+        
+        if currentTimestamp != cls._previousTimestamp:
+            cls._previousTimestamp = currentTimestamp
+            cls._timeOfDayString   = time.strftime("%H%M%S")
+
+        return cls._timeOfDayString
         
     #--------------------
 
@@ -149,6 +167,16 @@ class Logging:
     #--------------------
 
     @classmethod
+    def finalize (cls):
+        """Ends logging."""
+
+        cls._writeLine("END LOGGING")
+        cls._closeFileConditionally()
+
+    #--------------------
+    #--------------------
+
+    @classmethod
     def setEnabled (cls, isEnabled):
         """Sets logging to active or inactive"""
 
@@ -190,11 +218,10 @@ class Logging:
     #--------------------
 
     @classmethod
-    def finalize (cls):
-        """Ends logging."""
+    def setTracingWithTime (cls, timeIsLogged):
+        """Sets logging of time when tracing to active or inactive"""
 
-        cls._writeLine("END LOGGING")
-        cls._closeFileConditionally()
+        cls._timeIsLogged = timeIsLogged
 
     #--------------------
 
@@ -220,5 +247,11 @@ class Logging:
         if not hasStandardPrefix:
             template = iif(len(template) > 0, "--:", "--") + template
 
-        st = template[0:2] + functionName + template[2:] % argumentList
+        if cls._timeIsLogged:
+            timeString = " (" + cls._currentTimeOfDay() + ")"
+        else:
+            timeString = ""
+
+        st = (template[0:2] + functionName + timeString
+              + template[2:] % argumentList)
         cls.log(st, cls.Level_verbose)

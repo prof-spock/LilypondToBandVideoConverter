@@ -8,12 +8,11 @@
 # IMPORTS
 #====================
 
-import math
-
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simpleassertion import Assertion
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import iif, intListToHex, stringToIntList
+from basemodules.stringutil import stringToIntList
+from basemodules.ttbase import iif, intListToHex
 from basemodules.utf8file import UTF8File 
 
 #====================

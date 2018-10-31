@@ -9,11 +9,18 @@
 # IMPORTS
 #====================
 
+from numbers import Number
+import re
+import struct
+import wave
+
 from basemodules.configurationfile import ConfigurationFile
 from basemodules.operatingsystem import OperatingSystem
+from basemodules.python2and3support import isString
 from basemodules.simplelogging import Logging
+from basemodules.stringutil import tokenize
 from basemodules.ttbase import adaptToRange, iif, isInRange, MyRandom
-from basemodules.utf8file import UTF8File 
+from basemodules.utf8file import UTF8File
 
 from .ltbvc_businesstypes import humanReadableVoiceName
 from .miditransformer import MidiTransformer
@@ -29,18 +36,326 @@ _ffmpegLogLevel = "error"
 
 #====================
 
+class _WavFile:
+    """This class provides services for WAV files like shifting, mixing of
+       several files or normalization and aggregated services like mixdown"""
+
+    _chunkSize = 128  # number of frames to be read from wave file in one step
+    maximumSampleValue = 32767
+
+    #--------------------
+    # INTERNAL FEATURES
+    #--------------------
+
+    @classmethod
+    def _makeFraction (cls, value):
+        """Returns numerator and log2 of denominator representing value"""
+
+        log2denominator = 10
+        denominator = int(pow(2, log2denominator))
+        numerator = round(value * denominator)
+        return (numerator, log2denominator)
+
+    #--------------------
+
+    @classmethod
+    def _mix (cls, sampleList, file, volumeFactor):
+        """Mixes audio samples from <file> into <sampleList> using
+           <volumeFactor>"""
+
+        Logging.trace(">>: file = %s, factor = %4.3f", file, volumeFactor)
+
+        numerator, log2denominator = cls._makeFraction(volumeFactor)
+        fileSampleList  = file.readAllSamples()
+        fileSampleCount = len(fileSampleList)
+
+        for i in range(fileSampleCount):
+            sampleList[i] += (fileSampleList[i] * numerator >> log2denominator)
+
+        Logging.trace("<<")
+
+    #--------------------
+    # EXPORTED FEATURES
+    #--------------------
+
+    def __init__ (self, filePath, mode):
+        """Opens wav file given by <filePath> for reading or writing
+           depending on <mode>"""
+
+        Logging.trace(">>: file = %s, mode = %s", filePath, mode)
+
+        cls = self.__class__
+
+        file = wave.open(filePath, mode)
+
+        if mode == "w":
+            channelCount, frameCount, frameSize  = 0, 0, 0
+        else:
+            channelCount = file.getnchannels()
+            frameCount   = file.getnframes()
+            frameSize    = file.getsampwidth() * channelCount
+
+        self._path          = filePath
+        self._file          = file
+        self._channelCount  = channelCount
+        self._frameCount    = frameCount
+        self._frameSize     = frameSize
+        self._buffer        = bytearray(frameCount * frameSize)
+        self._bufferIsEmpty = True
+
+        Logging.trace("<<: %s", self)
+
+    #--------------------
+
+    def __str__ (self):
+        """Returns string representation of <self>"""
+
+        st = (("_WavFile(path = %s, channels = %d, frameSize = %d,"
+               + " frameCount = %d, isEmpty = %s)")
+              % (self._path, self._channelCount, self._frameSize,
+                 self._frameCount, self._bufferIsEmpty))
+        return st
+
+    #--------------------
+    #--------------------
+
+    def close (self):
+        """Closes <self>"""
+
+        Logging.trace(">>: %s", self)
+        self._file.close()
+        Logging.trace("<<")
+
+    #--------------------
+
+    def getParameters (self):
+        """Gets the parameters for wav file <self>"""
+
+        Logging.trace(">>: self = %s", self)
+
+        channelCount, sampleSize, frameRate, frameCount, _, _ = \
+            self._file.getparams()
+        result = (channelCount, sampleSize, frameRate, frameCount)
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    def frameCount (self):
+        """Returns frame count of audio file"""
+
+        Logging.trace(">>: %s", self)
+        result = self._file.getnframes()
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    @classmethod
+    def maximumVolume (cls, sampleList):
+        """Returns maximum volume in <sampleList>"""
+
+        Logging.trace(">>")
+
+        maxValue = max(*sampleList)
+        minValue = min(*sampleList)
+        result = max(abs(maxValue), abs(minValue))
+
+        Logging.trace("<<: %d", result)
+        return result
+        
+    #--------------------
+
+    @classmethod
+    def mixdown (cls, sourceFilePathList, volumeFactorList,
+                 attenuationLevel, targetFilePath):
+        """Mixes WAV audio files given in <sourceFilePathList> to target WAV
+           file with <targetFilePath> with volumes given by
+           <volumeFactorList> with loudness attenuation given by
+           <attenuationLevel> via Python modules only"""
+
+        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
+                      + " level = %4.3f, targetFile = %s",
+                      sourceFilePathList, volumeFactorList, attenuationLevel,
+                      targetFilePath)
+
+        OperatingSystem.showMessageOnConsole("  MIX", False)
+        sourceFileList = [cls(name, "r") for name in sourceFilePathList]
+        sourceFileCount = len(sourceFileList)
+        channelCount, sampleSize, frameRate, _ = \
+            sourceFileList[0].getParameters()
+        frameCount = max([file.frameCount() for file in sourceFileList])
+        resultSampleList = (frameCount * channelCount) * [ 0 ]
+
+        for i in range(sourceFileCount):
+            OperatingSystem.showMessageOnConsole(" %d" % (i + 1), False)
+            sourceFile   = sourceFileList[i]
+            volumeFactor = volumeFactorList[i]
+            cls._mix(resultSampleList, sourceFile, volumeFactor)
+
+        maximumVolume = cls.maximumVolume(resultSampleList)
+        maxValue = cls.maximumSampleValue
+        attenuationFactor = pow(2.0, attenuationLevel / 6.0)
+        scalingFactor = (1.0 if maximumVolume < (maxValue // 10)
+                         else (maxValue * attenuationFactor) / maximumVolume)
+        Logging.trace("--: maxVolume = %d, factor = %4.3f",
+                      maximumVolume, scalingFactor)
+        OperatingSystem.showMessageOnConsole(" S")
+        cls.scale(resultSampleList, scalingFactor)
+
+        for file in sourceFileList:
+            file.close()
+
+        targetFile = cls(targetFilePath, "w")
+        targetFrameCount = len(resultSampleList) // channelCount
+        targetFile.setParameters(channelCount, sampleSize,
+                                 frameRate, targetFrameCount)
+        targetFile.writeSamples(resultSampleList)
+        targetFile.close()
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def readAllSamples (self):
+        """Returns all samples in <wavFile> as an integer list"""
+
+        Logging.trace(">>:%s", self)
+
+        self.readAllSamplesRaw()
+        sampleCount = self._channelCount * self._frameCount
+        unpackFormat = "<%uh" % sampleCount
+        result = struct.unpack(unpackFormat, self._buffer)
+
+        Logging.trace("<<")
+        return result
+
+    #--------------------
+
+    def readAllSamplesRaw (self):
+        """Returns all samples in <wavFile> as an encoded string"""
+
+        Logging.trace(">>: %s", self)
+
+        if self._bufferIsEmpty:
+            self._bufferIsEmpty = False
+            self._buffer = self._file.readframes(self._frameCount)
+
+        Logging.trace("<<")
+        return self._buffer
+
+    #--------------------
+
+    @classmethod
+    def scale (cls, sampleList, factor):
+        """Scales <sampleList> inline by <factor>"""
+
+        Logging.trace(">>: factor = %4.3f", factor)
+
+        numerator, log2denominator = cls._makeFraction(factor)
+        sampleCount = len(sampleList)
+
+        for sample in sampleList:
+            sample = (sample * numerator) >> log2denominator
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def setParameters (self, channelCount, sampleSize, frameRate, frameCount):
+        """Sets the parameters for wav file <self>"""
+
+        Logging.trace(">>: self = %s, channelCount = %d, sampleSize = %d,"
+                      + " frameRate = %d, frameCount = %d",
+                      self, channelCount, sampleSize, frameRate, frameCount)
+
+        self._file.setparams((channelCount, sampleSize,
+                              frameRate, frameCount, "NONE", "not compressed"))
+        self._channelCount = channelCount
+        self._frameSize    = channelCount * sampleSize
+        self._frameCount   = frameCount
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def shiftAudio (cls, audioFilePath, shiftedFilePath, shiftOffset):
+        """Shifts audio file in <audioFilePath> to shifted audio in
+           <shiftedFilePath> with silence prefix of length
+           <shiftOffset> using internal python modules only"""
+
+        Logging.trace(">>: infile = '%s', outfile = '%s',"
+                      + " shiftOffset = %7.3f",
+                      audioFilePath, shiftedFilePath, shiftOffset)
+
+        sourceFile = cls.open(audioFilePath, "r")
+        targetFile = cls.open(shiftedFilePath, "w")
+
+        channelCount, sampleSize, frameRate, frameCount = \
+            sourceFile.getParameters()
+        silenceFrameCount = round(frameRate * shiftOffset)
+        targetFile.setParameters(channelCount, sampleSize, frameRate,
+                                 frameCount + silenceFrameCount)
+
+        # insert padding with silence
+        rawSampleList = (silenceFrameCount * channelCount) * [ 0 ]
+        targetFile.writeSamplesRaw(targetFile, rawFrameList)
+
+        # copy samples over
+        rawSampleList = sourceFile.readAllSamplesRaw()
+        targetFile.writeSamplesRaw(rawSampleList)
+
+        # close files
+        sourceFile.close()
+        targetFile.close()
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def writeSamples (self, sampleList):
+        """Writes all frames in a integer <sampleList> to <self>"""
+
+        Logging.trace(">>: %s", self)
+
+        cls = self.__class__
+        maxValue = cls.maximumSampleValue
+        rawSampleList = [(maxValue       if sampleValue > maxValue
+                          else -maxValue if sampleValue < -maxValue
+                          else sampleValue)
+                         for sampleValue in sampleList]
+        self.writeSamplesRaw(rawSampleList)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def writeSamplesRaw (self, rawSampleList):
+        """Writes all frames in a raw <sampleList> to <self>"""
+
+        Logging.trace(">>: %s", self)
+
+        packFormat = "<%uh" % len(rawSampleList)
+        sampleString = struct.pack(packFormat, *rawSampleList)
+        self._file.writeframesraw(sampleString)
+
+        Logging.trace("<<")
+
+#====================
+
 class AudioTrackManager:
     """This class encapsulates services for audio tracks generated
        from a midi file."""
 
-    _aacCommandLine              = None
-    _intermediateFilesAreKept    = None
-    _ffmpegCommand               = None
-    _fluidsynthCommand           = None
-    _soundFontDirectoryName      = None
-    _soundFontNameList           = None
-    _soundStyleNameToCommandsMap = None
-    _soxCommandLinePrefixList    = None
+    _aacCommandLine                = None
+    _audioRefinementCommandList    = None
+    _intermediateFilesAreKept      = None
+    _ffmpegCommand                 = None
+    _midiToWavRenderingCommandList = None
+    _soundStyleNameToCommandsMap   = None
+    _soxCommandLinePrefixList      = None
 
     #--------------------
     # LOCAL FEATURES
@@ -50,26 +365,25 @@ class AudioTrackManager:
         """Compresses audio file with <songTitle> in path with
           <audioFilePath> to AAC file at <targetFilePath>"""
 
-        Logging.trace(">>: audioFile = '%s', title = '%s', targetFile = '%s'",
+        Logging.trace(">>: audioFile = '%s', title = '%s',"
+                      + " targetFile = '%s'",
                       audioFilePath, songTitle, targetFilePath)
 
         cls = self.__class__
 
-        if cls._aacCommandLine == "":
-            command = ( cls._ffmpegCommand,
-                        "-loglevel", _ffmpegLogLevel,
-                        "-aac_tns", "0",                        
-                        "-i", audioFilePath,
-                        "-y", targetFilePath )
-        else:
-            commandLine = (cls._aacCommandLine
-                           .replace("$1", audioFilePath)
-                           .replace("$2", targetFilePath))
-            command = commandLine.split()
-
         OperatingSystem.showMessageOnConsole("== convert to AAC: "
                                              + songTitle)
-        OperatingSystem.executeCommand(command, False)
+
+        commandLine = iif(cls._aacCommandLine != "", cls._aacCommandLine,
+                          ("%s -loglevel %s -aac_tns 0"
+                           + " -i ${infile} -y ${outfile}")
+                           % (cls._ffmpegCommand, _ffmpegLogLevel))
+        variableMap = { "infile"  : audioFilePath,
+                        "outfile" : targetFilePath }
+        command = cls._replaceVariablesByValues(tokenize(commandLine),
+                                                variableMap)
+
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -84,40 +398,17 @@ class AudioTrackManager:
 
         cls = self.__class__
 
-        # prepare config file for fluidsynth
-        fluidsynthSettingsFilePath = ("%s/%s"
-                                      % (self._audioDirectoryPath,
-                                         "fluidsynthsettings.txt"))
-
-        st = "rev_setlevel 0\nrev_setwidth 1.5\nrev_setroomsize 0.5"
-
-        fluidsynthSettingsFile = UTF8File(fluidsynthSettingsFilePath, "wt")
-        fluidsynthSettingsFile.write(st)
-        fluidsynthSettingsFile.close()
-
-        Logging.trace("--: settings file '%s' generated",
-                      fluidsynthSettingsFilePath)
-
-        concatDirectoryProc = (lambda x: "%s/%s"
-                               % (cls._soundFontDirectoryName, x))
-        soundFonts = list(map(concatDirectoryProc, cls._soundFontNameList))
-
-        # processing midi file via fluidsynth
-        OperatingSystem.showMessageOnConsole("== fluidsynth "
+        # processing midi file via given command
+        OperatingSystem.showMessageOnConsole("== convertMidiToWav "
                                              + targetFilePath)
 
-        command = ([ cls._fluidsynthCommand,
-                     "-n", "-i", "-g", "1",
-                     "-f", fluidsynthSettingsFilePath,
-                     "-F", targetFilePath ]
-                   + soundFonts
-                   + [ voiceMidiFilePath ])
-        OperatingSystem.executeCommand(command, False,
+        variableMap = { "infile"  : voiceMidiFilePath,
+                        "outfile" : targetFilePath }
+        command = \
+            cls._replaceVariablesByValues(cls._midiToWavRenderingCommandList,
+                                          variableMap)
+        OperatingSystem.executeCommand(command, True,
                                        stdout=OperatingSystem.nullDevice)
-
-        # cleanup
-        OperatingSystem.removeFile(fluidsynthSettingsFilePath,
-                                   cls._intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -149,32 +440,69 @@ class AudioTrackManager:
                            attenuationLevel, targetFilePath):
         """Constructs and executes a command for audio mixdown of song with
            <songTitle> to target file with <targetFilePath> from given
-           <voiceNameList>, the mapping to volumes <voiceNameToVolumeMap> with
-           loudness attenuation given by <attenuationLevel>; if
-           <parallelTrackPath> is not empty, the parallel track is added"""
+           <voiceNameList>, the mapping to volumes <voiceNameToVolumeMap>
+           with loudness attenuation given by <attenuationLevel>; if
+           <parallelTrackPath> is not empty, the parallel track is
+           added"""
 
         Logging.trace(">>: voiceNames = %s, target = '%s'",
                       voiceNameList, targetFilePath)
 
         cls = self.__class__
-        command = (cls._soxCommandLinePrefixList
-                   + [ "--combine", "mix" ])
+        OperatingSystem.showMessageOnConsole("== make mix file: %s"
+                                             % songTitle)
+
+        sourceFilePathList = []
+        volumeFactorList   = []
 
         for voiceName in voiceNameList:
             audioFilePath = (_processedAudioFileTemplate
                              % (self._audioDirectoryPath, voiceName))
-            volume = voiceNameToVolumeMap.get(voiceName, 1)
-            command += [ "-v", str(volume), audioFilePath ]
+            volumeFactor = voiceNameToVolumeMap.get(voiceName, 1)
+            sourceFilePathList.append(audioFilePath)
+            volumeFactorList.append(volumeFactor)
 
         if parallelTrackFilePath != "":
-            volume = voiceNameToVolumeMap["parallel"]
-            command += [ "-v", str(volume), parallelTrackFilePath ]
-            
-        command += [ targetFilePath, "norm", str(attenuationLevel) ]
+            volumeFactor = voiceNameToVolumeMap["parallel"]
+            sourceFilePathList.append(parallelTrackFilePath)
+            volumeFactorList.append(volumeFactor)
 
-        OperatingSystem.showMessageOnConsole("== make mix file: %s"
-                                             % songTitle)
-        OperatingSystem.executeCommand(command, False)
+        if len(_soxCommandLinePrefixList) == 0:
+            _WavFile.mixdown(sourceFilePathList, volumeFactorList,
+                             attenuationLevel, targetFilePath)
+        else:
+            self._mixdownToWavFileViaSox(sourceFilePathList,
+                                         volumeFactorList,
+                                         attenuationLevel,
+                                         targetFilePath)
+            
+        Logging.trace("<<")
+
+    #--------------------
+
+    def _mixdownToWavFileViaSox (self, sourceFilePathList,
+                                 volumeFactorList, attenuationLevel,
+                                 targetFilePath):
+        """Mixes WAV audio files given in <sourceFilePathList> to target WAV
+           file with <targetFilePath> with volumes given by
+           <volumeFactorList> with loudness attenuation given by
+           <attenuationLevel> using external sox command"""
+
+        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
+                      + " level = %4.3f, targetFile = %s",
+                      sourceFilePathList, volumeFactorList, attenuationLevel,
+                      targetFilePath)
+
+        command = (cls._soxCommandLinePrefixList
+                   + [ "--combine", "mix" ])
+        
+        for i in range(elementCount):
+            volumeFactor = volumeFactorList[i]
+            filePath     = sourceFilePathList[i]
+            command += [ "-v", str(volumeFactor), filePath ]
+        
+        command += [ targetFilePath, "norm", str(attenuationLevel) ]
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -208,6 +536,36 @@ class AudioTrackManager:
     #--------------------
 
     @classmethod
+    def _replaceVariablesByValues (cls, stringList, variableMap):
+        """Replaces all occurrences of variables in <stringList> by values
+           given by <variableMap>"""
+
+        Logging.trace(">>: list = %s, map = %s", stringList, variableMap)
+
+        result = []
+        variableList = variableMap.keys()
+        variableRegexp = re.compile(r"\$\{([a-z]+)\}")
+
+        for st in stringList:
+            match = variableRegexp.match(st)
+
+            if match is None:
+                result.append(st)
+            else:
+                variable = match.group(1)
+                replacement = variableMap.get(variable, st)
+
+                if isString(replacement) or isinstance(replacement, Number):
+                    result.append(replacement)
+                else:
+                    result.extend(replacement)
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    @classmethod
     def _shiftAudioFile (cls, audioFilePath, shiftedFilePath, shiftOffset):
         """Shifts audio file in <audioFilePath> to shifted audio in
            <shiftedFilePath> with silence prefix of length <shiftOffset>"""
@@ -218,14 +576,36 @@ class AudioTrackManager:
 
         OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
                                              % (shiftedFilePath, shiftOffset))
+
+        if len(_soxCommandLinePrefixList) == 0:
+            _WavFile.shiftAudio(audioFilePath, shiftedFilePath, shiftOffset)
+        else:
+            cls._shiftAudioFileViaSox(audioFilePath, shiftedFilePath,
+                                      shiftOffset)
+            
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def _shiftAudioFileViaSox (cls, audioFilePath, shiftedFilePath,
+                               shiftOffset):
+        """Shifts audio file in <audioFilePath> to shifted audio in
+           <shiftedFilePath> with silence prefix of length
+           <shiftOffset> using external sox command"""
+
+        Logging.trace(">>: infile = '%s', outfile = '%s',"
+                      + " shiftOffset = %7.3f",
+                      audioFilePath, shiftedFilePath, shiftOffset)
+
         command = (cls._soxCommandLinePrefixList
                    + [ audioFilePath, shiftedFilePath,
                        "pad", ("%7.3f" % shiftOffset) ])
-        OperatingSystem.executeCommand(command, False,
+        OperatingSystem.executeCommand(command, True,
                                        stdout=OperatingSystem.nullDevice)
-        
+
         Logging.trace("<<")
-        
+
     #--------------------
 
     @classmethod
@@ -242,7 +622,7 @@ class AudioTrackManager:
         ParseState_inLimbo  = 1
         ParseState_inWord   = 2
         ParseState_inString = 3
-        
+
         parseState = ParseState_inLimbo
         result = []
 
@@ -274,7 +654,7 @@ class AudioTrackManager:
 
         currentWord += iif(parseState == ParseState_inString,
                            doubleQuoteChar, "")
-            
+
         if parseState != ParseState_inLimbo:
             result.append(currentWord)
 
@@ -307,37 +687,37 @@ class AudioTrackManager:
         MP4TagManager.tagFile(audioFilePath, tagToValueMap)
 
         Logging.trace("<<")
-        
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
 
     @classmethod
     def initialize (cls,
-                    aacCommandLine, ffmpegCommand, fluidsynthCommand,
-                    soxCommandLinePrefix, soundFontDirectoryName,
-                    soundFontNameList, soundStyleNameToCommandsMap,
+                    aacCommandLine, audioRefinementCommandLine,
+                    ffmpegCommand, midiToWavCommandLine,
+                    soxCommandLinePrefix, soundStyleNameToCommandsMap,
                     intermediateFilesAreKept):
         """Sets some global processing data like e.g. the command
            paths."""
 
-        Logging.trace(">>: aac = '%s', ffmpeg = '%s', fluidsynth = '%s',"
-                      + " sox = '%s', sfDirectory = '%s',"
-                      + " sfList = %s, soundStyleNameToCommandsMap = %s,"
+        Logging.trace(">>: aac = '%s', audioRefinement = '%s',"
+                      + " ffmpeg = '%s', midiToWavCommand = '%s',"
+                      + " sox = '%s', soundStyleNameToCommandsMap = %s,"
                       + " debugging = %s",
-                      aacCommandLine, ffmpegCommand, fluidsynthCommand,
-                      soxCommandLinePrefix, soundFontDirectoryName,
-                      soundFontNameList, soundStyleNameToCommandsMap,
+                      aacCommandLine, audioRefinementCommandLine,
+                      ffmpegCommand, midiToWavCommandLine,
+                      soxCommandLinePrefix, soundStyleNameToCommandsMap,
                       intermediateFilesAreKept)
 
-        cls._aacCommandLine              = aacCommandLine
-        cls._intermediateFilesAreKept    = intermediateFilesAreKept
-        cls._ffmpegCommand               = ffmpegCommand
-        cls._fluidsynthCommand           = fluidsynthCommand
-        cls._soundFontDirectoryName      = soundFontDirectoryName
-        cls._soundFontNameList           = soundFontNameList
-        cls._soundStyleNameToCommandsMap = soundStyleNameToCommandsMap
-        cls._soxCommandLinePrefixList    = soxCommandLinePrefix.split()
+        cls._aacCommandLine                = aacCommandLine
+        cls._audioRefinementCommandList    = \
+            tokenize(audioRefinementCommandLine)
+        cls._intermediateFilesAreKept      = intermediateFilesAreKept
+        cls._ffmpegCommand                 = ffmpegCommand
+        cls._midiToWavRenderingCommandList = tokenize(midiToWavCommandLine)
+        cls._soundStyleNameToCommandsMap   = soundStyleNameToCommandsMap
+        cls._soxCommandLinePrefixList      = tokenize(soxCommandLinePrefix)
 
         Logging.trace("<<")
 
@@ -373,7 +753,7 @@ class AudioTrackManager:
 
         Logging.trace("--: groupToVoiceSetMap = %s, trackList = %s",
                       groupToVoiceSetMap, audioTrackList)
-        
+
         # traverse all audio track objects
         for audioTrack in audioTrackList:
             # expand the set of audio groups into a set of voice names
@@ -421,10 +801,7 @@ class AudioTrackManager:
 
         targetFilePath = (_processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        command = (cls._soxCommandLinePrefixList
-                   + [ filePath, targetFilePath,
-                       "pad", ("%7.3f" % shiftOffset) ])
-        OperatingSystem.executeCommand(command, False)
+        cls._shiftAudioFile(filePath, targetFilePath, shiftOffset)
 
         Logging.trace("<<")
 
@@ -457,9 +834,11 @@ class AudioTrackManager:
             targetFilePath = defaultTemplate % (self._audioDirectoryPath,
                                                 voiceName)
             cls._shiftAudioFile(audioFilePath, targetFilePath, shiftOffset)
-            OperatingSystem.removeFile(audioFilePath, cls._intermediateFilesAreKept)
-            
-        OperatingSystem.removeFile(tempMidiFilePath, cls._intermediateFilesAreKept)
+            OperatingSystem.removeFile(audioFilePath,
+                                       cls._intermediateFilesAreKept)
+
+        OperatingSystem.removeFile(tempMidiFilePath,
+                                   cls._intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -508,8 +887,8 @@ class AudioTrackManager:
                        % soundVariant)
             Logging.trace(message)
             OperatingSystem.showMessageOnConsole(message)
-        
-        params += " norm -3" + reverbCommands
+
+        params += reverbCommands + " norm 0"
         parameterSequenceList = params.split("tee ")
 
         if not cls._intermediateFilesAreKept:
@@ -523,6 +902,7 @@ class AudioTrackManager:
         targetFilePath = (_processedAudioFileTemplate %
                           (self._audioDirectoryPath, voiceName))
         currentSource = sourceFilePath
+        commandList = cls._audioRefinementCommandList
 
         for i, parameterSequence in enumerate(parameterSequenceList):
             tempFilePath = (_tempAudioFileTemplate
@@ -530,13 +910,14 @@ class AudioTrackManager:
                                hex(i + 1).upper()))
             currentTarget = iif(i < commandCount - 1, tempFilePath,
                                 targetFilePath)
-            parameterList = cls._splitParameterSequence(parameterSequence)
-            command = (cls._soxCommandLinePrefixList
-                       + [ currentSource, currentTarget ]
-                       + parameterList)
-            OperatingSystem.executeCommand(command, False)
+            variableMap = { "infile"   : currentSource,
+                            "outfile"  : currentTarget,
+                            "commands" : tokenize(parameterSequence) }
+            command = cls._replaceVariablesByValues(commandList,
+                                                    variableMap)
+            OperatingSystem.executeCommand(command, True)
             currentSource = currentTarget
-                       
+
         Logging.trace("<<")
 
     #--------------------

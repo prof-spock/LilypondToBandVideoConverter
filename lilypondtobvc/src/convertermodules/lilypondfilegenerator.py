@@ -328,7 +328,10 @@ class LilypondFile:
 
         if voiceName in self._voiceNameToChordsMap:
            if target in self._voiceNameToChordsMap[voiceName]:
-               chordsName = "chords" + (voiceName[0].upper() + voiceName[1:])
+               lilypondVoiceName = self._lilypondVoiceName(voiceName)
+               lilypondVoiceName = (lilypondVoiceName[0].upper()
+                                    + lilypondVoiceName[1:])
+               chordsName = "chords" + lilypondVoiceName
                chordsMacroName = chordsName + target.capitalize()
                alternativeMacroNameList = [ chordsName,
                                             "chords" + target.capitalize(),

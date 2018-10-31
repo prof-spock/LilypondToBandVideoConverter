@@ -15,8 +15,9 @@ from basemodules.configurationfile import ConfigurationFile
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.regexppattern import RegExpPattern
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import adaptToKind, convertStringToList, \
-                               convertStringToMap, iif, isInRange
+from basemodules.stringutil import adaptToKind, convertStringToList, \
+                                   convertStringToMap
+from basemodules.ttbase import iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import generateObjectListFromString, \
@@ -92,13 +93,13 @@ class _ConfigDataGlobal:
 
     # list of attribute names with external representation in config file
     _attributeNameList = \
-        [ "aacCommandLine", "ffmpegCommand", "fluidsynthCommand",
-          "intermediateFileDirectoryPath", "lilypondCommand",
-          "loggingFilePath", "mp4boxCommand",
-          "soundFontDirectoryPath", "soxCommandLinePrefix",
-          "targetDirectoryPath", "tempAudioDirectoryPath",
-          "tempLilypondFilePath", "videoTargetMap",
-          "videoFileKindMap" ]
+        [ "aacCommandLine", "audioRefinementCommandLine",
+          "ffmpegCommand", "intermediateFileDirectoryPath",
+          "lilypondCommand", "loggingFilePath",
+          "midiToWavRenderingCommandLine", "mp4boxCommand",
+          "soxCommandLinePrefix", "targetDirectoryPath",
+          "tempAudioDirectoryPath", "tempLilypondFilePath",
+          "videoTargetMap", "videoFileKindMap" ]
 
     #--------------------
     # EXPORTED FEATURES
@@ -109,16 +110,15 @@ class _ConfigDataGlobal:
         """Initializes global attributes of <configData>"""
 
         configData.aacCommandLine                = "aac"
+        configData.audioRefinementCommandLine    = "soc"
         configData.ffmpegCommand                 = "ffmpeg"
-        configData.fluidsynthCommand             = "fluidsynth"
         configData.intermediateFileDirectoryPath = "."
         configData.intermediateFilesAreKept      = False
         configData.lilypondCommand               = "lilypond"
         configData.loggingFilePath               = ("/tmp/logs"
                                                    + "/makeLilypondAll.log")
+        configData.midiToWavRenderingCommandLine = "fluidsynth"
         configData.mp4boxCommand                 = "mp4box"
-        configData.soundFontDirectoryPath        = "/tmp/soundfonts"
-        configData.soundFontNameList             = ""
         configData.soundStyleNameToTextMap       = ""
         configData.soxCommandLinePrefix          = "sox"
         configData.targetDirectoryPath           = "generated"
@@ -136,33 +136,32 @@ class _ConfigDataGlobal:
 
         className = cls.__name__
         st = (("%s("
-               + "aacCommandLine = '%s', ffmpegCommand = '%s',"
-               + " fluidsynthCommand = '%s',"
-               + " intermediateFileDirectoryPath = %s,"
-               + " intermediateFilesAreKept = %s,"
-               + " lilypondCommand = '%s', mp4boxCommand = '%s',"
+               + "aacCommandLine = '%s', audioRefinementCommandLine = '%s',"
+               + " ffmpegCommand = '%s', intermediateFileDirectoryPath = %s,"
+               + " intermediateFilesAreKept = %s, lilypondCommand = '%s',"
+               + " midiToWavCommandLine = '%s', mp4boxCommand = '%s',"
                + " loggingFilePath = '%s',"
-               + " soundFontDirectoryPath = '%s', soundFontNameList = %s,"
-               + " soundStyleNameToTextMap = %s,"
-               + " soxCommandLinePrefix = '%s',"
+               + " soundStyleNameToTextMap = %s, soxCommandLinePrefix = '%s',"
                + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
                + " tempLilypondFilePath = '%s', videoTargetMap = %s,"
                + " videoFileKindMap = %s)")
               % (className,
-                 configData.aacCommandLine, configData.ffmpegCommand,
-                 configData.fluidsynthCommand,
+                 configData.aacCommandLine,
+                 configData.audioRefinementCommandLine,
+                 configData.ffmpegCommand,
                  configData.intermediateFileDirectoryPath,
                  configData.intermediateFilesAreKept,
-                 configData.lilypondCommand, configData.mp4boxCommand,
+                 configData.lilypondCommand,
+                 configData.midiToWavRenderingCommandLine,
+                 configData.mp4boxCommand,
                  configData.loggingFilePath,
-                 configData.soundFontDirectoryPath,
-                 configData.soundFontNameList,
                  configData.soundStyleNameToTextMap,
                  configData.soxCommandLinePrefix,
                  configData.targetDirectoryPath,
                  configData.tempAudioDirectoryPath,
                  configData.tempLilypondFilePath,
-                 configData.videoTargetMap, configData.videoFileKindMap))
+                 configData.videoTargetMap,
+                 configData.videoFileKindMap))
         return st
 
     #--------------------
@@ -179,8 +178,7 @@ class _ConfigDataGlobal:
                                               configurationFile.getValue)
 
         attributeNameList = (cls._attributeNameList
-                             + [ "keepIntermediateFiles",
-                                 "soundFontNames" ])
+                             + [ "keepIntermediateFiles" ])
         _checkVariableList(attributeNameList, configurationFile)
 
         # validate sound style definitions
@@ -193,20 +191,28 @@ class _ConfigDataGlobal:
                                           configurationFile.getValue,
                                           styleNamePrefix + "*")
 
+        soxCommand             = getValueProc("soxCommandLinePrefix")
+        audioRefinementCommand = getValueProc("audioRefinementCommandLine")
+
+        ValidityChecker.isValid((soxCommand != ""
+                                 or audioRefinementCommand != ""),
+                                "either soxCommandLinePrefix"
+                                + " or audioRefinementCommandLine"
+                                + " must be defined")
+
+        commandNameList = [ "aacCommandLine" ]
+
+        if soxCommand > "":
+            commandNameList.append("soxCommandLinePrefix")
+
+        if audioRefinementCommand > "":
+            commandNameList.append("audioRefinementCommandLine")
+        
         # additional checks
-        for variableName in ["aacCommandLine", "soxCommandLinePrefix"]:
+        for variableName in commandNameList:
             commandLine = getValueProc(variableName)
             command = commandLine.split()[0]
             ValidityChecker.isReadableFile(command, variableName)
-
-        configVariableName = "soundFontNames"
-        nameList = convertStringToList(getValueProc(configVariableName))
-        soundFontDirectoryPath = getValueProc("soundFontDirectoryPath")
-        separator = OperatingSystem.pathSeparator
-
-        for name in nameList:
-            fullPath = soundFontDirectoryPath + separator + name
-            ValidityChecker.isReadableFile(fullPath, configVariableName)
 
         Logging.trace("<<")
 
@@ -219,14 +225,18 @@ class _ConfigDataGlobal:
         Logging.trace(">>")
         cstl = convertStringToList
         
-        configData.soundFontNameList = cstl(configData.soundFontNameList)
         configData.videoFileKindMap = \
             generateObjectMapFromString(configData.videoFileKindMap,
                                         VideoFileKind())
         configData.videoTargetMap = \
             generateObjectMapFromString(configData.videoTargetMap,
                                         VideoTarget())
-        
+
+        if configData.audioRefinementCommandLine == "":
+            configData.audioRefinementCommandLine = \
+                ("%s ${infile} ${outfile} ${commands}"
+                 % configData.soxCommandLinePrefix)
+
         Logging.trace("<<")
 
     #--------------------
@@ -248,7 +258,6 @@ class _ConfigDataGlobal:
 
         configData.intermediateFilesAreKept = \
             getValueProc("keepIntermediateFiles")
-        configData.soundFontNameList = getValueProc("soundFontNames")
         configData.soundStyleNameToTextMap = \
             _readStylesWithPrefix(cls._soundStyleNamePrefix,
                                   configurationFile)
@@ -516,33 +525,24 @@ class _ConfigDataSong:
                       midiVolumes, panPositions, audioLevels,
                       reverbLevels, soundVariants)
 
-        elementsInString = lambda st: len(st.strip().split(","))
-
         checkForRequiredLength = (lambda st, valueName, elementCount:
-            ValidityChecker.isValid(elementsInString(st) == elementCount,
+            ValidityChecker.isValid(cls._elementCountInString(st) == elementCount,
                                     ("'%s' must contain %d elements"
                                      + " to match 'voiceNameList'")
                                     % (valueName, elementCount)))
 
-        ValidityChecker.isString(voiceNames, "voiceNameList")
-        ValidityChecker.isString(midiChannels, "midiChannelList")
-        ValidityChecker.isString(midiInstruments, "midiInstrumentList")
-        ValidityChecker.isString(midiVolumes, "midiVolumeList")
-        ValidityChecker.isString(panPositions, "panPositionList")
-        ValidityChecker.isString(reverbLevels, "reverbLevelList")
-        ValidityChecker.isString(audioLevels, "audioLevelList")
-        ValidityChecker.isString(soundVariants, "soundVariantList")
-
-        voiceCount = elementsInString(voiceNames)
+        voiceCount = cls._elementCountInString(voiceNames)
         checkForRequiredLength(midiChannels, "midiChannelList", voiceCount)
         checkForRequiredLength(midiInstruments, "midiInstrumentList",
                                voiceCount)
         checkForRequiredLength(midiVolumes, "midiVolumeList", voiceCount)
         checkForRequiredLength(panPositions, "panPositionList", voiceCount)
         checkForRequiredLength(audioLevels, "audioLevelList", voiceCount)
-        checkForRequiredLength(reverbLevels, "reverbLevelList", voiceCount)
         checkForRequiredLength(soundVariants, "soundVariantList", voiceCount)
 
+        if reverbLevels.strip() != "":
+            checkForRequiredLength(reverbLevels, "reverbLevelList", voiceCount)
+            
         Logging.trace("<<")
 
     #--------------------
@@ -640,6 +640,14 @@ class _ConfigDataSong:
 
         Logging.trace("<<: %s", result)
         return result
+
+    #--------------------
+
+    @classmethod
+    def _elementCountInString (cls, st):
+        """Returns count of comma-separated elements in <st>"""
+
+        return len(st.strip().split(","))
 
     #--------------------
 
@@ -824,20 +832,27 @@ class _ConfigDataSong:
         cls._adaptMap(tempoMap, 'F')
 
         for key, value in tempoMap.items():
-            if "/" not in value:
-                tempo = float(value)
-                measureLength = 4.0
+            if "|" not in value:
+                tempo, fractionString = value, "4/4"
             else:
-                slashPosition = value.find("/")
-                tempo = float(value[:slashPosition])
-                measureLength = float(value[slashPosition+1:])
+                tempo, fractionString = value.split("|")
 
-            tempoMap[key] = (tempo, measureLength)
+            tempo = float(tempo)
+            numerator, denominator = fractionString.split("/")
+            signatureFraction = float(numerator) / float(denominator)
+            measureLengthInQuarters = round(4.0 * signatureFraction, 5)
+            tempoMap[key] = (tempo, measureLengthInQuarters)
 
         configData.measureToTempoMap = tempoMap
-
-        # the voice data map is synthesized from several lists
         c = configData.voiceNameToVoiceDataMap
+
+        # if the reverb levels are not defined, they will be set to
+        # zeros with the same count as the voice names
+        if c["reverbLevelList"].strip() == "":
+            voiceCount = cls._elementCountInString(c["voiceNameList"])
+            c["reverbLevelList"] = "0, " * (voiceCount - 1) + "0"
+        
+        # the voice data map is synthesized from several lists
         cls._convertToVoiceMap(configData,
                                c["voiceNameList"], c["midiChannelList"],
                                c["midiInstrumentList"], c["midiVolumeList"],
@@ -1061,21 +1076,25 @@ class _LocalValidator:
         floatPattern      = RegExpPattern.floatPattern
 
         # special element patterns
-        beatPattern = r"(?:[1-8]|OTHER|SLACK|S)"
+        beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
         clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
         fileNameListPattern = makeListPat(fileNamePattern, False)
-        humanizationPattern = r"[BA]?\d+(\.\d+)?"
+        humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
+        humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
+                                    % (floatPattern, floatPattern))
         parallelTrackPattern = (r"[^,\s]+(?:,\s*%s\s*(?:,\s*%s\s*))"
                                 % (floatPattern, floatPattern))
         prephasePattern = r"(?:extract|midi|score|video)"
         staffListPattern = makeCompactListPat("(?:DrumStaff|PianoStaff"
                                               + "|Staff|TabStaff)")
-        tempoValuePattern = r"%s(?:/%s)?" % (floatPattern, floatPattern)
+        tempoValuePattern = (r"%s(?:\|%s/%s)?"
+                             % (floatPattern, integerPattern, integerPattern))
 
         # simple map patterns
         idToTextMapPattern = makeMapPat(identifierPattern, noCommaPattern)
 
         # regular expressions for lists of standard elements
+        emptyFloatListRegExp = makeRegExp(makeListPat(floatPattern, True))
         floatListRegExp = makeRegExp(makeListPat(floatPattern, False))
         identifierListRegExp = makeRegExp(makeListPat(identifierPattern,
                                                       False))
@@ -1086,11 +1105,12 @@ class _LocalValidator:
 
         # commands
         cls._setMap("aacCommandLine", "", "STRING")
+        cls._setMap("audioRefinementCommandLine", "", "STRING")
         cls._setMap("ffmpegCommand", None, "EXECUTABLE")
-        cls._setMap("fluidsynthCommand", None, "EXECUTABLE")
         cls._setMap("lilypondCommand", None, "EXECUTABLE")
+        cls._setMap("midiToWavRenderingCommandLine", None, "STRING")
         cls._setMap("mp4boxCommand", "", "EXECUTABLE")
-        cls._setMap("soxCommandLinePrefix", None, "STRING")
+        cls._setMap("soxCommandLinePrefix", "", "STRING")
 
         # global settings
         cls._setMap("keepIntermediateFiles", False, "BOOLEAN")
@@ -1146,12 +1166,9 @@ class _LocalValidator:
         cls._setMap("humanizedVoiceNameSet", "", "REGEXP",
                     emptyIdentifierListRegExp)
         cls._setMap("humanizationStyle*", None, "REGEXP",
-                    makeRegExp(makeMapPat(r"(?:timing|velocity)",
-                                          "(?:"
-                                          + makeMapPat(beatPattern,
-                                                       humanizationPattern,
-                                                       False)
-                                          + ")", False)))
+                    makeRegExp(makeMapPat(humanizationKeyPattern,
+                                          humanizationValuePattern,
+                                          False)))
         cls._setMap("measureToHumanizationStyleNameMap", "{}", "REGEXP",
                     makeRegExp(makeMapPat(integerPattern,
                                           identifierPattern)))
@@ -1183,10 +1200,7 @@ class _LocalValidator:
                     emptyIdentifierListRegExp)
         cls._setMap("parallelTrack", "", "REGEXP",
                     makeRegExp(parallelTrackPattern))
-        cls._setMap("reverbLevelList", None, "REGEXP", floatListRegExp)
-        cls._setMap("soundFontDirectoryPath", None, "RDIRECTORY")
-        cls._setMap("soundFontNames", None, "REGEXP",
-                    makeRegExp(fileNameListPattern))
+        cls._setMap("reverbLevelList", "", "REGEXP", emptyFloatListRegExp)
         cls._setMap("soundStyle*", None, "STRING")
         cls._setMap("soundVariantList", None, "REGEXP",
                     identifierListRegExp)

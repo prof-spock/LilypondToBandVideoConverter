@@ -11,7 +11,8 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from basemodules.python2and3support import isPython2
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import convertStringToList, iif
+from basemodules.stringutil import convertStringToList
+from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File 
 
 #====================

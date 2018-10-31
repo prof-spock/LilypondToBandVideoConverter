@@ -428,7 +428,7 @@ class MP4Video:
                        "-r", str(cls._frameRate),
                        "-t", "%02.2f" % pageDuration)
                        + iif(cls._ffmpegPresetName != "",
-                             ("-pre", cls._ffmpegPresetName),
+                             ("-fpre", cls._ffmpegPresetName),
                              ("-pix_fmt", "yuv420p",
                               "-profile:v", "baseline",
                               "-level", cls._defaultMp4BaselineLevel))

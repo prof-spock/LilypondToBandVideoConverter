@@ -8,9 +8,9 @@
 # IMPORTS
 #====================
 
-from basemodules.simplelogging import Logging
-from basemodules.ttbase import adaptToKind
-from basemodules.validitychecker import ValidityChecker
+from .simplelogging import Logging
+from .stringutil import adaptToKind
+from .validitychecker import ValidityChecker
 
 #====================
 

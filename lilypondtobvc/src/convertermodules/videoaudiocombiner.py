@@ -13,7 +13,8 @@ import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import convertStringToList, iif
+from basemodules.stringutil import convertStringToList
+from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File 
 from basemodules.validitychecker import ValidityChecker
 
@@ -291,8 +292,8 @@ class VideoAudioCombiner:
                     "-itsoffset", str(shiftOffset),
                     "-i", sourceVideoFilePath,
                     "-vf", subtitleOption)
-                   + iif(ffmpegPreset != "",
-                         ("-pre", ffmpegPresetName),
+                   + iif(ffmpegPresetName != "",
+                         ("-fpre", ffmpegPresetName),
                          ("-pix_fmt", "yuv420p",
                           "-profile:v", "baseline",
                           "-level", cls._defaultMp4BaselineLevel))

@@ -21,8 +21,8 @@ from copy import deepcopy
 from basemodules.attributemanager import AttributeManager
 from basemodules.regexppattern import RegExpPattern
 from basemodules.simplelogging import Logging
-from basemodules.ttbase import adaptToRange, convertStringToList, \
-                               convertStringToMap, iif2
+from basemodules.stringutil import convertStringToList, convertStringToMap
+from basemodules.ttbase import adaptToRange, iif2
 from basemodules.validitychecker import ValidityChecker
 
 #====================

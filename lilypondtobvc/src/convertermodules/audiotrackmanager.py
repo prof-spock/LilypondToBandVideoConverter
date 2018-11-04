@@ -467,7 +467,7 @@ class AudioTrackManager:
             sourceFilePathList.append(parallelTrackFilePath)
             volumeFactorList.append(volumeFactor)
 
-        if len(_soxCommandLinePrefixList) == 0:
+        if len(cls._soxCommandLinePrefixList) == 0:
             _WavFile.mixdown(sourceFilePathList, volumeFactorList,
                              attenuationLevel, targetFilePath)
         else:
@@ -493,9 +493,11 @@ class AudioTrackManager:
                       sourceFilePathList, volumeFactorList, attenuationLevel,
                       targetFilePath)
 
+        cls = self.__class__
         command = (cls._soxCommandLinePrefixList
                    + [ "--combine", "mix" ])
-        
+        elementCount = len(sourceFilePathList)
+
         for i in range(elementCount):
             volumeFactor = volumeFactorList[i]
             filePath     = sourceFilePathList[i]
@@ -568,7 +570,8 @@ class AudioTrackManager:
     @classmethod
     def _shiftAudioFile (cls, audioFilePath, shiftedFilePath, shiftOffset):
         """Shifts audio file in <audioFilePath> to shifted audio in
-           <shiftedFilePath> with silence prefix of length <shiftOffset>"""
+           <shiftedFilePath> with silence prefix of length
+           <shiftOffset>"""
 
         Logging.trace(">>: infile = '%s', outfile = '%s',"
                       + " shiftOffset = %7.3f",
@@ -577,7 +580,7 @@ class AudioTrackManager:
         OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
                                              % (shiftedFilePath, shiftOffset))
 
-        if len(_soxCommandLinePrefixList) == 0:
+        if len(cls._soxCommandLinePrefixList) == 0:
             _WavFile.shiftAudio(audioFilePath, shiftedFilePath, shiftOffset)
         else:
             cls._shiftAudioFileViaSox(audioFilePath, shiftedFilePath,

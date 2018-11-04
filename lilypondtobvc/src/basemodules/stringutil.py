@@ -257,17 +257,18 @@ def tokenize (st):
     ParseState_inString = 1
     ParseState_inEscape = 2
     ParseState_inToken  = 3
-    parseStateToString = { 0 : "LIM", 1 : "STR", 2 : "ESC", 3 : "TOK" }
+    parseStateToString = { 0 : "-", 1 : "S", 2 : escapeChar, 3 : "T" }
 
     parseState = ParseState_inLimbo
     result = []
     token = ""
+    fsaTrace = ""
 
     for ch in st:
         # process finite state automaton with three states based
         # on next character in string
-        Logging.trace("--: (%s) character: %s",
-                      parseStateToString[parseState], ch)
+        fsaTrace += (iif(fsaTrace == "", "", " ")
+                     + "[%s] %s" % (parseStateToString[parseState], ch))
 
         if parseState == ParseState_inLimbo:
             if ch in whiteSpaceCharList:
@@ -306,5 +307,6 @@ def tokenize (st):
     if parseState != ParseState_inLimbo:
         result.append(token)
 
+    Logging.trace("--: accumulatedTrace = %s", fsaTrace)
     Logging.trace("<<: %s", result)
     return result

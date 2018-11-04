@@ -75,17 +75,19 @@ class ConfigurationFile:
         ParseState_inString     = 1
         ParseState_inEscape     = 2
         ParseState_inIdentifier = 3
-        parseStateToString = { 0 : "LIM", 1 : "STR", 2 : "ESC", 3 : "ID " }
+        parseStateToString = { 0 : "-", 1 : "S",
+                               2 : cls._escapeCharacter, 3 : "I" }
 
         parseState = ParseState_inLimbo
         result = ""
         identifier = ""
+        fsaTrace = ""
 
         for ch in value:
             # process finite state automaton with three states based
             # on next character in string
-            Logging.trace("--: (%s) character: %s",
-                          parseStateToString[parseState], ch)
+            fsaTrace += (iif(fsaTrace == "", "", " ")
+                         + "[%s] %s" % (parseStateToString[parseState], ch))
 
             if parseState == ParseState_inLimbo:
                 if cls._identifierCharRegExp.search(ch):
@@ -117,6 +119,7 @@ class ConfigurationFile:
             identifierValue = self._findIdentifierValue(identifier)
             result += identifierValue
             
+        Logging.trace("--: accumulatedFSATrace = %s", fsaTrace)
         Logging.trace("<<: %s", repr(result))
         return result
 

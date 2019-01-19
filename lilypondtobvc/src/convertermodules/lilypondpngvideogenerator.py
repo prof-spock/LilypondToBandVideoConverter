@@ -211,6 +211,20 @@ class PostscriptFile:
 
     _fileName = None
     
+    # relevant constants for analyzing the postscript file
+    _barLineColourSettingText   = " 0.0030 0.0020 0.0010 setrgbcolor"
+    _barNumberColourSettingText = " 0.0010 0.0020 0.0030 setrgbcolor"
+    _digitRegexp                = re.compile(r".*/(zero|one|two|three|four"
+                                             + r"|five|six|seven|eight|nine)")
+    _endOfFileText              = "%EOF"
+    _fontDefinitionText         = "selectfont"
+    _pageRegexp                 = re.compile(r"%%Page: *(\w+)")
+    _printGlyphsText            = "print_glyphs"
+
+    _digitMap = { "zero" : 0, "one" : 1, "two" : 2, "three" : 3,
+                  "four" : 4, "five" : 5, "six" : 6, "seven" : 7,
+                  "eight" : 8, "nine" : 9 }
+
     #--------------------
 
     @classmethod
@@ -231,74 +245,77 @@ class PostscriptFile:
         """Scans postscript file for page numbers and measure numbers
            by some naive pattern matching and returns mapping from
            page to lowest measure number in page.  Assumes that pages
-           and page number are strictly ascending."""
+           and page numbers are strictly ascending."""
 
         Logging.trace(">>")
 
-        # define relevant constants for analyzing the postscript file
-        fontDescription = "CenturySchL-Roma"
-        printGlyphsPart = "print_glyphs"
-        pageRegexp      = re.compile(r"%%Page: *(\w+)")
-        digitRegexp     = re.compile(r".*/(zero|one|two|three|four"
-                                     + "|five|six|seven|eight|nine)")
-
-        digitMap = { "zero" : 0, "one" : 1, "two" : 2, "three" : 3,
-                      "four" : 4, "five" : 5, "six" : 6, "seven" : 7,
-                      "eight" : 8, "nine" : 9 }
-
-        ParseState_inLimbo       = 1
-        ParseState_inPage        = 2
-        ParseState_inMeasureText = 3
-        result = {}
-        lineList = []
-
-        # do the processing
+        # read postscript file into line list
         postscriptFile = UTF8File(cls._fileName, 'rb')
         lineList = [ line.decode(_postscriptFileEncoding).rstrip()
                      for line in postscriptFile.readlines() ]
         postscriptFile.close()
 
         Logging.trace("--: lineListCount = %d", len(lineList))
+
+        # do the processing in a finite state machine
+        ParseState_inLimbo           = 1
+        ParseState_inPage            = 2
+        ParseState_beforeMeasureText = 3
+        ParseState_inMeasureText     = 4
+
+        result = {}
         parseState = ParseState_inLimbo
         maximumPageNumber = 0
         maximumMeasureNumber = 0
+        pageNumber = 0
 
         for line in lineList:
+            lineIsPageStart = cls._pageRegexp.match(line)
+
             if parseState == ParseState_inLimbo:
-                if pageRegexp.match(line):
+                if lineIsPageStart:
                     parseState = ParseState_inPage
                 else:
                     continue
 
-            if pageRegexp.match(line):
-                matchList = pageRegexp.match(line)
+            if lineIsPageStart or cls._endOfFileText in line:
+                if pageNumber > 0:
+                    Logging.trace("--: firstMeasure = %d, measureCount = %d",
+                                  pageMeasureNumber, measureCount)
+
+            if lineIsPageStart:
+                parseState = ParseState_inPage
+                matchList = cls._pageRegexp.match(line)
                 pageNumber = int(matchList.group(1))
+                Logging.trace("--: entering page %d", pageNumber)
                 maximumPageNumber = max(pageNumber, maximumPageNumber)
                 pageMeasureNumber = _infinity
-                parseState = ParseState_inPage
-                Logging.trace("--: entering page %d", pageNumber)
-            elif fontDescription in line:
-                parseState = ParseState_inMeasureText
-                currentNumber = 0
-                currentFactor = 1
-            elif parseState >= ParseState_inMeasureText:
-                if printGlyphsPart in line:
-                    if currentNumber > maximumMeasureNumber:
+                measureCount = 0
+            elif parseState == ParseState_inPage:
+                if cls._barNumberColourSettingText in line:
+                    parseState = ParseState_beforeMeasureText
+                    currentNumber = 0
+                    currentFactor = 1
+            elif parseState == ParseState_beforeMeasureText:
+                parseState = iif(cls._fontDefinitionText in line,
+                                 parseState + 1, ParseState_inPage)
+            elif parseState == ParseState_inMeasureText:
+                if cls._digitRegexp.search(line):
+                    matchList = cls._digitRegexp.match(line)
+                    digit = matchList.group(1)
+                    currentNumber += cls._digitMap[digit] * currentFactor
+                    currentFactor *= 10
+                else:
+                    parseState = ParseState_inPage
+
+                    if (cls._printGlyphsText in line
+                        and currentNumber > maximumMeasureNumber):
                         Logging.trace("--: measure number %d",
                                       currentNumber)
                         pageMeasureNumber = min(currentNumber,
                                                 pageMeasureNumber)
                         result[pageNumber] = pageMeasureNumber
                         maximumMeasureNumber = currentNumber
-
-                    parseState = ParseState_inPage
-                elif digitRegexp.search(line):
-                    matchList = digitRegexp.match(line)
-                    digit = matchList.group(1)
-                    currentNumber += digitMap[digit] * currentFactor
-                    currentFactor *= 10
-                else:
-                    parseState = ParseState_inPage
 
         # correct the first entry: first page always starts with
         # measure 1

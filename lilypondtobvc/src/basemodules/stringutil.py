@@ -244,20 +244,28 @@ def convertStringToMap (st, separator=","):
 
 #--------------------
 
+def splitAndStrip (st, separator):
+    """Returns split of <st> by <separator> with each part stripped from
+       leading and trailing whitespace"""
+
+    return [x.strip() for x in st.split(separator)]
+
+#--------------------
+
 def tokenize (st):
     """Returns a list of tokens also taking care of strings"""
 
     Logging.trace(">>: %s", st)
 
-    whiteSpaceCharList = " "
-    quoteCharList = "'"""
-    escapeChar = '\\'
+    whiteSpaceCharacterList = " "
+    quoteCharacterList = "'"""
+    escapeCharacter = '\\'
 
     ParseState_inLimbo  = 0
     ParseState_inString = 1
     ParseState_inEscape = 2
     ParseState_inToken  = 3
-    parseStateToString = { 0 : "-", 1 : "S", 2 : escapeChar, 3 : "T" }
+    parseStateToString = { 0 : "-", 1 : "S", 2 : escapeCharacter, 3 : "T" }
 
     parseState = ParseState_inLimbo
     result = []
@@ -271,33 +279,33 @@ def tokenize (st):
                      + "[%s] %s" % (parseStateToString[parseState], ch))
 
         if parseState == ParseState_inLimbo:
-            if ch in whiteSpaceCharList:
+            if ch in whiteSpaceCharacterList:
                 pass
-            elif ch in quoteCharList:
+            elif ch in quoteCharacterList:
                 endCharacter = ch
-                token = ch
+                token = ""
                 parseState = ParseState_inString
             else:
                 token = ch
                 parseState = ParseState_inToken
         elif parseState == ParseState_inString:
-            token += ch
-
             if ch == endCharacter:
                 result.append(token)
                 token = ""
                 parseState = ParseState_inLimbo
-            elif ch == escapeCharacter:
-                parseState = ParseState_inEscape
+            else:
+                token += ch
+                parseState = iif(ch == escapeCharacter, ParseState_inEscape,
+                                 parseState)
         elif parseState == ParseState_inEscape:
             result += ch
             parseState = ParseState_inString
         elif parseState == ParseState_inToken:
-            if ch in whiteSpaceCharList:
+            if ch in whiteSpaceCharacterList:
                 result.append(token)
                 token = ""
                 parseState = ParseState_inLimbo
-            elif ch in quoteCharList:
+            elif ch in quoteCharacterList:
                 result.append(token)
                 token = ch
                 parseState = ParseState_inString

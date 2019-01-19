@@ -17,6 +17,7 @@ soxCommandLinePrefix = _programDirectory "/sox"
 -- GENERAL PARAMETERS
 --====================
 
+lilypondVersion = "2.19.82"
 loggingFilePath = "/tmp/logs/ltbvc.log"
 targetDirectoryPath = "generated"
 tempAudioDirectoryPath = "/tmp/audiofiles"

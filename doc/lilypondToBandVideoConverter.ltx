@@ -47,6 +47,14 @@
               {}
   \titlespacing*{\paragraph}{0pt}{1.5ex plus .5ex minus .2ex}{1em}
 
+  % subparagraph
+  \titleformat{\subparagraph}[hang]
+              {\normalfont\normalsize\slshape}
+              {\thesubparagraph}
+              {1em}
+              {}
+  \titlespacing*{\subparagraph}{0pt}{0.8ex plus .2ex minus .1ex}{0.25em}
+
   \setcounter{secnumdepth}{3}
   \setcounter{tocdepth}{3}
 
@@ -279,7 +287,7 @@
 \newcommand{\DESCaudioRefinementCommandLine}{%
   audio refinement command line with parameters for input
   (\placeholder{infile}) and output (\placeholder{outfile}); this
-  commandline is optional when \embeddedCommand{soxCommandLinePrefix}
+  commandline is optional when \embeddedCode{soxCommandLinePrefix}
   is set, otherwise it is mandatory
 }
 
@@ -408,6 +416,10 @@
 
 \newcommand{\DESClilypondCommand}{%
   location of lilypond command
+}
+
+\newcommand{\DESClilypondVersion}{%
+  the version string for lilypond
 }
 
 \newcommand{\DESCloggingFilePath}{%
@@ -644,7 +656,7 @@
 \title{\ltbvc\ - Automated Generation of Notation Videos with Backing
        Tracks}
 \author{Dr.~Thomas Tensi}
-\date{2018-06-12}
+\date{\today}
 \maketitle
 
 \tableofcontents
@@ -803,9 +815,11 @@ Additionally the following software must be available:
         \cite{reference:soxDocumentation}
 \end{ttDescription}
 
-``fluidsynth'' may be replaced by other software that does similar
-file transformation from MIDI to WAV; then the appropriate
-configuration has to be adapted accordingly.
+Both ``fluidsynth'' and ``sox'' may be replaced by other software that
+does similar file transformations.  ``fluidsynth'' can be substituted
+by a command-line program transforming MIDI to WAV, ``sox'' by one
+doing command-line audio processing on WAV files.  In both cases the
+corresponding configuration has to be adapted accordingly.
 
 The following software is optional:
 \begin{ttDescription}
@@ -1373,7 +1387,7 @@ following definitions in \embeddedCode{\macro{lyricmode}}:
 \end{lilypondFileCode}
 
 Again there is a default: when some lyrics macro is missing, the macro
-for the voice without the target but with the appropriate suffix is
+for the voice without the target (but with the appropriate suffix) is
 used.  So for example, for a missing \embeddedCode{vocalsLyricsScoreB}
 an existing \embeddedCode{vocalsLyricsB} is used.  Additionally for
 the first line the suffix may be totally omitted, so
@@ -1483,7 +1497,11 @@ Three entries are special: \embeddedCode{aacCommandLine} and
                {\DESClilypondCommand}
                {"/pathto/lilypond"}
 
-    \varDescriptionLong{midiToWavRenderingCommandLine}
+    \varDescriptionLong{lilypondVersion}
+               {\DESClilypondVersion}
+               {"2.18.2"}
+
+    \varDescriptionLong{midiToWavRendering\-CommandLine}
                {\DESCmidiToWavRenderingCommandLine}
                {"/pathto/fluidsynth"}
 
@@ -1508,6 +1526,7 @@ configuration variables could look like that:
   aacCommandLine     = "/usr/local/qaac -V100 -i $1 -o $2"
   ffmpegCommand      = "/usr/local/ffmpeg"
   lilypondCommand    = "/usr/local/lilypond"
+  lilypondVersion    = "2.18.2"
   midiToWavRenderingCommandLine = \
       "/usr/local/fluidsynth ${infile} ${outfile}"
   soxCommandLinePrefix = \
@@ -2146,21 +2165,28 @@ The algorithmic logic for a note humanization is as follows:
         Finally we have
             \[t^\prime_i := t_i + f_i\cdot \Delta_t
                 = t_i + f_i\cdot \tau(p_i)\cdot r_t\cdot \ell\cdot adj_t\]
-        The timing of simultaneous notes in a voice is changed
+        The timing of notes in a voice starting simultaneously is changed
         identically.
 
-  \item For the velocity take the associated scaling value \(\sigma(p_i)\)
-        given by the velocity map for the current position and the
-        global slack in the velocity map \(\psi\).  The velocity is
-        first scaled by the scaling value \(\sigma(p_i)\) (to
-        accentuate beats), then randomly adjusted by the product of
-        slack \(\psi\) and instrument-specific adjustment \(adj_v\)and
-        finally capped to the MIDI velocity interval \([0, 127]\).
+  \item For the velocity take the associated velocity emphasis value
+        \(\sigma(p_i)\) given by the velocity map for the current
+        position and the global slack in the velocity map \(\psi\).
+        The velocity is first scaled by the emphasis value
+        \(\sigma(p_i)\) (to accentuate beats) then randomly adjusted
+        by slack \(\psi\) and instrument-specific adjustment \(adj_v\)
+        and finally capped to the MIDI velocity interval \([0, 127]\).
 
         Finally we have
             \[v^\prime_i :=
               min(127,
-                  max(0, v_i\cdot \sigma(p_i) + \psi\cdot r_v\cdot adj_v))\]
+                  max(0,
+                      v_i \cdot (\sigma(p_i) + \psi 
+                                      \cdot r_v\cdot adj_v)))\]
+
+        If the velocity already varies within a measure, no emphasis
+        will \emph{not} be applied, but only the slack.  This means
+        that whenever the voice already has some nontrivial
+        accentuation, only some random velocity variation is applied.
 
 \end{enumerate}
 
@@ -2487,6 +2513,12 @@ targets that are used in the generation.
   \label{figure:configFileVideoVariables}
 \end{centeredFigure}
 
+Because the algorithm for finding the page breaks in the video relies
+on data scraping of a postscript file produced by lilypond, some
+restrictions apply for the notation videos: the bar numbers are
+activated for the line starts only and those bar numbers as well as
+the bar lines will be black.
+
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \subsection{Postprocessing Phases}
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2657,12 +2689,10 @@ There are four things to note:
         stands for a hex number.  Multiple ``tee'' commands are
         possible, so you can do an audio debugging of your chain.
 
-  \item Processing is purely sequential with a single signal path.
-        There is no sidechaining, no New York parallel compression
-        etc.
-
-        More complicated processing paths are planned for a future
-        version (see section~\ref{section:futureExtensions}).
+  \item Normally processing is purely sequential with a single signal
+        path (which is standard sox behaviour).  But it is possible to
+        add parallel signal paths and to combine them (e.g. for New
+        York parallel compression etc.).
 
   \item Reverb may be specified in the chain or ---~for really
         simple applications~--- is automatically applied with default
@@ -2705,23 +2735,82 @@ reverbLevel}):
        equalizer 150 4o +10 lowpass -2 600 1.2o reverb 40
 \end{commandLine}
 
-Sound styles can be defined per song or globally.  I prefer the
-latter, because I use a few bread-and-butter sounds per instrument and
-adapt them only by using different midi instruments, audio volumes and
-reverb levels in the voice configuration; hence the sound styles
-itself are not adapted.  But in principle you can fine-tune the voice
-sounds per song, which I find tedious.
+In general, sound styles can be defined per song or globally.  I
+prefer the latter, because I use a few bread-and-butter sounds per
+instrument and adapt them only by using different midi instruments,
+audio volumes and reverb levels in the voice configuration; hence the
+sound styles itself are not adapted.  But in principle you can
+fine-tune the voice sounds per song, which I find tedious.
 
-It is helpful to use a simple set of variants that apply to all
-voices, for example, ``STD'' (for a normal sound), ``HARD'' (for some
-heavier sound), ``EXTREME'' (for an ultra-hard sound) etc.
+For the bread-and-butter sound approach, it is helpful to use a simple
+set of variant names that apply to all voices, for example, ``STD''
+(for a normal sound), ``HARD'' (for some heavier sound), ``EXTREME''
+(for an ultra-hard sound) etc.
 
 So finally each audio voice has its processed wav version in
 \embeddedCode{targetDirectoryPath} called
 ``\meta{voice}-processed.wav'' for later mixdown.
 
-There are two cases that can also be handled by the audio processing
-phases:
+%............................
+\subparagraph{Parallel Paths}
+%............................
+
+Parallel signal paths cannot be handled directly by sox and are
+emulated by \ltbvc.  They can be specified as follows:
+\begin{itemize}
+  \item Parallel chains are specified by using chain separators using
+        the character token ``:''.
+
+  \item For each chain its (single) source and target are each given
+        by an identifier that is immediately preceeded or followed by
+        ``->''.  So a chain target might be specified as ``->xxx'', a
+        chain source might be specified as ``yyy->''.  When no
+        identifier is given for a source, the raw audio file is used.
+
+        Note that, of course, the name of a chain source must occur
+        as a preceeding chain target.
+
+        The first chain has ``->'' (the raw audio file) as its chain
+        source, the last chain has the refined audio file as target.
+
+  \item A chain may consist of a special ``mix'' command that does a
+        weighted mix of several sources into a single target.
+        E.g. the chain
+        \begin{configurationFileCode}
+          mix 1.0 -> 0.3 A-> 0.5 B-> ->C
+        \end{configurationFileCode}
+        mixes 100\% of the raw audio file, 30\% of A and 50\% of B
+        into C.
+
+        Very often, the last chain is a mix of several sources into
+        the refined audio file as the target.
+
+        A ``mix'' command must not have an embedded ``tee''.
+\end{itemize}
+
+As an example let us enhance a bass part by adding a copy pitched down
+by an octave and having some parallel compression added.  We assume
+that the bass is pre-processed by ``soundStyleBassStd'' and we simple
+add the postprocessing as follows:
+\begin{configurationFileCode}
+  soundStyleBassStd ->A \
+  : A-> pitch -1200 ->B \
+  : mix 1.0 A-> 0.75 B-> ->C \
+  : C-> compand 0.04,0.5 6:-25,-20,-5 -6 -90 0.02 ->D \
+  : mix 1.0 C-> 0.4 D->
+\end{configurationFileCode}
+
+``A'' contains the preprocessed audio, ``B'' the pitched down version,
+``C'' the enriched bass sound, ``D'' the compressed version of it and
+the combined audio goes to the refined audio file.
+
+%............................
+\subparagraph{Special Tracks}
+%............................
+
+Another helpful feature of the ``refinedaudio'' phase is the ability
+to introduce other audio files into the processing.  There are two
+cases:
 
 \begin{enumerate}
   \item One can override a processed track by some external audio
@@ -3080,11 +3169,10 @@ distribution.
 \section{Example Lilypond Fragment File}
 %---------------------------------------
 
-The lilypond fragment file starts with the version definition and the
-inclusion of the note name language file:
+The lilypond fragment file starts with the inclusion of the note name
+language file:
 
 \begin{lilypondFileCode}
-  \version "2.18.2"
   \include "english.ly"
 \end{lilypondFileCode}
 
@@ -3307,6 +3395,7 @@ also use slashes as path separators for Windows.
   ffmpegCommand = _programDirectory "/ffmpeg"
   fluidsynthCommand = _programDirectory "/fluidsynth"
   lilypondCommand = _programDirectory "/lilypond"
+  lilypondVersion = "2.18.2"
   soxCommandLinePrefix = _programDirectory "/sox"
 \end{configurationFileCode}
 
@@ -3663,8 +3752,8 @@ planned for future versions:
 \begin{itemize}
 
   \item The audio processing chain during the postprocessing phase 
-        is currently linear.  It is planned to allow complex graphs
-        (DAGs) for audio processing.
+        is currently linear.  It is planned to allow complex function
+        graphs (DAGs) for audio processing.
 
   \item The sound variant list (describing a single sound variant for
         each voice) shall be replaced by map from voice to a map from
@@ -3674,12 +3763,25 @@ planned for future versions:
 
   \item The algorithm for finding the measures for the page breaks for
         the video is quite naive and fragile.  The page breaks are
-        currently found by scanning the Postscript file, because
-        Lilypond currently has no means for finding those breaks
-        programmatically.  Some better solution must be found.
+        currently found by scanning the Lilypond Postscript file,
+        because to my knowledge Lilypond currently has no means for
+        providing the location of those breaks programmatically.  Some
+        better solution must be found.
 
   \item Currently the humanization algorithm can only cope with a
-        single time signature.
+        single time signature for the complete song and uses the same
+        (measure-specific) humanization pattern for all voices.
+        Similarly to the sound variants a map should be used from
+        measure and voice to the humanization pattern.
+
+  \item In professional audio productions drums are processed by
+        handling the different drum instrument groups (e.g. kick,
+        snare, toms, cymbals) individually.  This is currently not
+        possible: drums are simply a single audio voice.  A workaround
+        could be done, if the used midi-to-wav-converter produced a
+        multi-channel result and the refinement stage were able to
+        combine those parts into a final result.  But possibly this
+        must go into the workflow itself.
 
 \end{itemize}
 
@@ -3810,11 +3912,6 @@ been mentioned first in the current document.
                         {\mandatory}
                         {SongRelated}
 
-    \varDescriptionFinal{fluidsynthCommand}
-                        {\DESCfluidsynthCommand}
-                        {\mandatory}
-                        {Program}
-
     \varDescriptionFinal{humanizationStyleXXX}
                         {\DESChumanizationStyleXXX}
                         {empty}
@@ -3842,6 +3939,11 @@ been mentioned first in the current document.
 
     \varDescriptionFinal{lilypondCommand}
                         {\DESClilypondCommand}
+                        {\mandatory}
+                        {Program}
+
+    \varDescriptionFinal{lilypondVersion}
+                        {\DESClilypondVersion}
                         {\mandatory}
                         {Program}
 
@@ -3874,6 +3976,11 @@ been mentioned first in the current document.
                         {\DESCmidiPanList}
                         {\mandatory, compatible to voiceNameList}
                         {MidiRelated}
+
+    \varDescriptionFinal{midiToWavRendering\-CommandLine}
+                        {\DESCmidiToWavRenderingCommandLine}
+                        {\mandatory}
+                        {Program}
 
     \varDescriptionFinal{midiVoiceNameList}
                         {\DESCmidiVoiceNameList}

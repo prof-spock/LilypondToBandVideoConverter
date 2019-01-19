@@ -18,9 +18,10 @@ from basemodules.configurationfile import ConfigurationFile
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.python2and3support import isString
 from basemodules.simplelogging import Logging
-from basemodules.stringutil import tokenize
-from basemodules.ttbase import adaptToRange, iif, isInRange, MyRandom
+from basemodules.stringutil import splitAndStrip, tokenize
+from basemodules.ttbase import adaptToRange, iif, iif3, isInRange, MyRandom
 from basemodules.utf8file import UTF8File
+from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import humanReadableVoiceName
 from .miditransformer import MidiTransformer
@@ -29,7 +30,7 @@ from .mp4tagmanager import MP4TagManager
 #====================
 
 _processedAudioFileTemplate = "%s/%s-processed.wav"
-_tempAudioFileTemplate = "%s/%s-temp%s.wav"
+_tempAudioFileTemplate = "%s/%s-temp_%s.wav"
 
 # the log level for ffmpeg rendering
 _ffmpegLogLevel = "error"
@@ -349,6 +350,10 @@ class AudioTrackManager:
     """This class encapsulates services for audio tracks generated
        from a midi file."""
 
+    _processingChainSeparator = ";"
+    _chainSourceIndicatorRegExp = re.compile("([A-Za-z]+)\->")
+    _chainTargetIndicatorRegExp = re.compile("\->([A-Za-z]+)")
+
     _aacCommandLine                = None
     _audioRefinementCommandList    = None
     _intermediateFilesAreKept      = None
@@ -411,6 +416,113 @@ class AudioTrackManager:
                                        stdout=OperatingSystem.nullDevice)
 
         Logging.trace("<<")
+
+    #--------------------
+
+    def _extractCommandSrcAndTgt (self, voiceName, chainPosition,
+                                  partPosition, debugFileCount,
+                                  commandTokenList):
+        """Returns list of sources and single target from audio refinement
+           command token list <commandTokenList>; adapts
+           <commandTokenList> accordingly by deleting those tokens;
+           <voiceName> gives name of current voice; <chainPosition>
+           tells whether this is a single, the first, last or other
+           chain; <partPosition> tells whether this is a single, the
+           first, last or other part; <debugFileCount> gives the
+           number of the next available tee file"""
+                
+        Logging.trace(">>: voice = %s, chainPosition = %s, partPosition = %s,"
+                      + " debugFileCount = %d, commands = %s",
+                      voiceName, chainPosition, partPosition, debugFileCount,
+                      commandTokenList)
+
+        cls = self.__class__
+
+        sourceFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
+        targetFilePath = (_processedAudioFileTemplate %
+                          (self._audioDirectoryPath, voiceName))
+
+        tempFilePath = (lambda st: (_tempAudioFileTemplate
+                                   % (self._audioDirectoryPath,
+                                      voiceName, st)))
+        teeFilePath = (lambda i: tempFilePath(hex(i).upper()[2:]))
+        chainFilePath = (lambda identifier: tempFilePath(identifier))
+
+        # collect sources and targets and delete them from token list
+        sourceList = \
+            cls._extractMatchingElementsFromList(commandTokenList,
+                                        cls._chainSourceIndicatorRegExp)
+        targetList = \
+            cls._extractMatchingElementsFromList(commandTokenList,
+                                        cls._chainTargetIndicatorRegExp)
+
+        # make simple plausibility checks
+        if len(targetList) > 1:
+            Logging.trace("--: too many targets in chain")
+
+        if len(targetList) > 0:
+            target = targetList[0]
+        else:
+            target = targetFilePath
+
+        if chainPosition in ["SINGLE", "FIRST"]:
+            if len(sourceList) > 0:
+                Logging.trace("--: bad source in first chain")
+
+            sourceList = [ sourceFilePath ]
+        else:
+            tempList = sourceList
+            sourceList = []
+
+            for source in tempList:
+                source = iif(source == "", sourceFilePath,
+                             chainFilePath(source))
+                sourceList.append(source)
+
+        if chainPosition in ["SINGLE", "LAST"]:
+            if len(targetList) > 0:
+                Logging.trace("--: bad target in last chain")
+
+            target = targetFilePath
+        else:
+            target = chainFilePath(target)
+
+        # override source and target assignment for tee files
+        if partPosition in ["OTHER", "LAST"]:
+            sourceList = [ teeFilePath(debugFileCount) ]
+
+        if partPosition in ["FIRST", "OTHER"]:
+            debugFileCount += 1
+            target = teeFilePath(debugFileCount)
+            
+        Logging.trace("<<: commands = %s, sources = %s, target = %s,"
+                      " debugFileCount = %d",
+                      commandTokenList, sourceList, target, debugFileCount)
+        return (sourceList, target, debugFileCount)
+            
+    #--------------------
+
+    @classmethod
+    def _extractMatchingElementsFromList (cls, elementList, elementRegExp):
+        """Scans <elementList> for elements matching <elementsRegExp>, 
+           removes them from <elementList> and returns them as ordered
+           list"""
+
+        Logging.trace(">>: elementList = %s, regExp = %s",
+                      elementList, elementRegExp.pattern)
+
+        result = []
+        
+        for i in reversed(range(len(elementList))):
+            element = elementList[i]
+
+            if elementRegExp.match(element):
+                normalizedElement = elementRegExp.match(element).group(1)
+                result = [ normalizedElement ] + result
+                del elementList[i]
+
+        Logging.trace("<<: %s", result)
+        return result
 
     #--------------------
 
@@ -605,61 +717,6 @@ class AudioTrackManager:
                                        stdout=OperatingSystem.nullDevice)
 
         Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def _splitParameterSequence (cls, parameterSequence):
-        """Splits string <parameterSequence> into list of single words
-           taking quoting into account"""
-
-        Logging.trace(">>: %s", parameterSequence)
-
-        blankChar       = " "
-        singleQuoteChar = "'"
-        doubleQuoteChar = "\""
-
-        ParseState_inLimbo  = 1
-        ParseState_inWord   = 2
-        ParseState_inString = 3
-
-        parseState = ParseState_inLimbo
-        result = []
-
-        for ch in parameterSequence:
-            parameterIsDone = False
-
-            if parseState == ParseState_inString:
-                if ch != singleQuoteChar:
-                    currentWord += ch
-                else:
-                    parameterIsDone = True
-            elif parseState == ParseState_inWord:
-                if ch == blankChar:
-                    parameterIsDone = True
-                else:
-                    currentWord += ch
-            elif parseState == ParseState_inLimbo:
-                currentWord = ""
-
-                if ch == singleQuoteChar:
-                    parseState = ParseState_inString
-                elif ch != blankChar:
-                    currentWord = ch
-                    parseState = ParseState_inWord
-
-            if parameterIsDone:
-                result.append(currentWord)
-                parseState = ParseState_inLimbo
-
-        currentWord += iif(parseState == ParseState_inString,
-                           doubleQuoteChar, "")
-
-        if parseState != ParseState_inLimbo:
-            result.append(currentWord)
-
-        Logging.trace("<<: %s", result)
-        return result
 
     #--------------------
 
@@ -873,50 +930,91 @@ class AudioTrackManager:
         message = "== processing %s (%s)" % (voiceName, soundVariant)
         OperatingSystem.showMessageOnConsole(message)
 
-        # prepare list of sox argument lists for processing
+        # prepare list of audio processing commands
         reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
         reverbCommands = iif(reverbLevel > 0, " reverb %d" % reverbLevel, "")
 
         if isCopyVariant:
-            params = ""
+            audioProcessingCommands = ""
         elif soundStyleName in cls._soundStyleNameToCommandsMap:
-            params = cls._soundStyleNameToCommandsMap[soundStyleName]
+            audioProcessingCommands = \
+                cls._soundStyleNameToCommandsMap[soundStyleName]
         else:
-            params = ""
+            audioProcessingCommands = ""
             message = ("--: unknown variant %s replaced by copy default"
                        % soundVariant)
             Logging.trace(message)
             OperatingSystem.showMessageOnConsole(message)
 
-        params += reverbCommands + " norm 0"
-        parameterSequenceList = params.split("tee ")
+        audioProcessingCommands += reverbCommands
+        self._processAudioRefinement(voiceName, audioProcessingCommands)
 
-        if not cls._intermediateFilesAreKept:
-            # when not debugging, there is no need to have intermediate
-            # audio files => use only one single command line
-            parameterSequenceList = [ " ".join(parameterSequenceList) ]
+        Logging.trace("<<")
+        
+    #--------------------
 
-        Logging.trace("--: parameterSeqList = %s", parameterSequenceList)
-        commandCount = len(parameterSequenceList)
-        sourceFilePath = "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
-        targetFilePath = (_processedAudioFileTemplate %
-                          (self._audioDirectoryPath, voiceName))
-        currentSource = sourceFilePath
+    def _processAudioRefinement (self, voiceName, audioProcessingCommands):
+        """Handles audio processing given by <audioProcessingCommands>"""
+
+        Logging.trace(">>: voice = %s, commands = %s",
+                      voiceName, audioProcessingCommands)
+        
+        cls = self.__class__
+        separator = cls._processingChainSeparator
+        chainCommandList = splitAndStrip(audioProcessingCommands, separator)
+        chainCommandCount = len(chainCommandList)
+        debugFileCount = 0
         commandList = cls._audioRefinementCommandList
 
-        for i, parameterSequence in enumerate(parameterSequenceList):
-            tempFilePath = (_tempAudioFileTemplate
-                            % (self._audioDirectoryPath, voiceName,
-                               hex(i + 1).upper()))
-            currentTarget = iif(i < commandCount - 1, tempFilePath,
-                                targetFilePath)
-            variableMap = { "infile"   : currentSource,
-                            "outfile"  : currentTarget,
-                            "commands" : tokenize(parameterSequence) }
-            command = cls._replaceVariablesByValues(commandList,
-                                                    variableMap)
-            OperatingSystem.executeCommand(command, True)
-            currentSource = currentTarget
+        for chainIndex, chainProcessingCommands in enumerate(chainCommandList):
+            Logging.trace("--: chain[%d] = %s",
+                          chainIndex, chainProcessingCommands)
+            chainPosition = iif3(chainCommandCount == 1, "SINGLE",
+                                 chainIndex == 0, "FIRST",
+                                 chainIndex == chainCommandCount - 1, "LAST",
+                                 "OTHER")
+            chainPartCommandList = splitAndStrip(chainProcessingCommands,
+                                                 "tee ")
+            partCount = len(chainPartCommandList)
+
+            for partIndex, partProcessingCommands \
+                in enumerate(chainPartCommandList):
+
+                partPosition = iif3(partCount == 1, "SINGLE",
+                                    partIndex == 0, "FIRST",
+                                    partIndex == partCount - 1, "LAST",
+                                    "OTHER")
+                partCommandTokenList = tokenize(partProcessingCommands)
+                sourceList, currentTarget, debugFileCount = \
+                    self._extractCommandSrcAndTgt(voiceName, chainPosition,
+                                                  partPosition,
+                                                  debugFileCount,
+                                                  partCommandTokenList)
+
+                if partCommandTokenList[0] != "mix":
+                    currentSource = sourceList[0]
+                else:
+                    numberList = partCommandTokenList[1:]
+
+                    if len(numberList) < len(sourceList):
+                        Logging.trace("--: bad argument pairing for mix")
+                    else:
+                        partCommandTokenList = []
+                        currentSource = [ "-m" ]
+
+                        for i in range(len(sourceList)):
+                            volume = numberList[i]
+                            valueName = "value %d in mix" % (i+1)
+                            ValidityChecker.isNumberString(volume,
+                                                           valueName, True)
+                            currentSource += ["-v", volume, sourceList[i]]
+
+                variableMap = { "infile"   : currentSource,
+                                "outfile"  : currentTarget,
+                                "commands" : partCommandTokenList }
+                command = cls._replaceVariablesByValues(commandList,
+                                                        variableMap)
+                OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 

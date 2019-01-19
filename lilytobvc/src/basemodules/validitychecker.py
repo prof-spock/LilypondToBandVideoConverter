@@ -49,7 +49,7 @@ class ValidityChecker:
     @classmethod
     def isBoolean (cls, value, valueName):
         """Checks whether <value> of variable given by <valueName> is
-           a boolean, otherwise exists program with a message."""
+           a boolean, otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a boolean", valueName, value))
         message = "'%s' must be a boolean: %s" % (valueName, repr(value))
@@ -60,7 +60,7 @@ class ValidityChecker:
     @classmethod
     def isDirectory (cls, pathName, valueName=None):
         """Checks whether directory given by <pathName> is readable,
-           otherwise exists program with a message."""
+           otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a directory", valueName, pathName))
         template = "Directory '%s'%s is not readable."
@@ -72,7 +72,7 @@ class ValidityChecker:
     @classmethod
     def isInteger (cls, value, valueName):
         """Checks whether <value> of variable given by <valueName> is
-           an integer or long integer, otherwise exists program with a
+           an integer or long integer, otherwise exits program with a
            message."""
 
         Logging.trace(cls._checkTemplate("an integer", valueName, value))
@@ -84,7 +84,7 @@ class ValidityChecker:
     @classmethod
     def isFloat (cls, value, valueName):
         """Checks whether <value> of variable given by <valueName> is
-           a float, otherwise exists program with a message."""
+           a float, otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a float", valueName, value))
         message = "'%s' must be a float: %s" % (valueName, repr(value))
@@ -95,7 +95,7 @@ class ValidityChecker:
     @classmethod
     def isNatural (cls, value, valueName, zeroIsIncluded=True):
         """Checks whether <value> of variable given by <valueName> is
-           a positive integer or long integer, otherwise exists
+           a positive integer or long integer, otherwise exits
            program with a message.  When <zeroIsIncluded> is set, also
            zero is acceptable."""
 
@@ -151,7 +151,7 @@ class ValidityChecker:
     @classmethod
     def isReadableFile (cls, pathName, valueName=None):
         """Checks whether file given by <pathName> is readable,
-           otherwise exists program with a message."""
+           otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a readableFile",
                                          valueName, pathName))
@@ -164,7 +164,7 @@ class ValidityChecker:
     @classmethod
     def isString (cls, value, valueName):
         """Checks whether <value> of variable given by <valueName> is
-           a unicode string, otherwise exists program with a message."""
+           a unicode string, otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a (unicode) string",
                                          valueName, value))
@@ -176,7 +176,7 @@ class ValidityChecker:
     @classmethod
     def isWritableFile (cls, pathName, valueName=None):
         """Checks whether file given by <pathName> is writable,
-           otherwise exists program with a message."""
+           otherwise exits program with a message."""
 
         Logging.trace(cls._checkTemplate("a writable file",
                                          valueName, pathName))
@@ -191,7 +191,7 @@ class ValidityChecker:
 
     @classmethod
     def isValid (cls, condition, message):
-        """Checks whether <condition> holds, otherwise exists program
+        """Checks whether <condition> holds, otherwise exits program
            with <message>."""
 
         Logging.trace("--: checking condition (%s), otherwise failure is '%s'",

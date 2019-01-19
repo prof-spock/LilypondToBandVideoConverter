@@ -246,13 +246,15 @@ class _LilypondProcessor:
 
         tempLilypondFilePath = configData.tempLilypondFilePath
         lilypondFile = LilypondFile(tempLilypondFilePath)
-        lilypondFile.generate(configData.includeFilePath, processingPhase,
-                              voiceNameList,
+        lilypondFile.generate(configData.includeFilePath,
+                              configData.lilypondVersion,
+                              processingPhase, voiceNameList,
                               configData.title,
                               configData.songComposerText,
                               configData.voiceNameToChordsMap,
                               configData.voiceNameToLyricsMap,
                               configData.voiceNameToScoreNameMap,
+                              configData.measureToTempoMap,
                               configData.phaseAndVoiceNameToClefMap,
                               configData.phaseAndVoiceNameToStaffListMap)
         cls._processLilypond(tempLilypondFilePath, targetFileNamePrefix)
@@ -396,12 +398,14 @@ class _LilypondProcessor:
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         tempLilypondFilePath = configData.tempLilypondFilePath
         lilypondFile = LilypondFile(tempLilypondFilePath)
-        lilypondFile.generate(configData.includeFilePath, "midi",
+        lilypondFile.generate(configData.includeFilePath,
+                              configData.lilypondVersion, "midi",
                               configData.midiVoiceNameList, configData.title,
                               configData.songComposerText,
                               configData.voiceNameToChordsMap,
                               configData.voiceNameToLyricsMap,
                               configData.voiceNameToScoreNameMap,
+                              configData.measureToTempoMap,
                               configData.phaseAndVoiceNameToClefMap,
                               configData.phaseAndVoiceNameToStaffListMap)
 
@@ -569,13 +573,15 @@ class _LilypondProcessor:
                                                 videoTarget.topBottomMargin,
                                                 videoWidth, videoHeight,
                                                 videoLineWidth)
-                lilypondFile.generate(configData.includeFilePath, "video",
+                lilypondFile.generate(configData.includeFilePath,
+                                    configData.lilypondVersion, "video",
                                     videoFileKind.voiceNameList,
                                     configData.title,
                                     configData.songComposerText,
                                     configData.voiceNameToChordsMap,
                                     configData.voiceNameToLyricsMap,
                                     configData.voiceNameToScoreNameMap,
+                                    configData.measureToTempoMap,
                                     configData.phaseAndVoiceNameToClefMap,
                                     configData.phaseAndVoiceNameToStaffListMap)
                 targetMp4FileName = (targetDirectoryPath
@@ -667,8 +673,6 @@ def initialize ():
                                              configData.lilypondCommand)
         VideoAudioCombiner.initialize(configData.ffmpegCommand,
                                       configData.mp4boxCommand)
-
-        LilypondFile.initialize(configData.measureToTempoMap)
         AudioTrackManager.initialize(configData.aacCommandLine,
                                      configData.audioRefinementCommandLine,
                                      configData.ffmpegCommand,

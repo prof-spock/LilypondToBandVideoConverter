@@ -95,7 +95,7 @@ class _ConfigDataGlobal:
     _attributeNameList = \
         [ "aacCommandLine", "audioRefinementCommandLine",
           "ffmpegCommand", "intermediateFileDirectoryPath",
-          "lilypondCommand", "loggingFilePath",
+          "lilypondCommand", "lilypondVersion", "loggingFilePath",
           "midiToWavRenderingCommandLine", "mp4boxCommand",
           "soxCommandLinePrefix", "targetDirectoryPath",
           "tempAudioDirectoryPath", "tempLilypondFilePath",
@@ -115,6 +115,7 @@ class _ConfigDataGlobal:
         configData.intermediateFileDirectoryPath = "."
         configData.intermediateFilesAreKept      = False
         configData.lilypondCommand               = "lilypond"
+        configData.lilypondVersion               = "2.18"
         configData.loggingFilePath               = ("/tmp/logs"
                                                    + "/makeLilypondAll.log")
         configData.midiToWavRenderingCommandLine = "fluidsynth"
@@ -139,8 +140,8 @@ class _ConfigDataGlobal:
                + "aacCommandLine = '%s', audioRefinementCommandLine = '%s',"
                + " ffmpegCommand = '%s', intermediateFileDirectoryPath = %s,"
                + " intermediateFilesAreKept = %s, lilypondCommand = '%s',"
-               + " midiToWavCommandLine = '%s', mp4boxCommand = '%s',"
-               + " loggingFilePath = '%s',"
+               + " lilypondVersion = '%s', midiToWavCommandLine = '%s',"
+               + " mp4boxCommand = '%s', loggingFilePath = '%s',"
                + " soundStyleNameToTextMap = %s, soxCommandLinePrefix = '%s',"
                + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
                + " tempLilypondFilePath = '%s', videoTargetMap = %s,"
@@ -151,10 +152,9 @@ class _ConfigDataGlobal:
                  configData.ffmpegCommand,
                  configData.intermediateFileDirectoryPath,
                  configData.intermediateFilesAreKept,
-                 configData.lilypondCommand,
+                 configData.lilypondCommand, configData.lilypondVersion,
                  configData.midiToWavRenderingCommandLine,
-                 configData.mp4boxCommand,
-                 configData.loggingFilePath,
+                 configData.mp4boxCommand, configData.loggingFilePath,
                  configData.soundStyleNameToTextMap,
                  configData.soxCommandLinePrefix,
                  configData.targetDirectoryPath,
@@ -1089,6 +1089,7 @@ class _LocalValidator:
                                               + "|Staff|TabStaff)")
         tempoValuePattern = (r"%s(?:\|%s/%s)?"
                              % (floatPattern, integerPattern, integerPattern))
+        versionPattern = r"\d+(\.\d+)*"
 
         # simple map patterns
         idToTextMapPattern = makeMapPat(identifierPattern, noCommaPattern)
@@ -1108,6 +1109,8 @@ class _LocalValidator:
         cls._setMap("audioRefinementCommandLine", "", "STRING")
         cls._setMap("ffmpegCommand", None, "EXECUTABLE")
         cls._setMap("lilypondCommand", None, "EXECUTABLE")
+        cls._setMap("lilypondVersion", None, "REGEXP",
+                    makeRegExp(versionPattern))
         cls._setMap("midiToWavRenderingCommandLine", None, "STRING")
         cls._setMap("mp4boxCommand", "", "EXECUTABLE")
         cls._setMap("soxCommandLinePrefix", "", "STRING")

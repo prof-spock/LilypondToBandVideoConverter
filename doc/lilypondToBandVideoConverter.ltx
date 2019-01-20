@@ -2759,7 +2759,7 @@ Parallel signal paths cannot be handled directly by sox and are
 emulated by \ltbvc.  They can be specified as follows:
 \begin{itemize}
   \item Parallel chains are specified by using chain separators using
-        the character token ``:''.
+        the character token ``;''.
 
   \item For each chain its (single) source and target are each given
         by an identifier that is immediately preceeded or followed by
@@ -2794,10 +2794,10 @@ that the bass is pre-processed by ``soundStyleBassStd'' and we simple
 add the postprocessing as follows:
 \begin{configurationFileCode}
   soundStyleBassStd ->A \
-  : A-> pitch -1200 ->B \
-  : mix 1.0 A-> 0.75 B-> ->C \
-  : C-> compand 0.04,0.5 6:-25,-20,-5 -6 -90 0.02 ->D \
-  : mix 1.0 C-> 0.4 D->
+  ; A-> pitch -1200 ->B \
+  ; mix 1.0 A-> 0.75 B-> ->C \
+  ; C-> compand 0.04,0.5 6:-25,-20,-5 -6 -90 0.02 ->D \
+  ; mix 1.0 C-> 0.4 D->
 \end{configurationFileCode}
 
 ``A'' contains the preprocessed audio, ``B'' the pitched down version,

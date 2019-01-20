@@ -2,9 +2,9 @@
 
 ## Introduction
 
-The LilypondToBandVideoConverter is a system of several
-python scripts that orchestrate existing command line tools
-to convert a music piece written in the lilypond notation to
+The LilypondToBandVideoConverter is a python script that orchestrates
+existing command line tools to convert a music piece written in the
+lilypond notation to
 
 - a *PDF score* of the whole piece,
 
@@ -30,15 +30,15 @@ For processing a piece one must have
   target audio volume, list of mutable voices for the audio
   tracks etc.
 
-Based on those files the python scripts -- together with some
-open-source command-line software like ffmpeg or fluidsynth -- produce
-all the target files either incrementally or altogether.
+Based on those files the python script -- together with some
+open-source command-line software like ffmpeg or fluidsynth --
+produces all the target files either incrementally or altogether.
 
 ## Installation and Requirements
 
-All the scripts are written in python and can be installed as a python
-package.  The package requires either Python&nbsp;2.7 or
-Python&nbsp;3.3 or later.
+The script and its components are written in python and can be
+installed as a single python package.  The package requires either
+Python&nbsp;2.7 or Python&nbsp;3.3 or later.
 
 Additionally the following software has to be available:
 

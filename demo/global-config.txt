@@ -11,7 +11,15 @@ lilypondCommand = _programDirectory "/lilypond"
 midiToWavRenderingCommandLine = \
   _programDirectory "/fluidsynth.exe -n -i -g 1 -R 0" \
   " -F ${outfile} " _soundFonts " ${infile}"
-soxCommandLinePrefix = _programDirectory "/sox"
+_sox = _programDirectory "/sox"
+audioProcessor = "{" \
+  "mixingCommandLine: '" _sox \
+      " -m [-v ${factor} ${infile} ] ${outfile}'," \
+  "paddingCommandLine: '" _sox \
+      " ${infile} ${outfile} pad ${duration}'," \
+  "refinementCommandLine: '" _sox \
+      " ${infile} ${outfile} ${commands}'" \
+  "}"
 
 --====================
 -- GENERAL PARAMETERS

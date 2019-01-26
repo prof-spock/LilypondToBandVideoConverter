@@ -93,13 +93,11 @@ class _ConfigDataGlobal:
 
     # list of attribute names with external representation in config file
     _attributeNameList = \
-        [ "aacCommandLine", "audioRefinementCommandLine",
-          "ffmpegCommand", "intermediateFileDirectoryPath",
+        [ "aacCommandLine", "ffmpegCommand", "intermediateFileDirectoryPath",
           "lilypondCommand", "lilypondVersion", "loggingFilePath",
           "midiToWavRenderingCommandLine", "mp4boxCommand",
-          "soxCommandLinePrefix", "targetDirectoryPath",
-          "tempAudioDirectoryPath", "tempLilypondFilePath",
-          "videoTargetMap", "videoFileKindMap" ]
+          "targetDirectoryPath", "tempAudioDirectoryPath",
+          "tempLilypondFilePath", "videoTargetMap", "videoFileKindMap" ]
 
     #--------------------
     # EXPORTED FEATURES
@@ -110,7 +108,7 @@ class _ConfigDataGlobal:
         """Initializes global attributes of <configData>"""
 
         configData.aacCommandLine                = "aac"
-        configData.audioRefinementCommandLine    = "soc"
+        configData.audioProcessorMap             = ""
         configData.ffmpegCommand                 = "ffmpeg"
         configData.intermediateFileDirectoryPath = "."
         configData.intermediateFilesAreKept      = False
@@ -121,7 +119,6 @@ class _ConfigDataGlobal:
         configData.midiToWavRenderingCommandLine = "fluidsynth"
         configData.mp4boxCommand                 = "mp4box"
         configData.soundStyleNameToTextMap       = ""
-        configData.soxCommandLinePrefix          = "sox"
         configData.targetDirectoryPath           = "generated"
         configData.tempAudioDirectoryPath        = "/tmp"
         configData.tempLilypondFilePath          = "."
@@ -137,18 +134,17 @@ class _ConfigDataGlobal:
 
         className = cls.__name__
         st = (("%s("
-               + "aacCommandLine = '%s', audioRefinementCommandLine = '%s',"
+               + "aacCommandLine = '%s', audioProcessor = '%s',"
                + " ffmpegCommand = '%s', intermediateFileDirectoryPath = %s,"
                + " intermediateFilesAreKept = %s, lilypondCommand = '%s',"
                + " lilypondVersion = '%s', midiToWavCommandLine = '%s',"
                + " mp4boxCommand = '%s', loggingFilePath = '%s',"
-               + " soundStyleNameToTextMap = %s, soxCommandLinePrefix = '%s',"
+               + " soundStyleNameToTextMap = %s,"
                + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
                + " tempLilypondFilePath = '%s', videoTargetMap = %s,"
                + " videoFileKindMap = %s)")
               % (className,
-                 configData.aacCommandLine,
-                 configData.audioRefinementCommandLine,
+                 configData.aacCommandLine, configData.audioProcessorMap,
                  configData.ffmpegCommand,
                  configData.intermediateFileDirectoryPath,
                  configData.intermediateFilesAreKept,
@@ -156,7 +152,6 @@ class _ConfigDataGlobal:
                  configData.midiToWavRenderingCommandLine,
                  configData.mp4boxCommand, configData.loggingFilePath,
                  configData.soundStyleNameToTextMap,
-                 configData.soxCommandLinePrefix,
                  configData.targetDirectoryPath,
                  configData.tempAudioDirectoryPath,
                  configData.tempLilypondFilePath,
@@ -178,7 +173,7 @@ class _ConfigDataGlobal:
                                               configurationFile.getValue)
 
         attributeNameList = (cls._attributeNameList
-                             + [ "keepIntermediateFiles" ])
+                             + [ "audioProcessor", "keepIntermediateFiles" ])
         _checkVariableList(attributeNameList, configurationFile)
 
         # validate sound style definitions
@@ -191,26 +186,41 @@ class _ConfigDataGlobal:
                                           configurationFile.getValue,
                                           styleNamePrefix + "*")
 
-        soxCommand             = getValueProc("soxCommandLinePrefix")
-        audioRefinementCommand = getValueProc("audioRefinementCommandLine")
+        # validate audio processor map
+        audioProcessorMapAsString = getValueProc("audioProcessor")
+        audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
+        chainSeparator        = audioProcessorMap.get("chainSeparator", ";")
+        refinementCommandLine = audioProcessorMap.get("refinementCommandLine",
+                                                      "")
+        paddingCommandLine    = audioProcessorMap.get("paddingCommandLine",
+                                                      "")
+        mixingCommandLine     = audioProcessorMap.get("mixingCommandLine",
+                                                      "")
+        redirector            = audioProcessorMap.get("redirector", "->")
 
-        ValidityChecker.isValid((soxCommand != ""
-                                 or audioRefinementCommand != ""),
-                                "either soxCommandLinePrefix"
-                                + " or audioRefinementCommandLine"
-                                + " must be defined")
+        Logging.trace("--: chainSep = '%s', mixCmd = '%s', padCmd = '%s',"
+                      + " redirector = '%s', refCmd = '%s'",
+                      chainSeparator, mixingCommandLine, paddingCommandLine,
+                      redirector, refinementCommandLine)
 
-        commandNameList = [ "aacCommandLine" ]
-
-        if soxCommand > "":
-            commandNameList.append("soxCommandLinePrefix")
-
-        if audioRefinementCommand > "":
-            commandNameList.append("audioRefinementCommandLine")
+        ValidityChecker.isValid(chainSeparator > "",
+            "'audioProcessor.chainSeparator' must be non-empty")
+        
+        ValidityChecker.isValid(redirector > "",
+            "'audioProcessor.redirector' must be non-empty")
+        
+        ValidityChecker.isValid(refinementCommandLine > "",
+            "'audioProcessor.refinementCommandLine' must be defined")
         
         # additional checks
-        for variableName in commandNameList:
-            commandLine = getValueProc(variableName)
+        aacCommandLine = getValueProc("aacCommandLine")
+        commandNameMap = { "aacCommandLine" : aacCommandLine }
+
+        for key, commandLine in audioProcessorMap.items():
+            if key not in ["chainSeparator", "redirector"]:
+                commandNameMap["audioProcessor." + key] = commandLine
+
+        for variableName, commandLine in commandNameMap.items():
             command = commandLine.split()[0]
             ValidityChecker.isReadableFile(command, variableName)
 
@@ -232,10 +242,17 @@ class _ConfigDataGlobal:
             generateObjectMapFromString(configData.videoTargetMap,
                                         VideoTarget())
 
-        if configData.audioRefinementCommandLine == "":
-            configData.audioRefinementCommandLine = \
-                ("%s ${infile} ${outfile} ${commands}"
-                 % configData.soxCommandLinePrefix)
+        audioProcessorMapAsString = configData.audioProcessorMap
+        audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
+
+        defaultMap = { "chainSeparator": ";", "mixingCommandLine" : "",
+                       "paddingCommandLine": "", "redirector": "->" }
+                
+        for key, defaultValue in defaultMap.items():
+            if key not in audioProcessorMap:
+                audioProcessorMap[key] = defaultValue
+
+        configData.audioProcessorMap = audioProcessorMap
 
         Logging.trace("<<")
 
@@ -256,6 +273,7 @@ class _ConfigDataGlobal:
         _readAttributesFromConfigFile(configData, cls._attributeNameList,
                                       configurationFile)
 
+        configData.audioProcessorMap = getValueProc("audioProcessor")
         configData.intermediateFilesAreKept = \
             getValueProc("keepIntermediateFiles")
         configData.soundStyleNameToTextMap = \
@@ -1076,6 +1094,9 @@ class _LocalValidator:
         floatPattern      = RegExpPattern.floatPattern
 
         # special element patterns
+        audioProcessorKeyPattern = \
+                      (r"(?:(?:mixing|padding|refinement)CommandLine"
+                       + r"|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
         clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
         fileNameListPattern = makeListPat(fileNamePattern, False)
@@ -1106,14 +1127,15 @@ class _LocalValidator:
 
         # commands
         cls._setMap("aacCommandLine", "", "STRING")
-        cls._setMap("audioRefinementCommandLine", "", "STRING")
+        cls._setMap("audioProcessor", None, "REGEXP",
+                    makeRegExp(makeMapPat(audioProcessorKeyPattern,
+                                          noCommaPattern, False)))
         cls._setMap("ffmpegCommand", None, "EXECUTABLE")
         cls._setMap("lilypondCommand", None, "EXECUTABLE")
         cls._setMap("lilypondVersion", None, "REGEXP",
                     makeRegExp(versionPattern))
         cls._setMap("midiToWavRenderingCommandLine", None, "STRING")
         cls._setMap("mp4boxCommand", "", "EXECUTABLE")
-        cls._setMap("soxCommandLinePrefix", "", "STRING")
 
         # global settings
         cls._setMap("keepIntermediateFiles", False, "BOOLEAN")

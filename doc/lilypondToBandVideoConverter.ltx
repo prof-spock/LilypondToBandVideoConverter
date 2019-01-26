@@ -23,7 +23,7 @@
   \DeclareFontFamily{\encodingdefault}{\ttdefault}{\hyphenchar\font=`\-}
 
   \renewcommand*\ttdefault{pcr}
-  
+
   %------------
   %-- TITLES --
   %------------
@@ -284,13 +284,6 @@
   if not defined ffmpeg is used for aac encoding)
 }
 
-\newcommand{\DESCaudioRefinementCommandLine}{%
-  audio refinement command line with parameters for input
-  (\placeholder{infile}) and output (\placeholder{outfile}); this
-  commandline is optional when \embeddedCode{soxCommandLinePrefix}
-  is set, otherwise it is mandatory
-}
-
 \newcommand{\DESCalbumName}{%
   album for song group (embedded as ``album'' in audio and video
   files)
@@ -317,6 +310,39 @@
   \embeddedCode{voiceName} used for mixing the refined audio files
   into cumulated audio files; the factors are decimal values with 1.0
   meaning that the refined voice file is taken unchanged
+}
+
+\newcommand{\DESCaudioProcessorChainSeparator}{%
+  string or character used for separating audio chains within audio
+  refinement commands; defaults to ";"
+}
+
+\newcommand{\DESCaudioProcessorMixingCommandLine}{%
+  audio processor command line for mixing audio files with volume
+  factors containing \placeholder{factor}, \placeholder{infile} and
+  \placeholder{outfile} as placeholders; the group of factor and
+  infile is embraced by parentheses ("[]") and will be repeated
+  depending on the number of infiles with the parentheses removed;
+  if missing, mixing will be done by (slow) internal routines
+}
+
+\newcommand{\DESCaudioProcessorPaddingCommandLine}{%
+ audio processor command line for padding an audio files with leading
+ silence containing \placeholder{duration} (in seconds),
+ \placeholder{infile} and \placeholder{outfile} as
+ placeholders; if missing, padding will be done by (slow) internal
+ routines
+}
+
+\newcommand{\DESCaudioProcessorRedirector}{%
+  string or character used for specifying special inputs or outputs
+  within audio refinement commands; defaults to "->"
+}
+
+\newcommand{\DESCaudioProcessorRefinementCommandLine}{%
+  audio processor command line for audio refinement with parameters
+  for input (\placeholder{infile}), output (\placeholder{outfile}) and
+  the refinement commands (\placeholder{commands})
 }
 
 \newcommand{\DESCaudioTargetDirectoryPath}{%
@@ -493,8 +519,8 @@
 }
 
 \newcommand{\DESCsoundStyleXXX}{%
-  sequence of (sox) refinement commands to be applied on raw audio
-  file when this style is selected for \meta{voice}
+  sequence of refinement commands (typically from sox) to be applied
+  on raw audio file when this style is selected for \meta{voice}
 }
 
 \newcommand{\DESCsoundVariantList}{%
@@ -502,12 +528,6 @@
   with the list \embeddedCode{voiceName}; those style variant names
   are combined into a complete style name to be applied during audio
   refinement
-}
-
-\newcommand{\DESCsoxCommandLinePrefix}{%
-  command line prefix for sox audio filter with global options (like
-  buffering or multithreading settings); if missing, (slow) internal
-  routines will be used for audio shifting and mixdown
 }
 
 \newcommand{\DESCtargetDirectoryPath}{%
@@ -900,14 +920,14 @@ The options have the following meaning:
   \item [\embeddedCode{-k}]
         force the program to keep intermediate files
 
-  \item [\embeddedCode{--phases PHASELIST}]
+  \item [\embeddedCode{-\relax-phases PHASELIST}]
         specifies the processing phases or combination of processing
         phases to be applied; is a slash-separated identifier list
         from the set \embeddedCode{ \{all, preprocess, postprocess,
         extract, score, midi, silentvideo, rawaudio, refinedaudio,
         mixdown, finalvideo\}}
 
-  \item [\embeddedCode{--voices VOICELIST}]
+  \item [\embeddedCode{-\relax-voices VOICELIST}]
         gives the slash-separated list of voices where current phase
         should be done on (for example, only on vocals and on drums);
         those voice names should be a subset of the list of voices
@@ -1448,8 +1468,8 @@ figure~\ref{figure:configFileProgramVariables}.  For example,
 \embeddedCode{ffmpegCommand} tells the path of the ffmpeg command (you
 wouldn't have guessed that, would you?).
 
-Three entries are special: \embeddedCode{aacCommandLine} and
-\embeddedCode{soxCommandLinePrefix}.
+Two entries are special: \embeddedCode{aacCommandLine} and
+\embeddedCode{audioProcessor}.
 \begin{itemize}
 
   \item The aac command line specifies the complete line for an aac
@@ -1457,21 +1477,32 @@ Three entries are special: \embeddedCode{aacCommandLine} and
         \placeholder{outfile} as placeholders for the input and output
         file name.  If empty, ffmpeg is used for aac encoding.
 
-  \item The audio refinement command line specifies the complete
-        line for refining audio files with \placeholder{infile},
-        \placeholder{outfile} and \placeholder{commands} as
-        placeholders for the input and output file name and the
-        refinement commands from a sound style.  If empty the variable
-        \embeddedCode{soxCommandLinePrefix} \emph{must} be set.
-        
-  \item The sox command line prefix specifies the prefix for the
-        audio refinement command sox with command name and global
-        options (like buffering) for refinement, audio shifting and
-        mixdown.  If this value is not set, slow internal routines
-        will be used instead for audio shifting and mixdown and also
-        the variable \embeddedCode{audioRefinementCommandLine}
-        \emph{must} be set.
+  \item The audio processor settings variable specifies three commands
+        lines used in the refinement and mixdown phases and two
+        (optional) strings used for the refinement commands:
+        \begin{itemize}
 
+          \item the command line for refining audio files with
+                \placeholder{infile}, \placeholder{outfile} and
+                \placeholder{commands} as placeholders for the input
+                and output file name and the refinement commands
+                from a sound style,
+
+          \item the command line for mixing audio files with volume
+                factors containing \placeholder{factor},
+                \placeholder{infile} and \placeholder{outfile} as
+                placeholders with the repeating group of factor and
+                infile embraced by parentheses,
+
+          \item the command line for padding an audio files with leading
+                silence containing \placeholder{duration} (in seconds),
+                \placeholder{infile} and \placeholder{outfile} as
+                placeholders, and
+
+          \item the strings for separation of parallel chains and for
+                the redirection into temporary buffers (see below)
+
+        \end{itemize}
 \end{itemize}
 
 \begin{centeredFigure}
@@ -1483,11 +1514,6 @@ Three entries are special: \embeddedCode{aacCommandLine} and
                {\DESCaacCommandLine}
                {"/pathto/qaac -V100 -i \placeholder{infile}
                  -o \placeholder{outfile}"}
-
-    \varDescriptionLong{audioRefinementCommandLine}
-               {\DESCaudioRefinementCommandLine}
-               {"/pathto/sox \placeholder{infile}
-                 \placeholder{outfile} \placeholder{commands}"}
 
     \varDescriptionLong{ffmpegCommand}
                {\DESCffmpegCommand}
@@ -1509,14 +1535,35 @@ Three entries are special: \embeddedCode{aacCommandLine} and
                {\DESCmpfourboxCommand}
                {"/pathto/mp4box"}
 
-    \varDescriptionLong{soxCommandLinePrefix}
-               {\DESCsoxCommandLinePrefix}
-               {"/pathto/sox"}
-
   \end{variableDescriptionTableLong}
 
   \caption{Global Configuration Variables for Programs}
   \label{figure:configFileProgramVariables}
+\end{centeredFigure}
+
+\begin{centeredFigure}
+  \begin{variableDescriptionTableShort}
+
+    \varDescriptionShort{chainSeparator}
+                        {\DESCaudioProcessorChainSeparator}
+
+    \varDescriptionShort{mixingCommandLine}
+                        {\DESCaudioProcessorMixingCommandLine}
+
+    \varDescriptionShort{paddingCommandLine}
+                        {\DESCaudioProcessorPaddingCommandLine}
+
+    \varDescriptionShort{redirector}
+                        {\DESCaudioProcessorRedirector}
+
+    \varDescriptionShort{refinementCommandLine}
+                        {\DESCaudioProcessorRefinementCommandLine}
+
+  \end{variableDescriptionTableShort}
+
+  \caption{Parameters for Command Lines in
+           \embeddedCode{audioProcessor} Variable}
+  \label{figure:configFileAudioProcessorVariables}
 \end{centeredFigure}
 
 So an example setting in the configuration file for the global
@@ -1529,20 +1576,35 @@ configuration variables could look like that:
   lilypondVersion    = "2.18.2"
   midiToWavRenderingCommandLine = \
       "/usr/local/fluidsynth ${infile} ${outfile}"
-  soxCommandLinePrefix = \
-      "/usr/local/sox --buffer 100000 --multi-threaded"
 \end{configurationFileCode}
 
-Note that we use sox for audio refinement.  Other variables shown in
-figure~\ref{figure:configFilePathVariables} define file and path
-locations.  Very important is the path where the logging file
-\embeddedCode{ltvbc.log} is located: sometimes it is the only way to
-find out what went wrong.
+When using the standard software ``sox'' for audio refinement, this is
+specified by setting the \embeddedCode{audioProcessor} variable
+accordingly using the components from
+figure~\ref{figure:configFileAudioProcessorVariables}.
+
+\begin{configurationFileCode}
+  _sox = "/usr/local/sox --buffer 100000 --multi-threaded"
+  audioProcessor = \
+    "{ redirector: '->'," \
+    "  chainSeparator: ';'," \
+    "  mixingCommandLine: '" _sox \
+         " -m [-v ${factor} ${infile} ] ${outfile}'," \
+    "  paddingCommandLine: '" _sox \
+         " ${infile} ${outfile} pad ${duration}'," \
+    "  refinementCommandLine: '" _sox \
+         " ${infile} ${outfile} ${commands}' }"
+\end{configurationFileCode}
+
+Other variables shown in figure~\ref{figure:configFilePathVariables}
+define file and path locations.  Very important is the path where the
+logging file \embeddedCode{ltvbc.log} is located: sometimes it is the
+only way to find out what went wrong.
 
 Temporary files go to \embeddedCode{intermediateFileDirectoryPath}.
 By default, all temp files go to the current directory and the
 phase-internal files are deleted at the end of a phase (but you can
-prevent that, see~\ref{section:debugging}).
+prevent that, see chapter~\ref{section:debugging}).
 
 \begin{centeredFigure}
   \begin{variableDescriptionTableLong}
@@ -2180,7 +2242,7 @@ The algorithmic logic for a note humanization is as follows:
             \[v^\prime_i :=
               min(127,
                   max(0,
-                      v_i \cdot (\sigma(p_i) + \psi 
+                      v_i \cdot (\sigma(p_i) + \psi
                                       \cdot r_v\cdot adj_v)))\]
 
         If the velocity already varies within a measure, no emphasis
@@ -2362,7 +2424,7 @@ So we have two configuration file variables:
         ``hardware'' parameters (because normally the video should
         have the appropriate size), others like
         \embeddedCode{topBottomMargin} the layout of the video.
-        
+
         Figure~\ref{figure:targetVideoVariables} shows how some of the
         parameters for video generation are connected to the physical
         output device and the video target in general.
@@ -2546,10 +2608,9 @@ The following processing is done:
         each relevant audio voice into a refined audio file,
 
   \item [mixdown:]
-        mixed versions of the voice audio
-        files are generated with \embeddedCode{sox} grouped into audio
-        groups from the configuration file (for later selection as
-        audio track), and
+        mixed versions of the voice audio files are generated with
+        \embeddedCode{sox} grouped into audio groups from the
+        configuration file (for later selection as audio track), and
 
   \item [finalvideo:]
         the still videos and the subtitle file produced from the
@@ -2622,10 +2683,10 @@ information can be found in the sox
 documentation~\cite{reference:soxDocumentation}.
 
 Note that you can also use another command-line audio processor by
-setting the variable \embeddedCode{audioRefinementCommandLine}
-appropriately and adapting the refinement commands for the voices for
-the tool used.  But this is an expert solution beyond the scope of
-this documentation; hence you are on your own\dots
+setting the variable \embeddedCode{audioProcessor} appropriately and
+adapting the refinement commands for the voices for the tool used.
+But this is an expert solution beyond the scope of this documentation;
+hence you are on your own\dots
 
 Each audio voice is transformed depending on voice-specific settings
 in the configuration file.  Because the input file comes from the
@@ -2692,7 +2753,7 @@ There are four things to note:
   \item Normally processing is purely sequential with a single signal
         path (which is standard sox behaviour).  But it is possible to
         add parallel signal paths and to combine them (e.g. for New
-        York parallel compression etc.).
+        York parallel compression etc.).  See below\dots
 
   \item Reverb may be specified in the chain or ---~for really
         simple applications~--- is automatically applied with default
@@ -3396,13 +3457,21 @@ also use slashes as path separators for Windows.
   fluidsynthCommand = _programDirectory "/fluidsynth"
   lilypondCommand = _programDirectory "/lilypond"
   lilypondVersion = "2.18.2"
-  soxCommandLinePrefix = _programDirectory "/sox"
+  _sox = _programDirectory "/sox"
+  audioProcessor = "{" \
+    "mixingCommandLine: '" _sox \
+        " -m [-v ${factor} ${infile} ] ${outfile}'," \
+    "paddingCommandLine: '" _sox \
+        " ${infile} ${outfile} pad ${duration}'," \
+    "refinementCommandLine: '" _sox \
+        " ${infile} ${outfile} ${commands}'" \
+  "}"
 \end{configurationFileCode}
 
 We have not provided a definition for the \embeddedCode{mp4boxcommand}
 because ---~as a default~--- ffmpeg can also do the MP4 container
-packaging.  Note also that aac and sox must have more extensive
-definitions.
+packaging.  Note also that aac and the audio processing via sox must
+have more extensive definitions.
 
 Other global settings define paths for files or directories.  The
 generated PDF and MIDI files go to subdirectory ``generated'' of the
@@ -3751,10 +3820,6 @@ planned for future versions:
 
 \begin{itemize}
 
-  \item The audio processing chain during the postprocessing phase 
-        is currently linear.  It is planned to allow complex function
-        graphs (DAGs) for audio processing.
-
   \item The sound variant list (describing a single sound variant for
         each voice) shall be replaced by map from voice to a map from
         measure to sound variant.  This allows to have individual
@@ -3781,7 +3846,7 @@ planned for future versions:
         could be done, if the used midi-to-wav-converter produced a
         multi-channel result and the refinement stage were able to
         combine those parts into a final result.  But possibly this
-        must go into the workflow itself.
+        should go into the workflow itself.
 
 \end{itemize}
 
@@ -3811,12 +3876,6 @@ been mentioned first in the current document.
                         {empty}
                         {Program}
 
-    \varDescriptionFinal{audioRefinementCommandLine}
-                        {\DESCaudioRefinementCommandLine}
-                        {empty, must be set when
-                         \embeddedCode{soxCommandLinePrefix} is empty}
-                        {Program}
-
     \varDescriptionFinal{albumName}
                         {\DESCalbumName}
                         {"UNKNOWN ALBUM"}
@@ -3841,6 +3900,32 @@ been mentioned first in the current document.
                         {\DESCaudioLevelList}
                         {\mandatory, compatible to voiceNameList}
                         {Mixdown}
+
+
+    \varDescriptionFinal{audioProcessor\bdot chainSeparator}
+                        {\DESCaudioProcessorChainSeparator}
+                        {";"}
+                        {AudioProcessor}
+
+    \varDescriptionFinal{audioProcessor\bdot mixingCommandLine}
+                        {\DESCaudioProcessorMixingCommandLine}
+                        {empty, uses (slow) internal routine}
+                        {AudioProcessor}
+
+    \varDescriptionFinal{audioProcessor\bdot paddingCommandLine}
+                        {\DESCaudioProcessorPaddingCommandLine}
+                        {empty, uses (slow) internal routine}
+                        {AudioProcessor}
+
+    \varDescriptionFinal{audioProcessor\bdot redirector}
+                        {\DESCaudioProcessorRedirector}
+                        {"->"}
+                        {AudioProcessor}
+
+    \varDescriptionFinal{audioProcessor\bdot refinementCommandLine}
+                        {\DESCaudioProcessorRefinementCommandLine}
+                        {\mandatory}
+                        {AudioProcessor}
 
     \varDescriptionFinal{audioTargetDirectory\-Path}
                         {\DESCaudioTargetDirectoryPath}
@@ -4027,13 +4112,6 @@ been mentioned first in the current document.
                         {\mandatory, compatible to voiceNameList}
                         {Audio}
 
-    \varDescriptionFinal{soxCommandLinePrefix}
-                        {\DESCsoxCommandLinePrefix}
-                        {empty, must be set when
-                         \embeddedCode{audioRefinementCommandLine} is
-                         empty}
-                        {Program}
-
     \varDescriptionFinal{targetDirectoryPath}
                         {\DESCtargetDirectoryPath}
                         {current directory}
@@ -4213,7 +4291,7 @@ been mentioned first in the current document.
         underlying generation programs; consists of key-value pairs
         with variable names as keys followed by an equal sign and a
         string, boolean or numeric value
-        
+
     \item [extract (phase)]
         a \glossaryLink{processing phase} producing the extract PDF
         notation files for single \glossaryLink{voice}s using the
@@ -4259,7 +4337,7 @@ been mentioned first in the current document.
         information; based on a song-specific
         \glossaryLink{configuration file} the generator provides wrapping
         lilypond code and calls the appropriated underlying programs
-        
+
     \item [midi (phase)]
         a \glossaryLink{processing phase} producing a MIDI file
         containing all \glossaryLink{voice}s with specified

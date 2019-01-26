@@ -676,10 +676,9 @@ def initialize ():
         VideoAudioCombiner.initialize(configData.ffmpegCommand,
                                       configData.mp4boxCommand)
         AudioTrackManager.initialize(configData.aacCommandLine,
-                                     configData.audioRefinementCommandLine,
+                                     configData.audioProcessorMap,
                                      configData.ffmpegCommand,
                                      configData.midiToWavRenderingCommandLine,
-                                     configData.soxCommandLinePrefix,
                                      configData.soundStyleNameToTextMap,
                                      configData.intermediateFilesAreKept)
         MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,

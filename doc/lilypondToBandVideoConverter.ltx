@@ -2820,19 +2820,23 @@ Parallel signal paths cannot be handled directly by sox and are
 emulated by \ltbvc.  They can be specified as follows:
 \begin{itemize}
   \item Parallel chains are specified by using chain separators using
-        the character token ``;''.
+        the character token ``;'' (which can be redefined by setting
+        \embeddedCode{audioProcessor.chainSeparator}).
 
   \item For each chain its (single) source and target are each given
         by an identifier that is immediately preceeded or followed by
-        ``->''.  So a chain target might be specified as ``->xxx'', a
-        chain source might be specified as ``yyy->''.  When no
-        identifier is given for a source, the raw audio file is used.
+        ``->'' (which can be redefined by setting
+        \embeddedCode{audioProcessor.redirector}).  So a chain target
+        might be specified as ``->xxx'', a chain source might be
+        specified as ``yyy->''.  When no identifier is given for a
+        source, the raw audio file is used.
 
         Note that, of course, the name of a chain source must occur
-        as a preceeding chain target.
+        as a chain target somewhere before.
 
-        The first chain has ``->'' (the raw audio file) as its chain
-        source, the last chain has the refined audio file as target.
+        The first chain has ``->'' (the raw audio file) as its
+        implicit chain source, the last chain has the refined audio
+        file as its implicit target.
 
   \item A chain may consist of a special ``mix'' command that does a
         weighted mix of several sources into a single target.

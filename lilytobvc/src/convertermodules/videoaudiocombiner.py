@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # videoaudiocombiner -- services for combining silent video files with
 #                       audio tracks and measure counting subtitles
 #
@@ -235,7 +234,7 @@ class VideoAudioCombiner:
 
         for i, audioTrackData in enumerate(trackDataList):
             _, _, _, audioFilePath, description,\
-                languageCode = audioTrackData
+              languageCode, _, _, _ = audioTrackData
             element = (audioFilePath, languageCode, description)
             audioTrackDataList.append(element)
 

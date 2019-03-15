@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # midiTransformer -- processes midi file and provides several
 #                    transformations on it (e.g. drum humanization,
 #                    volume adaptation, etc.)

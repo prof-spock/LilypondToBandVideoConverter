@@ -294,27 +294,14 @@
   artist'' in audio and video files)
 }
 
-\newcommand{\DESCattenuationLevel}{%
-  decimal value in decibels telling the volume change to be applied to
-  the final audio files; this is helpful to adjust volume levels of
-  different songs within an album
-}
-
 \newcommand{\DESCaudioGroupToVoicesMap}{%
   mapping from freely defined voice group names to names of voices
   contained in that group described by a slash-separated name list
 }
 
-\newcommand{\DESCaudioLevelList}{%
-  list of volume factors aligned with the list
-  \embeddedCode{voiceName} used for mixing the refined audio files
-  into cumulated audio files; the factors are decimal values with 1.0
-  meaning that the refined voice file is taken unchanged
-}
-
 \newcommand{\DESCaudioProcessorChainSeparator}{%
   string or character used for separating audio chains within audio
-  refinement commands; defaults to ";"
+  refinement effects; defaults to ";"
 }
 
 \newcommand{\DESCaudioProcessorMixingCommandLine}{%
@@ -324,6 +311,11 @@
   infile is embraced by parentheses ("[]") and will be repeated
   depending on the number of infiles with the parentheses removed;
   if missing, mixing will be done by (slow) internal routines
+}
+
+\newcommand{\DESCaudioProcessorNormalizationEffect}{%
+  audio processor command for normalizing audio to a dbFS value
+  containing \placeholder{attenuationLevel} as placeholder
 }
 
 \newcommand{\DESCaudioProcessorPaddingCommandLine}{%
@@ -336,13 +328,13 @@
 
 \newcommand{\DESCaudioProcessorRedirector}{%
   string or character used for specifying special inputs or outputs
-  within audio refinement commands; defaults to "->"
+  within audio refinement effects; defaults to "->"
 }
 
 \newcommand{\DESCaudioProcessorRefinementCommandLine}{%
   audio processor command line for audio refinement with parameters
   for input (\placeholder{infile}), output (\placeholder{outfile}) and
-  the refinement commands (\placeholder{commands})
+  the refinement effects (\placeholder{effects})
 }
 
 \newcommand{\DESCaudioTargetDirectoryPath}{%
@@ -353,6 +345,12 @@
 \newcommand{\DESCaudioTrackAlbumName}{%
   name of the album of the audio file for given list of voices (where
   an embedded dollar-sign is replaced by the global album name)
+}
+
+\newcommand{\DESCaudioTrackAttenuationLevel}{%
+  decimal value in decibels telling the volume change to be applied to
+  a track audio file; this is helpful to adjust volume levels of
+  different songs within an album
 }
 
 \newcommand{\DESCaudioTrackAudioFileTemplate}{%
@@ -376,10 +374,22 @@
   supported by video players)
 }
 
+\newcommand{\DESCaudioTrackMasteringEffectList}{%
+  list of audio track specific refinement effects to be applied after
+  voice mixdown
+}
+
 \newcommand{\DESCaudioTrackSongNameTemplate}{%
   template string defining how the song name for given list of voices
   is constructed from the plain song name (indicated by a
   dollar-sign)
+}
+
+\newcommand{\DESCaudioTrackVoiceNameToAudioLevelMap}{%
+  mapping from voice names to volume factors used for mixing the
+  refined audio files into cumulated audio file for given track; the
+  factors are decimal values (where 1.0 means that the refined voice
+  file is taken without change)
 }
 
 \newcommand{\DESCaudioTrackList}{%
@@ -511,7 +521,7 @@
   list of reverb levels (as decimal values typically between 0 and 1)
   for the voices aligned with the list \embeddedCode{voiceNameList};
   those reverb levels are applied to each voice as the final
-  refinement operation
+  refinement operation (when the sox audio processor is used)
 }
 
 \newcommand{\DESCscoreVoiceNameList}{%
@@ -519,7 +529,7 @@
 }
 
 \newcommand{\DESCsoundStyleXXX}{%
-  sequence of refinement commands (typically from sox) to be applied
+  sequence of refinement effects (typically from sox) to be applied
   on raw audio file when this style is selected for \meta{voice}
 }
 
@@ -925,7 +935,7 @@ The options have the following meaning:
         phases to be applied; is a slash-separated identifier list
         from the set \embeddedCode{ \{all, preprocess, postprocess,
         extract, score, midi, silentvideo, rawaudio, refinedaudio,
-        mixdown, finalvideo\}}
+        mix, finalvideo\}}
 
   \item [\embeddedCode{-\relax-voices VOICELIST}]
         gives the slash-separated list of voices where current phase
@@ -943,7 +953,8 @@ The options have the following meaning:
 \end{ttDescription}
 
 The several processing phases of \ltbvc\ produce the several outputs
-incrementally.  Those phases have the following meanings:
+incrementally and are named by the kind of result they produce.  Those
+phases have the following meanings:
 
 \begin{ttDescription}
 
@@ -969,13 +980,13 @@ incrementally.  Those phases have the following meanings:
 
   \item [refinedaudio:]
         generates (intermediate) audio files for all the instrument
-        voices with additional sound processing applied,
+        voices with additional audio processing applied,
 
-  \item [mixdown:]
+  \item [mix:]
         generates final compressed audio files with submixes of all
-        instruments voices based on the refined audio files with
-        specified volume balance (where the submix variants are
-        configurable), and
+        instrument voices based on the refined audio files with
+        a specified volume balance and some subsequent mastering audio
+        processing (where the submix variants are configurable), and
 
   \item [finalvideo:]
         generates a final video file with all submixes as selectable
@@ -1021,7 +1032,7 @@ There are also some combining phase available as follows:
 
   \item [postprocess:]
         combining all the phases \embeddedCode{rawaudio},
-        \embeddedCode{refinedaudio}, \embeddedCode{mixdown} and
+        \embeddedCode{refinedaudio}, \embeddedCode{mix} and
         \embeddedCode{finalvideo} for generation of the intermediate
         raw and refined WAV files, the submixes as compressed audios
         and the final videos for all video file kinds
@@ -1097,7 +1108,7 @@ Each configuration file has a simple line-oriented syntax as follows:
 
   \item A line ending with a continuation marker
         ``\textvisiblespace\textbackslash'' is combined with the
-        following line.
+        following line with the continuation marker discarded.
 
   \item Each relevant line starts with an identifier followed by an
         equal sign and the associated value.  The associated value may
@@ -1119,11 +1130,12 @@ Each configuration file has a simple line-oriented syntax as follows:
         character.
 
   \item When a variable identifier occurs on the right hand side of an
-        assignment, it is replaced by its associated value.  If there is
-        none, this is an error.  The processing is strictly
-        sequential: the use of an identifier must come after its
-        definition.  It is okay to use an identifier in its own
-        redefinition.
+        assignment, it is \emph{immediately} replaced by its
+        associated value.  If there is none, this is an error.  The
+        processing is strictly sequential: the use of an identifier
+        \emph{must occur after its definition}.  It is okay to use an
+        identifier in its own redefinition or to have more than one
+        definitions of an identifier.
 
   \item A sequence of adjacent string literals or variables with
         string contents are concatenated into a single string value.
@@ -1478,14 +1490,14 @@ Two entries are special: \embeddedCode{aacCommandLine} and
         file name.  If empty, ffmpeg is used for aac encoding.
 
   \item The audio processor settings variable specifies three commands
-        lines used in the refinement and mixdown phases and two
+        lines used in the refinement and mix phases and two
         (optional) strings used for the refinement commands:
         \begin{itemize}
 
           \item the command line for refining audio files with
                 \placeholder{infile}, \placeholder{outfile} and
-                \placeholder{commands} as placeholders for the input
-                and output file name and the refinement commands
+                \placeholder{effects} as placeholders for the input
+                and output file name and the refinement effects
                 from a sound style,
 
           \item the command line for mixing audio files with volume
@@ -1493,6 +1505,10 @@ Two entries are special: \embeddedCode{aacCommandLine} and
                 \placeholder{infile} and \placeholder{outfile} as
                 placeholders with the repeating group of factor and
                 infile embraced by parentheses,
+
+          \item the effect for attenuating an audio file by some factor
+                given in dB containing \placeholder{attenuationLevel} as
+                placeholder,
 
           \item the command line for padding an audio files with leading
                 silence containing \placeholder{duration} (in seconds),
@@ -1550,6 +1566,9 @@ Two entries are special: \embeddedCode{aacCommandLine} and
     \varDescriptionShort{mixingCommandLine}
                         {\DESCaudioProcessorMixingCommandLine}
 
+    \varDescriptionShort{normalizationEffect}
+                        {\DESCaudioProcessorNormalizationEffect}
+
     \varDescriptionShort{paddingCommandLine}
                         {\DESCaudioProcessorPaddingCommandLine}
 
@@ -1588,12 +1607,13 @@ figure~\ref{figure:configFileAudioProcessorVariables}.
   audioProcessor = \
     "{ redirector: '->'," \
     "  chainSeparator: ';'," \
+    "  normalizationEffect: 'norm ${attenuationLevel}'," \
     "  mixingCommandLine: '" _sox \
          " -m [-v ${factor} ${infile} ] ${outfile}'," \
     "  paddingCommandLine: '" _sox \
          " ${infile} ${outfile} pad ${duration}'," \
     "  refinementCommandLine: '" _sox \
-         " ${infile} ${outfile} ${commands}' }"
+         " ${infile} ${outfile} ${effects}' }"
 \end{configurationFileCode}
 
 Other variables shown in figure~\ref{figure:configFilePathVariables}
@@ -1799,7 +1819,7 @@ identifier) in the variable \embeddedCode{voiceNameList}.
 
 Note that the order in the voice name list is significant, because
 later on variable in other phases rely on that order.  For example,
-the audio volumes for phase ``mixdown'' in variable
+the audio volumes for phase ``mix'' in variable
 \embeddedCode{audioVolumeList} have the same order as the
 \embeddedCode{voiceNameList}.  So the lines
 
@@ -2607,10 +2627,11 @@ The following processing is done:
         file is refined typically by \embeddedCode{sox} processing for
         each relevant audio voice into a refined audio file,
 
-  \item [mixdown:]
-        mixed versions of the voice audio files are generated with
-        \embeddedCode{sox} grouped into audio groups from the
-        configuration file (for later selection as audio track), and
+  \item [mix:]
+        mixed and mastered versions of the voice audio files are
+        generated, mastered and grouped into audio groups from the
+        configuration file (for later selection as audio track)
+        typically by \embeddedCode{sox} , and
 
   \item [finalvideo:]
         the still videos and the subtitle file produced from the
@@ -2693,9 +2714,9 @@ in the configuration file.  Because the input file comes from the
 previous ``rawaudio'' phase (for example ``bass.wav'') and the output
 file name for the ``refinedaudio'' phase is also well-defined (for
 example as ``bass-processed.wav''), we only have to specify the sox
-commands for the transformation itself.
+effects for the transformation itself.
 
-Those commands depend on the voice/instrument and on the style of the
+Those effects depend on the voice/instrument and on the style of the
 playing and this is combined in a so-called \emph{sound style}
 variable.
 
@@ -2747,7 +2768,7 @@ There are four things to note:
         is active, this ``effect'' writes out the audio data available
         at that position in the chain into a temporary file in the
         target audio directory called ``\meta{voice}X.wav'' where X
-        stands for a hex number.  Multiple ``tee'' commands are
+        stands for a hex number.  Multiple ``tee'' occurrences are
         possible, so you can do an audio debugging of your chain.
 
   \item Normally processing is purely sequential with a single signal
@@ -2760,11 +2781,15 @@ There are four things to note:
         parameters and an intensity defined by the configuration
         variable \embeddedCode{reverbLevelList} to the final audio.
 
-        If that simple reverb is not good enough and specific settings
-        are needed, you can set the reverb level for some voice to 0
-        and add a more elaborate reverb effect to the sound style.  If
-        you leave off the \embeddedCode{reverbLevelList} altogether,
-        all voices have no automatic reverb applied.
+        Note that this feature is only available when the sox audio
+        processor is used.
+
+        If this is not the case or the simple reverb is not good
+        enough and specific settings are needed, you can set the
+        reverb level for some voice to 0 and add a more elaborate
+        reverb effect to the sound style.  If you leave off the
+        \embeddedCode{reverbLevelList} altogether, all voices have no
+        automatic reverb applied.
 
 \end{enumerate}
 
@@ -2785,9 +2810,9 @@ and applies the specified reverb to it.
 
 The sound variant may be given in any letter case, because it is
 automatically adapted for the selection of the sound style.  Combined
-with the above sound style this leads to the following sox commands
----~when debugging is active~--- (note the command split at the tee
-effect and the added final reverb with \embeddedCode{100\(\cdot\)
+with the above sound style this leads to the following sox effects
+---~when debugging is active~--- (note the effect line split at the
+tee effect and the added final reverb with \embeddedCode{100\(\cdot\)
 reverbLevel}):
 
 \begin{commandLine}
@@ -2834,7 +2859,7 @@ emulated by \ltbvc.  They can be specified as follows:
         The first chain has ``->'' (the raw audio file) as its chain
         source, the last chain has the refined audio file as target.
 
-  \item A chain may consist of a special ``mix'' command that does a
+  \item A chain may consist of a special ``mix'' effect that does a
         weighted mix of several sources into a single target.
         E.g. the chain
         \begin{configurationFileCode}
@@ -2846,7 +2871,7 @@ emulated by \ltbvc.  They can be specified as follows:
         Very often, the last chain is a mix of several sources into
         the refined audio file as the target.
 
-        A ``mix'' command must not have an embedded ``tee''.
+        A ``mix'' effect must not have an embedded ``tee''.
 \end{itemize}
 
 As an example let us enhance a bass part by adding a copy pitched down
@@ -2958,25 +2983,17 @@ configuration variables described for the ``rawaudio'' and
 \end{centeredFigure}
 
 %........................................................
-\subsubsection{Final Audio Generation: ``mixdown'' Phase}
+\subsubsection{Final Audio Generation: ``mix'' Phase}
 %........................................................
 
-The ``mixdown'' phase combines the refined audio files into one or
+The ``mix'' phase combines the refined audio files into one or
 more audio file with all voices and in aac audio format.
 
-Audio levels of the individual voices and a final attenuation factor
-are specified in the configuration; the audio voices are mixed with
-those levels and the attenuation is applied to the mix before it gets
-compressed into an AAC file.
-
-The entries are specified as follows:
-
-\begin{configurationFileCode}
-  voiceNameList  = "...,  bass, guitar, ..."
-  audioLevelList = "...,   0.7,    0.5, ..."
-
-  attenuationLevel = -0.2
-\end{configurationFileCode}
+Audio levels of the individual voices, mastering effects and a final
+attenuation factor are specified in the configuration.  Hence the
+audio voices are mixed with those levels, have the mastering audio
+processing applied and finally are attenuated by the given factor
+before the result is compressed into an AAC file.
 
 The target file is stored in the
 \embeddedCode{audioTargetDirectoryPath} with a name concatenated from
@@ -2985,7 +3002,7 @@ suffix ``-ALL.m4a''.
 
 But: you do not want a backing track with all voices of your
 arrangement, but the ones to be played live should be missing and
-ideally one should be able to switch them on and off!
+ideally you should be able to switch them on and off!
 
 Again we specify this by several mapping variables in the
 configuration file.
@@ -3004,7 +3021,7 @@ names.
    "}"
 \end{configurationFileCode}
 
-The voice names in the song should be a subset of the voice names
+The voice names in the song should be a subset of those voice names
 mentioned in the audio group map, missing or extraneous voice names
 will be ignored.  When defining those settings globally for a group of
 songs, ensure that typical voice name variants (like, for example,
@@ -3019,7 +3036,9 @@ Each track is described by a track descriptor with several fields as
 shown in figure~\ref{figure:configFileAudioTrackVariables}.  It
 consists of a list of the several groups to be combined, templates for
 the audio file and the song name, an album name, and some description
-and a language code for the video track.
+and a language code for the video track.  Also there is some audio
+information about the specific volume levels for each voice, the
+mastering effects for this voice and the final attenuation level.
 
 \begin{centeredFigure}
   \begin{variableDescriptionTableShort}
@@ -3042,6 +3061,15 @@ and a language code for the video track.
     \varDescriptionShort{languageCode}
                         {\DESCaudioTrackLanguageCode}
 
+    \varDescriptionShort{voiceNameTo\-AudioLevelMap}
+                        {\DESCaudioTrackVoiceNameToAudioLevelMap}
+
+    \varDescriptionShort{masteringEffectList}
+                        {\DESCaudioTrackMasteringEffectList}
+
+    \varDescriptionShort{attenuationLevel}
+                        {\DESCaudioTrackAttenuationLevel}
+
   \end{variableDescriptionTableShort}
 
   \caption{Parameters for Audio Track in \embeddedCode{audioTrackList}
@@ -3059,23 +3087,64 @@ Of course, the selected languages are quite arbitrary, because you
 typically do not find a connection between a list of audio voice names
 and some language name.  So you must be creative\dots
 
-Altogether we have something like that in the configuration file:
+\begin{centeredFigure}
+  \centeredExternalPicture{0.65}{trackMixdown.mps}
+  \caption{Audio Flow during Track Mixdown}
+  \label{figure:trackMixdown}
+\end{centeredFigure}
+
+The final stage of audio processing is described by the attributes
+\embeddedCode{voiceNameToAudioLevelMap},
+\embeddedCode{masteringEffectList} and
+\embeddedCode{attenuationLevel}.  Figure~\ref{figure:trackMixdown}
+illustrates how the audio voice files from the ``refinedaudio'' phase
+are combined into the several audio tracks by the mix phase.  In
+principle the mix levels per voice can be individual per audio track
+as well as its mastering effects and its final level, but of course
+there is no adaptation of the voice files done: they are taken
+unchanged from the previous phase.
+
+Nevertheless you can also define global settings for all of those and
+reference them in the audio track list variable.  Especially the audio
+level map may be global, because the track specific mapping will only
+use the levels of those voices defined in its associated audio groups.
+
+In the configuration file we can define auxiliary variables for the
+audio processing:
+
+\begin{configurationFileCode}
+  _voiceNameToAudioLevelMap = "{" \
+      " bass : 0.5, keyboard : 0.3, keyboardSimple : 0.2," \
+      " strings : 0.8, vocals : 1.0, bgVocals : 0.9," \
+      " guitar : 0.6, drums : 1.2, percussion : 1.0" \
+    "}"
+  _masteringEffectList = ""
+  _attenuationLevel = -1.2
+\end{configurationFileCode}
+
+They are used in the audio track list definition.
 
 \begin{configurationFileCode}
   audioTrackList = "{" \
-    "all :   { audioGroupList    : base/voc/gtr/drm,"    \
-    "          audioFileTemplate : '$',"                 \
-    "          songNameTemplate  : '$ [ALL]',"           \
-    "          albumName         : 'Best',"              \
-    "          description       : 'all voices',"        \
-    "          languageCode      : eng },"               \
-    "novoc : { audioGroupList    : base/gtr/drm,"        \
-    "          audioFileTemplate : '$-novoc',"           \
-    "          songNameTemplate  : '$ [-V]',"            \
-    "          albumName         : 'Best [no vocals]',"  \
-    "          description       : 'no vocals',"         \
-    "          languageCode      : deu },"               \
-    ...
+   "all :   { audioGroupList   : base/voc/gtr/drm," \
+   " audioFileTemplate        : '$'," \
+   " songNameTemplate         : '$ [ALL]'," \
+   " albumName                : 'Best'," \
+   " description              : 'all voices'," \
+   " languageCode             : eng," \
+   " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"," \
+   " masteringEffectList      : "_masteringEffectList"," \
+   " attenuationLevel         : "_attenuationLevel"}," \
+   "novoc : { audioGroupList   : base/gtr/drm," \
+   " audioFileTemplate        : '$-novoc'," \
+   " songNameTemplate         : '$ [-V]'," \
+   " albumName                : 'Best [no vocals]'," \
+   " description              : 'no vocals'," \
+   " languageCode             : deu," \
+   " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"," \
+   " masteringEffectList     : "_masteringEffectList"," \
+   " attenuationLevel         : "_attenuationLevel"}," \
+   ...
   "}"
 \end{configurationFileCode}
 
@@ -3099,7 +3168,7 @@ the following properties:
 
 \end{enumerate}
 
-Figure~\ref{figure:configFileMixdownVariables} shows the variables
+Figure~\ref{figure:configFileMixVariables} shows the variables
 introduced in this section in summary.
 
 \begin{centeredFigure}
@@ -3107,17 +3176,9 @@ introduced in this section in summary.
 
     \varDescriptionHeaderLong
 
-    \varDescriptionLong{attenuationLevel}
-                       {\DESCattenuationLevel}
-                       {-1.3}
-
     \varDescriptionLong{audioGroupToVoicesMap}
                        {\DESCaudioGroupToVoicesMap}
                        {see text}
-
-    \varDescriptionLong{audioLevelList}
-                       {\DESCaudioLevelList}
-                       {"0.7, 0.5, 1.2"}
 
     \varDescriptionLong{audioTargetDirectoryPath}
                        {\DESCaudioTargetDirectoryPath}
@@ -3129,8 +3190,8 @@ introduced in this section in summary.
 
   \end{variableDescriptionTableLong}
 
-  \caption{Mixdown Configuration File Variables}
-  \label{figure:configFileMixdownVariables}
+  \caption{Mix Configuration File Variables}
+  \label{figure:configFileMixVariables}
 \end{centeredFigure}
 
 %.....................................................
@@ -3155,7 +3216,7 @@ following parts:
   \item the subtitle file located in
         \embeddedCode{targetDirectoryPath}, and
 
-  \item the compressed audio files generated by the ``mixdown'' phase
+  \item the compressed audio files generated by the ``mix'' phase
         and located in \embeddedCode{audioTargetDirectoryPath}
 \end{itemize}
 
@@ -3203,15 +3264,16 @@ As the example we take a twelve-bar blues in E with two verses and
 some intro and outro.  Note that this song is just an example, its
 musical merit is limited.
 
-In the following we shall work with three files:
+In the following we shall work with four files:
 \begin{itemize}
-
-  \item a global configuration file containing overall settings (like
-        for example, the path to programs),
 
   \item a song-specific configuration file containing the settings
         for the song (like, for example, the title of the song or the
         voice names), and
+
+  \item a global configuration containing the overall settings (like
+        for example, the path to programs) in two files: one before
+        and one after the song-specific configuration,
 
   \item a lilypond music file containing the music fragments used by
         the generator.
@@ -3223,7 +3285,7 @@ single lilypond fragment file, but by this approach we can keep global
 and song-specific stuff separate.
 
 In the following we explain the lilypond fragment file and
-configuration file in pieces; the complete versions are in the
+configuration files in pieces; the complete versions are in the
 distribution.
 
 %---------------------------------------
@@ -3433,16 +3495,16 @@ case for extracts/score and other notation renderings.
 \section{Example Configuration Files}
 %------------------------------------
 
-As mentioned above the configuration is split up into a file with
-global settings and one with the song settings.
+As mentioned above the configuration is split up into three files: two
+with global settings and one with the song settings.
 
 As a convention we prefix auxiliary variable with an underscore to
 distinguish them from the real configuration variables.
 
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-\subsection{Example Global Configuration}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Example Global Configuration - Part 1}
 \label{section:exampleGlobalConfiguration}
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The first setup steps define the program locations.  We assume that
 programs are located together in some directory, but this depends on
@@ -3461,6 +3523,7 @@ also use slashes as path separators for Windows.
   audioProcessor = "{" \
     "mixingCommandLine: '" _sox \
         " -m [-v ${factor} ${infile} ] ${outfile}'," \
+    "normalizationCommand: 'norm ${attenuationLevel}'," \
     "paddingCommandLine: '" _sox \
         " ${infile} ${outfile} pad ${duration}'," \
     "refinementCommandLine: '" _sox \
@@ -3605,23 +3668,12 @@ path ``./mediaFiles/test-wonderful\_song.m4a''.
       " voc  : vocals/bgVocals," \
       " gtr  : guitar" \
   "}"
-
-  audioTrackList = "{" \
-      "all :      { audioGroupList    : base/voc/gtr,"  \
-      "             audioFileTemplate : '$',"      \
-      "             songNameTemplate  : '$ [ALL]',"     \
-      "             albumName         : '$',"           \
-      "             description       : 'all voices',"  \
-      "             languageCode      : deu },"         \
-      "novocals : { audioGroupList    : base/gtr,"      \
-      "             audioFileTemplate : '$-v',"    \
-      "             songNameTemplate  : '$ [-V]',"      \
-      "             albumName         : '$ [-V]',"      \
-      "             description       : 'no vocals',"   \
-      "             languageCode      : eng }"          \
-  "}"
 \end{configurationFileCode}
 
+The global setting \embeddedCode{audioTrackList} cannot be defined
+here, because it relies on setting made in the song configuration.
+Hence we split the file here and put the \embeddedCode{audioTrackList}
+setting in a second part below.
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \subsection{Example Song Configuration}
@@ -3641,9 +3693,8 @@ properties:
 \end{configurationFileCode}
 
 The main information about a song is given in the table of voices with
-the voice names, midi data, audio and reverb levels and the sound
-variants.  As mentioned before only bass and guitar have an audio
-postprocessing.
+the voice names, midi data, reverb levels and the sound variants.
+Note that only bass and guitar have an audio postprocessing.
 
 \begin{configurationFileCode}
   voiceNameList      =  "vocals,    bass,  guitar,   drums"
@@ -3651,10 +3702,21 @@ postprocessing.
   midiInstrumentList =  "    54,      35,      29,      18"
   midiVolumeList     =  "   100,     120,      70,     110"
   panPositionList    =  "     C,    0.3R,    0.8R,    0.1L"
-  audioLevelList     =  "   1.0,    0.83,    0.33,    1.48"
   reverbLevelList    =  "   0.3,     0.2,     0.0,     0.4"
   soundVariantList   =  "  COPY, EXTREME,  CRUNCH,    COPY"
 \end{configurationFileCode}
+
+The audio levels are given in a mapping, which is used in the audio
+track list.  We use a single mapping for all targets, that means the
+relative levels are identical in all mixes.
+
+\begin{configurationFileCode}
+  _voiceNameToAudioLevelMap = \
+    "{ vocals : 1.0, bass : 0.83, guitar : 0.33, drums : 1.48 }"
+\end{configurationFileCode}
+
+Note that the above definition must come before the
+\embeddedCode{audioTrackList} definition.
 
 We also have lyrics: two lines of lyrics in vocals extract and score,
 one (serialized) line in the video.
@@ -3680,14 +3742,57 @@ The overall tempo is 85bpm throughout the song.
   measureToTempoMap = "{ 1 : 85 }"
 \end{configurationFileCode}
 
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\subsection{Example Global Configuration - Part 2}
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We already emphasized that at least the \embeddedCode{audioTrackList}
+setting must come \emph{after} the song parameters, because it relies
+on the voice name to audio level mapping.  So here is the missing
+part.
+
+\begin{configurationFileCode}
+  audioTrackList = "{" \
+    "all : { audioGroupList : base/voc/gtr," \
+    " audioFileTemplate        : '$'," \
+    " songNameTemplate         : '$ [ALL]'," \
+    " albumName                : '$'," \
+    " description              : 'all voices'," \
+    " languageCode             : deu," \
+    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}," \
+    "novocals : { audioGroupList : base/gtr," \
+    " audioFileTemplate        : '$-v'," \
+    " songNameTemplate         : '$ [-V]'," \
+    " albumName                : '$ [-V]'," \
+    " description              : 'no vocals'," \
+    " languageCode             : eng," \
+    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}" \
+  "}"
+\end{configurationFileCode}
+
+Note that the audio level map is defined in a separate variable
+\embeddedCode{\_voiceNameToAudioLevelMap}; there is no special
+mastering and all attenuation levels are (the default) 0dB.
+
 %--------------------------------
 \section{Putting it All Together}
 %--------------------------------
 
-Now we are set to start the tool chain.  Assuming that the
-configuration is in file ``wonderful\_song-config.txt'' and the
-lilypond stuff is in ``wonderful\_song-music.ly'', the command to
-produce everything is
+Now we are set to start the tool chain.  Because we only can have one
+configuration file name as parameter for the command, the song
+configuration file must \embeddedCode{INCLUDE} both global
+configuration file parts: one at the beginning and the other at the
+end.  This looks as follows:
+
+\begin{configurationFileCode}
+  INCLUDE "globalconfig-pre.txt"
+  <<song specific stuff>>
+  INCLUDE "globalconfig-post.txt"
+\end{configurationFileCode}
+
+Assuming that the resulting configuration is in file
+``wonderful\_song-config.txt'' and the lilypond stuff is in
+``wonderful\_song-music.ly'', the command to produce everything is
 
 \begin{commandLine}
   lilypondToBVC --phases all wonderful_song-config.txt
@@ -3795,7 +3900,7 @@ For the postprocessing phases all intermediate files are kept as follows:
         specified by \embeddedCode{tempAudioDirectoryPath} as
         ``\meta{voice}-processed.wav'',
 
-  \item [mixdown and finalvideo:] both phases only have target files
+  \item [mix and finalvideo:] both phases only have target files
         in \embeddedCode{audioTargetDirectoryPath} and the target
         specific path in \embeddedCode{targetVideoDirectory}.
 
@@ -3848,6 +3953,18 @@ planned for future versions:
         combine those parts into a final result.  But possibly this
         should go into the workflow itself.
 
+  \item It is not clear whether the modelled workflow is really
+        adequate for a band setting.  Many steps (e.g. the different
+        submixes) are similar to aux busses in an analog mixer, but in
+        digital mixers also pan position or even equalization of
+        voices may be adapted for the submix.  This cannot be achieved
+        now.
+
+  \item If you use this setup feeding a mixer from e.g. a tablet,
+        there is only one device available.  If other band members
+        have different videos, there is currently no way to
+        synchronize them (e.g. via a time code).
+
 \end{itemize}
 
 \newpage
@@ -3886,21 +4003,10 @@ been mentioned first in the current document.
                         {"UNKNOWN ARTIST"}
                         {SongGroupRelated}
 
-    \varDescriptionFinal{attenuationLevel}
-                        {\DESCattenuationLevel}
-                        {0}
-                        {Mixdown}
-
     \varDescriptionFinal{audioGroupToVoicesMap}
                         {\DESCaudioGroupToVoicesMap}
                         {\mandatory}
-                        {Mixdown}
-
-    \varDescriptionFinal{audioLevelList}
-                        {\DESCaudioLevelList}
-                        {\mandatory, compatible to voiceNameList}
-                        {Mixdown}
-
+                        {Mix}
 
     \varDescriptionFinal{audioProcessor\bdot chainSeparator}
                         {\DESCaudioProcessorChainSeparator}
@@ -3910,6 +4016,11 @@ been mentioned first in the current document.
     \varDescriptionFinal{audioProcessor\bdot mixingCommandLine}
                         {\DESCaudioProcessorMixingCommandLine}
                         {empty, uses (slow) internal routine}
+                        {AudioProcessor}
+
+    \varDescriptionFinal{audioProcessor\bdot normalizationEffect}
+                        {\DESCaudioProcessorNormalizationEffect}
+                        {empty, then no attenuation is done}
                         {AudioProcessor}
 
     \varDescriptionFinal{audioProcessor\bdot paddingCommandLine}
@@ -3930,12 +4041,17 @@ been mentioned first in the current document.
     \varDescriptionFinal{audioTargetDirectory\-Path}
                         {\DESCaudioTargetDirectoryPath}
                         {current directory}
-                        {Mixdown}
+                        {Mix}
 
     \varDescriptionFinal{audioTrack\bdot albumName}
                         {\DESCaudioTrackAlbumName}
                         {albumName}
                         {AudioTrack}
+
+    \varDescriptionFinal{audioTrack\bdot attenuationLevel}
+                        {\DESCaudioTrackAttenuationLevel}
+                        {0}
+                        {Mix}
 
     \varDescriptionFinal{audioTrack\bdot audioFileTemplate}
                         {\DESCaudioTrackAudioFileTemplate}
@@ -3957,6 +4073,11 @@ been mentioned first in the current document.
                         {eng}
                         {AudioTrack}
 
+    \varDescriptionFinal{audioTrack\bdot masteringEffectList}
+                        {\DESCaudioTrackMasteringEffectList}
+                        {empty}
+                        {Mix}
+
     \varDescriptionFinal{audioTrack\bdot songNameTemplate}
                         {\DESCaudioTrackSongNameTemplate}
                         {title}
@@ -3965,7 +4086,7 @@ been mentioned first in the current document.
     \varDescriptionFinal{audioTrackList}
                         {\DESCaudioTrackList}
                         {\mandatory}
-                        {Mixdown}
+                        {Mix}
 
     \varDescriptionFinal{audioVoiceNameSet}
                         {\DESCaudioVoiceNameSet}
@@ -4292,6 +4413,12 @@ been mentioned first in the current document.
         with variable names as keys followed by an equal sign and a
         string, boolean or numeric value
 
+    \item [(audio) effect]
+        a filter applied to audio files during the phases
+        \glossaryLink{refinedaudio} and \glossaryLink{mix} to
+        transform input audio; typically the program
+        \glossaryLink{sox} will provide the necessary filters
+        
     \item [extract (phase)]
         a \glossaryLink{processing phase} producing the extract PDF
         notation files for single \glossaryLink{voice}s using the
@@ -4344,12 +4471,13 @@ been mentioned first in the current document.
         instruments, pan positions and volumes using the program
         \glossaryLink{lilypond} plus some \glossaryLink{humanization}
 
-    \item [mixdown (phase)]
+    \item [mix (phase)]
         a \glossaryLink{processing phase} generating final compressed
-        audio files with submixes of all instruments
+        audio files with submixes of all instrument
         \glossaryLink{voice}s based on the refined audio files with
-        specified volume balance (where the submix variants are
-        configurable) using the program \glossaryLink{sox}
+        specified volume balance and some subsequent mastering audio
+        processing (where the submix variants are configurable)
+        typically using the program \glossaryLink{sox}
 
     \item [mp4box]
         a command-line program for combining the silent notation
@@ -4367,7 +4495,7 @@ been mentioned first in the current document.
 
     \item [parallel track (audio)]
         an additional audio file to be added in the
-        \glossaryLink{mixdown} phase; this is used for a single external
+        \glossaryLink{mix} phase; this is used for a single external
         audio file not associated with some voice (like, for example,
         background sounds)
 
@@ -4382,7 +4510,7 @@ been mentioned first in the current document.
     \item [postprocess (phase group)]
         a group of \glossaryLink{processing phase}s combining
         \glossaryLink{rawaudio},
-        \glossaryLink{refinedaudio}, \glossaryLink{mixdown} and
+        \glossaryLink{refinedaudio}, \glossaryLink{mix} and
         \glossaryLink{finalvideo} for generation of the intermediate
         raw and refined WAV files, the submixes as compressed audios
         and the final videos for all \glossaryLink{video file kind}s
@@ -4396,7 +4524,7 @@ been mentioned first in the current document.
         \glossaryLink{extract}, \glossaryLink{score},
         \glossaryLink{midi}, \glossaryLink{silentvideo},
         \glossaryLink{rawaudio}, \glossaryLink{refinedaudio},
-        \glossaryLink{mixdown} and \glossaryLink{finalvideo}
+        \glossaryLink{mix} and \glossaryLink{finalvideo}
 
     \item [qaac]
         a command-line program for converting WAV audio files into aac
@@ -4413,7 +4541,7 @@ been mentioned first in the current document.
     \item [refinedaudio (phase)]
         a \glossaryLink{processing phase} producing (intermediate)
         audio files for all the instrument \glossaryLink{voice}s
-        with additional sound processing applied by the program
+        with additional audio processing applied by the program
         \glossaryLink{sox}
 
     \item [score (phase)]
@@ -4451,9 +4579,9 @@ been mentioned first in the current document.
 
     \item [sox]
         a program for transformation of audio files via parametrizable
-        audio filters (like, for example, equalizers, distortions or
-        reverbs) used in the \glossaryLink{refinedaudio} and
-        \glossaryLink{mixdown} phases
+        audio \glossaryLink{effect}s (like, for example, equalizers,
+        distortions or reverbs) used in the
+        \glossaryLink{refinedaudio} and \glossaryLink{mix} phases
 
     \item [video file kind]
         the configuration information used in the

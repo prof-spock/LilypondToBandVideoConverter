@@ -1,12 +1,13 @@
-# -*- coding: utf-8-unix -*-
 # assertion - provide simple assertion checking
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 
 import os.path
 import sys
 
-from basemodules.simplelogging import Logging
+from .simplelogging import Logging
 
 #====================
 

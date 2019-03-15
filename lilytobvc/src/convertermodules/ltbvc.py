@@ -1,9 +1,8 @@
-# -*- coding: utf-8-unix -*-
 # ltbvc -- script that produces lilypond files and target files
 #          for single voices, a complete score, a midi file, audio and
 #          video files based on a configuration file from a lilypond
 #          music fragment file
-
+#
 # author: Dr. Thomas Tensi, 2006 - 2018
 
 #====================
@@ -89,7 +88,7 @@ class _CommandLineOptions:
                                        "configurationFilePath")
         allowedPhaseSet = set(["all", "preprocess", "postprocess",
                                "extract", "score", "midi", "silentvideo",
-                               "rawaudio", "refinedaudio", "mixdown",
+                               "rawaudio", "refinedaudio", "mix",
                                "finalvideo"])
         Logging.trace("--: given phase set %s, allowed phase set %s",
                       processingPhaseSet, allowedPhaseSet)
@@ -444,21 +443,14 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def processMixdown (cls):
+    def processMix (cls):
         """Mixdown audio tracks."""
 
         Logging.trace(">>")
 
         audioTrackManager = \
             AudioTrackManager(configData.tempAudioDirectoryPath)
-
-        voiceNameToVolumeMap = {}
-
-        for voiceName in configData.voiceNameList:
-            descriptor = configData.voiceNameToVoiceDataMap[voiceName]
-            voiceNameToVolumeMap[voiceName] = descriptor.audioLevel
-
-        audioTrackManager.mixdown(configData, voiceNameToVolumeMap)
+        audioTrackManager.mixdown(configData)
 
         Logging.trace("<<")
 
@@ -707,7 +699,7 @@ def main ():
              ("silentvideo",  True,  _LilypondProcessor.processSilentVideo),
              ("rawaudio",     False, _LilypondProcessor.processRawAudio),
              ("refinedaudio", False, _LilypondProcessor.processRefinedAudio),
-             ("mixdown",      False, _LilypondProcessor.processMixdown),
+             ("mix",          False, _LilypondProcessor.processMix),
              ("finalvideo",   False, _LilypondProcessor.processFinalVideo))
 
         for processingPhase, isPreprocessing, handlerProc in actionList:

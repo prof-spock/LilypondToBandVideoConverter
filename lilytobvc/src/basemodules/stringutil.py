@@ -1,6 +1,7 @@
-# -*- coding: utf-8-unix -*-
 # StringUtil - provides several utility string functions like conversions
 #              from strings to maps or lists or tokenization
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 

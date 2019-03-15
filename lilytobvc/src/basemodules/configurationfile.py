@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # configurationfile - provides reading from a configuration file containing
 #                     comments and assignment to variables
 #
@@ -108,10 +107,11 @@ class ConfigurationFile:
                 if cls._identifierCharRegExp.search(ch):
                     identifier += ch
                 else:
-                    parseState = ParseState_inLimbo
                     identifierValue = self._findIdentifierValue(identifier)
                     result += identifierValue
                     result += ch
+                    parseState = iif(ch == cls._doubleQuoteCharacter,
+                                     ParseState_inString, ParseState_inLimbo)
 
         if parseState == ParseState_inIdentifier:
             identifierValue = self._findIdentifierValue(identifier)
@@ -229,9 +229,10 @@ class ConfigurationFile:
         """Parses - possibly fragmented - external representation of a
            string given by <value> and returns sanitized string."""
 
-        ParseState_inLimbo  = 0
-        ParseState_inString = 1
-        ParseState_inEscape = 2
+        ParseState_inLimbo   = 0
+        ParseState_inString  = 1
+        ParseState_inLiteral = 2
+        ParseState_inEscape  = 3
 
         parseState = ParseState_inLimbo
         result = ""
@@ -245,7 +246,8 @@ class ConfigurationFile:
                 if ch == cls._doubleQuoteCharacter:
                     parseState = ParseState_inString
                 elif not cls._whiteSpaceCharRegExp.search(ch):
-                    Logging.trace("--: bad white space character: %s", ch)
+                    parseState = ParseState_inLiteral
+                    result += ch
             elif parseState == ParseState_inString:
                 if ch == cls._doubleQuoteCharacter:
                     parseState = ParseState_inLimbo
@@ -253,6 +255,10 @@ class ConfigurationFile:
                     parseState = ParseState_inEscape
                 else:
                     result += ch
+            elif parseState == ParseState_inLiteral:
+                result += ch
+                if cls._whiteSpaceCharRegExp.search(ch):
+                    parseState = ParseState_inLimbo
             else:
                 assert (parseState == ParseState_inEscape)
                 result += ch

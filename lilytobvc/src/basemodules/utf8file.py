@@ -1,11 +1,12 @@
-# -*- coding: utf-8-unix -*-
 # utf8file - simple wrapper for UTF8 encoded text files
+#
+# author: Dr. Thomas Tensi, 2014
 
 #============================================================
 
 import io
 
-from basemodules.python2and3support import toUnicodeString
+from .python2and3support import toUnicodeString
 
 #============================================================
 

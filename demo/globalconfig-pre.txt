@@ -1,0 +1,121 @@
+--====================
+-- PROGRAMS
+--====================
+
+_programDirectory = "/usr/local"
+_soundFonts = _programDirectory "/soundfonts/FluidR3_GM.SF2"
+
+aacCommandLine = _programDirectory "/qaac -V100 -i $1 -o $2"
+ffmpegCommand = _programDirectory "/ffmpeg"
+lilypondCommand = _programDirectory "/lilypond"
+midiToWavRenderingCommandLine = \
+  _programDirectory "/fluidsynth.exe -n -i -g 1 -R 0" \
+  " -F ${outfile} " _soundFonts " ${infile}"
+_sox = _programDirectory "/sox"
+audioProcessor = "{" \
+  "mixingCommandLine: '" _sox \
+      " -m [-v ${factor} ${infile} ] ${outfile}'," \
+  "normalizationEffect: 'norm ${attenuationLevel}'," \
+  "paddingCommandLine: '" _sox \
+      " ${infile} ${outfile} pad ${duration}'," \
+  "refinementCommandLine: '" _sox \
+      " ${infile} ${outfile} ${effects}'" \
+  "}"
+
+--====================
+-- GENERAL PARAMETERS
+--====================
+
+lilypondVersion = "2.19.82"
+loggingFilePath = "/tmp/logs/ltbvc.log"
+targetDirectoryPath = "generated"
+tempAudioDirectoryPath = "/tmp/audiofiles"
+
+--====================
+-- PREPROCESSING
+--====================
+
+_voiceNameToStaffListMap = "{ drums : DrumStaff }"
+_voiceNameToClefMap = "{" \
+  "bass : bass_8, drums : '', guitar : G_8" \
+"}"
+
+phaseAndVoiceNameToStaffListMap = "{"      \
+    "extract :" _voiceNameToStaffListMap ","  \
+    "midi    :" _voiceNameToStaffListMap ","  \
+    "score   :" _voiceNameToStaffListMap ","  \
+    "video   :" _voiceNameToStaffListMap "}"
+
+phaseAndVoiceNameToClefMap = "{"      \
+    "extract :" _voiceNameToClefMap ","  \
+    "midi    :" _voiceNameToClefMap ","  \
+    "score   :" _voiceNameToClefMap ","  \
+    "video   :" _voiceNameToClefMap "}"
+
+voiceNameToChordsMap = "{" \
+    "vocals : s/v, bass : e, guitar : e" \
+"}"
+
+--====================
+-- HUMANIZATION
+--====================
+
+countInMeasureCount = 2
+
+humanizationStyleRockHard  = \
+    "{ 0.00:    1/0.2, 0.25: 1.15/0," \
+    "  0.50: 0.95/0.2, 0.75:  1.1/0," \
+    "  OTHER: 0.9/B0.25," \
+    "  RASTER : 0.03125, SLACK : 0.1 }"
+
+--====================
+-- VIDEO OUTPUT
+--====================
+
+videoTargetMap = "{" \
+    "tablet: { resolution: 132," \
+	     " height: 1024," \
+	     " width: 768," \
+	     " topBottomMargin: 5," \
+	     " leftRightMargin: 10," \
+	     " scalingFactor: 4," \
+	     " frameRate: 10.0," \
+	     " mediaType: 'Music Video'," \
+	     " systemSize: 25," \
+	     " subtitleColor: 2281766911," \
+	     " subtitleFontSize: 20," \
+	     " subtitlesAreHardcoded: true } }"
+
+videoFileKindMap = "{" \
+    "tabletVocGtr: { target:         tablet,"      \
+		   " fileNameSuffix: '-tblt-vg',"     \
+		   " directoryPath:  './mediaFiles' ," \
+		   " voiceNameList:  'vocals, guitar' } }"
+
+--====================
+-- SOUND PROCESSING
+--====================
+
+soundStyleBassExtreme = \
+    " norm -12 highpass -2 40 lowpass -2 2k" \
+    " norm -10 overdrive 30 0" \
+    " norm -24 equalizer  150 4o +10 lowpass -2 600 1.2o"
+
+soundStyleGuitarCrunch = \
+    " highpass -1 100 norm -6" \
+    " compand 0.04,0.5 6:-25,-20,-5 -6 -90 0.02" \
+    " overdrive 10 40"
+
+--====================
+-- AUDIO OUTPUT
+--====================
+
+targetFileNamePrefix = "test-"
+audioTargetDirectoryPath = "~/mediaFiles"
+albumArtFilePath = "demo.jpg"
+
+audioGroupToVoicesMap = "{" \
+    " base : bass/keyboard/strings/drums/percussion," \
+    " voc  : vocals/bgVocals," \
+    " gtr  : guitar" \
+"}"

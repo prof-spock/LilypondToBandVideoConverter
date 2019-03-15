@@ -1,6 +1,7 @@
-# -*- coding: utf-8-unix -*-
 # RegExpPattern -- services for construction of patterns for regular
 #                  expressions
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 # IMPORTS
@@ -8,8 +9,8 @@
 
 import re
 
-from basemodules.simplelogging import Logging
-from basemodules.ttbase import iif
+from .simplelogging import Logging
+from .ttbase import iif
 
 #====================
 

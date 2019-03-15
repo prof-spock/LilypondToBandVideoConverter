@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # midiFileHandler -- converts midi file into a text representation
 #                    and writes a midi file from text representation
 #

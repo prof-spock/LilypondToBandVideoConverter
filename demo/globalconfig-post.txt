@@ -1,0 +1,16 @@
+audioTrackList = "{" \
+    "all :      { audioGroupList : base/voc/gtr," \
+    "    audioFileTemplate        : '$'," \
+    "    songNameTemplate         : '$ [ALL]'," \
+    "    albumName                : '$'," \
+    "    description              : 'all voices'," \
+    "    languageCode             : deu," \
+    "    voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}," \
+    "novocals : { audioGroupList : base/gtr," \
+    "    audioFileTemplate        : '$-v'," \
+    "    songNameTemplate         : '$ [-V]'," \
+    "    albumName                : '$ [-V]'," \
+    "    description              : 'no vocals'," \
+    "    languageCode             : eng," \
+    "    voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}" \
+"}"

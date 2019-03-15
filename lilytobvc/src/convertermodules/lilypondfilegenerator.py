@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # lilypondFileGenerator -- generates a lilypond main file for several
 #                          parameters by inclusion of a structured lilypond
 #                          file with tracks

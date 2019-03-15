@@ -5,11 +5,13 @@ TARGETPDF = $(PREFIX).pdf
 LATEXSOURCE = $(PREFIX).ltx
 FIGURESOURCE = ltbvcFigure.mp
 INTERMEDIATEFIGURELIST = ltbvcFigure-1.mps ltbvcFigure-2.mps \
-                         ltbvcFigure-3.mps ltbvcFigure-4.mps
+                         ltbvcFigure-3.mps ltbvcFigure-4.mps \
+                         ltbvcFigure-5.mps
 TARGETFIGURELIST = figures/dependencyDiagram.mps \
                    figures/preprocessingPhaseDependencies.mps \
                    figures/postprocessingPhaseDependencies.mps \
-                   figures/videoTargetDimensions.mps
+                   figures/trackMixdown.mps \
+                   figures/videoTargetDimensions.mps \
 
 METAPOST = mpost -s prologues=3
 
@@ -46,6 +48,9 @@ figures/postprocessingPhaseDependencies.mps: ltbvcFigure-3.mps
 	cp $< $@
 
 figures/videoTargetDimensions.mps: ltbvcFigure-4.mps
+	cp $< $@
+
+figures/trackMixdown.mps: ltbvcFigure-5.mps
 	cp $< $@
 
 #--

@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # ltbvc_businesstypes -- services for several simple business types for the
 #                        lilypond to band video converter that are used
 #                        across modules:
@@ -27,7 +26,7 @@ from basemodules.validitychecker import ValidityChecker
 
 #====================
 
-_noCommaPattern    = r"(?:'[^']*'|[^,'\s]+)"
+_noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
 
 #====================
 
@@ -107,14 +106,23 @@ class AudioTrack:
        combining audio groups together with all their
        properties."""
 
-    _attributeNameToTypeMap = {
-        "name"                     : "S",
-        "audioGroupList"           : "S",
-        "audioFileTemplate"        : "S",
-        "songNameTemplate"         : "S",
+    _attributeNameList = \
+        [ "name", "audioGroupList", "audioFileTemplate", "songNameTemplate",
+          "albumName", "description", "languageCode",
+          "voiceNameToAudioLevelMap", "masteringEffectList",
+          "attenuationLevel" ]
+
+    _attributeNameToKindMap = {
         "albumName"                : "S",
+        "attenuationLevel"         : "F",
+        "audioFileTemplate"        : "S",
+        "audioGroupList"           : "S",
         "description"              : "S",
-        "languageCode"             : "S"
+        "languageCode"             : "S",
+        "masteringEffectList"      : "S",
+        "name"                     : "S",
+        "songNameTemplate"         : "S",
+        "voiceNameToAudioLevelMap" : "{}"
     }
 
     #--------------------
@@ -122,13 +130,14 @@ class AudioTrack:
     #--------------------
 
     def __init__ (self):
-        self.name              = "XXX"
-        self.audioGroupList    = []
-        self.audioFileTemplate = "%"
-        self.songNameTemplate  = "%"
-        self.albumName         = "[ALBUM NAME]"
-        self.description       = "XXX"
-        self.languageCode      = "eng"
+        self.name                    = "XXX"
+        self.audioGroupList          = []
+        self.audioFileTemplate       = "%"
+        self.songNameTemplate        = "%"
+        self.albumName               = "[ALBUM NAME]"
+        self.description             = "XXX"
+        self.languageCode            = "eng"
+        self.voiceNameToAudioLevelMap = ""
 
     #--------------------
 
@@ -138,14 +147,11 @@ class AudioTrack:
     #--------------------
 
     def __str__ (self):
-        clsName = self.__class__.__name__
-        st = (("%s(name = %s, groupList = %s,"
-               + " audioFileTemplate = '%s', songNameTemplate = '%s',"
-               + " albumName = '%s', description = '%s', language = %s")
-               % (clsName,
-                  self.name, self.audioGroupList,
-                  self.audioFileTemplate, self.songNameTemplate,
-                  self.albumName, self.description, self.languageCode))
+        cls = self.__class__
+        clsName = cls.__name__
+        st = AttributeManager.convertToString(self, clsName,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -158,16 +164,25 @@ class AudioTrack:
         cls = self.__class__
 
         # set optional attributes to default values
+        _setToDefault(attributeNameToValueMap, "attenuationLevel", 0.0)
         _setToDefault(attributeNameToValueMap, "description", "")
+        _setToDefault(attributeNameToValueMap, "masteringEffectList", "")
 
         # check and set object values
         name = attributeNameToValueMap["name"]
         AttributeManager.checkForTypesAndCompleteness(name, "audio track",
                                                 attributeNameToValueMap,
-                                                cls._attributeNameToTypeMap)
+                                                cls._attributeNameToKindMap)
 
         AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
+
+        # adapt values
         self.audioGroupList = convertStringToList(self.audioGroupList, "/")
+        self.attenuationLevel = float(self.attenuationLevel)
+        Logging.trace("--: vntalm = %s", self.voiceNameToAudioLevelMap)
+        self.voiceNameToAudioLevelMap = \
+            { key : float(value)
+              for (key, value) in self.voiceNameToAudioLevelMap.items() }
 
     #--------------------
 
@@ -176,7 +191,7 @@ class AudioTrack:
         """Returns regexp pattern for checking an audio track string"""
 
         attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToTypeMap.keys()))
+            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
         result = RegExpPattern.makeMapPattern(attributeNamePattern,
                                               _noCommaPattern, False)
         return result
@@ -265,11 +280,15 @@ class VideoFileKind:
     """This class encapsulates the settings for a video file kind used
        for video generation."""
 
-    _attributeNameToTypeMap = {
+    _attributeNameList = \
+        [ "name", "target", "fileNameSuffix", "directoryPath",
+          "voiceNameList" ]
+    
+    _attributeNameToKindMap = {
+        "directoryPath"  : "S",
+        "fileNameSuffix" : "S",
         "name"           : "S",
         "target"         : "S",
-        "fileNameSuffix" : "S",
-        "directoryPath"  : "S",
         "voiceNameList"  : "S"
     }
 
@@ -292,12 +311,11 @@ class VideoFileKind:
     #--------------------
 
     def __str__ (self):
-        clsName = self.__class__.__name__
-        st = (("%s(name = %s, target = %s, fileNameSuffix = %s,"
-               + " directory = %s, voiceNameList = %s")
-               % (clsName,
-                  self.name, self.target, self.fileNameSuffix,
-                  self.directoryPath, self.voiceNameList))
+        cls = self.__class__
+        clsName = cls.__name__
+        st = AttributeManager.convertToString(self, clsName,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -314,7 +332,7 @@ class VideoFileKind:
         AttributeManager.checkForTypesAndCompleteness(targetName,
                                                 "video file kind",
                                                 attributeNameToValueMap,
-                                                cls._attributeNameToTypeMap)
+                                                cls._attributeNameToKindMap)
 
         AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
         self.voiceNameList = convertStringToList(self.voiceNameList)
@@ -326,7 +344,7 @@ class VideoFileKind:
         """Returns regexp pattern for checking a video file kind string"""
 
         attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToTypeMap.keys()))
+            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
         result = RegExpPattern.makeMapPattern(attributeNamePattern,
                                               _noCommaPattern, False)
         return result
@@ -337,21 +355,27 @@ class VideoTarget:
     """This class encapsulates the settings for a video target used
        for video generation."""
 
-    _attributeNameToTypeMap = {
+    _attributeNameList = \
+        [ "name", "resolution", "height", "width", "topBottomMargin",
+          "leftRightMargin", "systemSize", "scalingFactor",
+          "mediaType", "frameRate", "ffmpegPresetName",
+          "subtitleColor", "subtitleFontSize", "subtitlesAreHardcoded" ]
+
+    _attributeNameToKindMap = {
+        "ffmpegPresetName"         : "S",
+        "frameRate"                : "F",
+        "height"                   : "I",
+        "leftRightMargin"          : "F",
+        "mediaType"                : "S",
         "name"                     : "S",
         "resolution"               : "I",
-        "height"                   : "I",
-        "width"                    : "I",
-        "topBottomMargin"          : "F",
-        "leftRightMargin"          : "F",
-        "systemSize"               : "F",
-        "mediaType"                : "S",
+        "scalingFactor"            : "I",
         "subtitleColor"            : "I",
         "subtitleFontSize"         : "F",
-        "scalingFactor"            : "I",
-        "frameRate"                : "F",
-        "ffmpegPresetName"         : "S",
-        "subtitlesAreHardcoded"    : "B"
+        "subtitlesAreHardcoded"    : "B",
+        "systemSize"               : "F",
+        "topBottomMargin"          : "F",
+        "width"                    : "I"
     }
 
     #--------------------
@@ -382,22 +406,11 @@ class VideoTarget:
     #--------------------
 
     def __str__ (self):
-        clsName = self.__class__.__name__
-        st = (("%s(name = %s,"
-               + " resolution = %s, height = %s, width = %s,"
-               + " topBottomMargin = %s, leftRightMargin = %s,"
-               + " systemSize = %s, scalingFactor = %s,"
-               + " mediaType = '%s', frameRate = %s, ffmpegPresetName = %s,"
-               + " subtitleColor = %s, subtitleFontSize = %s,"
-               + " subtitlesAreHardcoded = %s")
-               % (clsName,
-                  self.name,
-                  self.resolution, self.height, self.width,
-                  self.topBottomMargin, self.leftRightMargin,
-                  self.systemSize, self.scalingFactor,
-                  self.mediaType, self.frameRate, self.ffmpegPresetName,
-                  self.subtitleColor, self.subtitleFontSize,
-                  self.subtitlesAreHardcoded))
+        cls = self.__class__
+        clsName = cls.__name__
+        st = AttributeManager.convertToString(self, clsName,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -422,10 +435,10 @@ class VideoTarget:
         AttributeManager.checkForTypesAndCompleteness(targetName,
                                                 "video target",
                                                 attributeNameToValueMap,
-                                                cls._attributeNameToTypeMap)
+                                                cls._attributeNameToKindMap)
 
         AttributeManager.setAttributesFromMap(self, attributeNameToValueMap,
-                                              cls._attributeNameToTypeMap)
+                                              cls._attributeNameToKindMap)
 
     #--------------------
 
@@ -434,7 +447,7 @@ class VideoTarget:
         """Returns regexp pattern for checking a video target string"""
 
         attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToTypeMap.keys()))
+            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
         result = RegExpPattern.makeMapPattern(attributeNamePattern,
                                               _noCommaPattern, False)
         return result
@@ -451,7 +464,6 @@ class VoiceDescriptor:
         self.midiVolume     = None
         self.panPosition    = None
         self.reverbLevel    = None
-        self.audioVolume    = None
         self.soundVariant   = None
 
     #--------------------
@@ -466,9 +478,9 @@ class VoiceDescriptor:
         st = (("%s("
                + "voice = %s, midiChannel = %s, midiInstrument = %s,"
                + " midiVolume = %s, panPosition = %s, reverb = %s,"
-               + " audioVolume = %s, soundVariant = %s)")
+               + " soundVariant = %s)")
                % (className,
                   self.voiceName, self.midiChannel, self.midiInstrument,
                   self.midiVolume, self.panPosition, self.reverbLevel,
-                  self.audioVolume, self.soundVariant))
+                  self.soundVariant))
         return st

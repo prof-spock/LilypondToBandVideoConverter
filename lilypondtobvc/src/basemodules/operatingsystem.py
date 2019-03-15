@@ -1,6 +1,7 @@
-# -*- coding: utf-8-unix -*-
 # operatingsystem -- provides simple facilities for access of operating
 #                    system services
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 
@@ -11,7 +12,7 @@ import shutil
 import sys
 import subprocess
 
-from basemodules.simplelogging import Logging
+from .simplelogging import Logging
 
 #====================
 

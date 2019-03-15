@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # ltbvc_configurationdatahandler -- services for access to the global
 #                                   configuration file of ltbvc
 #
@@ -11,6 +10,7 @@
 import datetime
 import re
 
+from basemodules.attributemanager import AttributeManager
 from basemodules.configurationfile import ConfigurationFile
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.regexppattern import RegExpPattern
@@ -99,6 +99,30 @@ class _ConfigDataGlobal:
           "targetDirectoryPath", "tempAudioDirectoryPath",
           "tempLilypondFilePath", "videoTargetMap", "videoFileKindMap" ]
 
+    # attributes derived from other information and stored in object
+    _additionalAttributeNameList = \
+        [ "audioProcessorMap", "intermediateFilesAreKept",
+          "soundStyleNameToTextMap" ]
+
+    _attributeNameToKindMap = {
+        "aacCommandLine"                : "S",
+        "audioProcessorMap"             : "{}",
+        "ffmpegCommand"                 : "S",
+        "intermediateFileDirectoryPath" : "S",
+        "intermediateFilesAreKept"      : "B",
+        "lilypondCommand"               : "S",
+        "lilypondVersion"               : "S",
+        "loggingFilePath"               : "S",
+        "midiToWavRenderingCommandLine" : "S",
+        "mp4boxCommand"                 : "S",
+        "soundStyleNameToTextMap"       : "{}",
+        "targetDirectoryPath"           : "S",
+        "tempAudioDirectoryPath"        : "S",
+        "tempLilypondFilePath"          : "S",
+        "videoFileKindMap"              : "{}",
+        "videoTargetMap"                : "{}"
+    }
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -132,31 +156,10 @@ class _ConfigDataGlobal:
         """Returns the string representation of the global attributes
            of <configData>"""
 
-        className = cls.__name__
-        st = (("%s("
-               + "aacCommandLine = '%s', audioProcessor = '%s',"
-               + " ffmpegCommand = '%s', intermediateFileDirectoryPath = %s,"
-               + " intermediateFilesAreKept = %s, lilypondCommand = '%s',"
-               + " lilypondVersion = '%s', midiToWavCommandLine = '%s',"
-               + " mp4boxCommand = '%s', loggingFilePath = '%s',"
-               + " soundStyleNameToTextMap = %s,"
-               + " targetDirectoryPath = '%s', tempAudioDirectoryPath = '%s',"
-               + " tempLilypondFilePath = '%s', videoTargetMap = %s,"
-               + " videoFileKindMap = %s)")
-              % (className,
-                 configData.aacCommandLine, configData.audioProcessorMap,
-                 configData.ffmpegCommand,
-                 configData.intermediateFileDirectoryPath,
-                 configData.intermediateFilesAreKept,
-                 configData.lilypondCommand, configData.lilypondVersion,
-                 configData.midiToWavRenderingCommandLine,
-                 configData.mp4boxCommand, configData.loggingFilePath,
-                 configData.soundStyleNameToTextMap,
-                 configData.targetDirectoryPath,
-                 configData.tempAudioDirectoryPath,
-                 configData.tempLilypondFilePath,
-                 configData.videoTargetMap,
-                 configData.videoFileKindMap))
+        st = AttributeManager.convertToString(configData,
+                                              cls.__name__,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -189,26 +192,28 @@ class _ConfigDataGlobal:
         # validate audio processor map
         audioProcessorMapAsString = getValueProc("audioProcessor")
         audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
-        chainSeparator        = audioProcessorMap.get("chainSeparator", ";")
-        refinementCommandLine = audioProcessorMap.get("refinementCommandLine",
-                                                      "")
-        paddingCommandLine    = audioProcessorMap.get("paddingCommandLine",
-                                                      "")
-        mixingCommandLine     = audioProcessorMap.get("mixingCommandLine",
-                                                      "")
-        redirector            = audioProcessorMap.get("redirector", "->")
+        apmGet = audioProcessorMap.get
 
-        Logging.trace("--: chainSep = '%s', mixCmd = '%s', padCmd = '%s',"
+        chainSeparator        = apmGet("chainSeparator", ";")
+        mixingCommandLine     = apmGet("mixingCommandLine", "")
+        normalizationEffect   = apmGet("normalizationEffect", "")
+        paddingCommandLine    = apmGet("paddingCommandLine", "")
+        redirector            = apmGet("redirector", "->")
+        refinementCommandLine = apmGet("refinementCommandLine", "")
+
+        Logging.trace("--: chainSep = '%s', mixCmd = '%s',"
+                      + " normEffect = '%s', padCmd = '%s',"
                       + " redirector = '%s', refCmd = '%s'",
-                      chainSeparator, mixingCommandLine, paddingCommandLine,
+                      chainSeparator, mixingCommandLine,
+                      normalizationEffect, paddingCommandLine,
                       redirector, refinementCommandLine)
 
         ValidityChecker.isValid(chainSeparator > "",
             "'audioProcessor.chainSeparator' must be non-empty")
-        
+        ValidityChecker.isValid(normalizationEffect > "",
+            "'audioProcessor.normalizationEffect' must be non-empty")
         ValidityChecker.isValid(redirector > "",
             "'audioProcessor.redirector' must be non-empty")
-        
         ValidityChecker.isValid(refinementCommandLine > "",
             "'audioProcessor.refinementCommandLine' must be defined")
         
@@ -217,7 +222,8 @@ class _ConfigDataGlobal:
         commandNameMap = { "aacCommandLine" : aacCommandLine }
 
         for key, commandLine in audioProcessorMap.items():
-            if key not in ["chainSeparator", "redirector"]:
+            if key not in ["chainSeparator", "normalizationEffect",
+                           "redirector"]:
                 commandNameMap["audioProcessor." + key] = commandLine
 
         for variableName, commandLine in commandNameMap.items():
@@ -295,6 +301,16 @@ class _ConfigDataMidiHumanization:
     _attributeNameList = \
         [ "humanizedVoiceNameSet", "voiceNameToVariationFactorMap" ]
 
+    # attributes derived from other information and stored in object
+    _additionalAttributeNameList = \
+        [ "humanizationStyleNameToTextMap" ]
+
+    _attributeNameToKindMap = {
+        "humanizationStyleNameToTextMap" : "{}",
+        "humanizedVoiceNameSet"          : "{}",
+        "voiceNameToVariationFactorMap"  : "{}"
+    }
+    
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -314,15 +330,10 @@ class _ConfigDataMidiHumanization:
         """Returns the string representation of the midi humanization
            attributes of <configData>"""
 
-        className = cls.__name__
-        st = (("%s("
-               + "humanizationStyleNameToTextMap = %s,"
-               + " humanizedVoiceNameSet = %s,"
-               + " voiceNameToVariationFactorMap = %s)")
-              % (className,
-                 configData.humanizationStyleNameToTextMap,
-                 configData.humanizedVoiceNameSet,
-                 configData.voiceNameToVariationFactorMap))
+        st = AttributeManager.convertToString(configData,
+                                              cls.__name__,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -398,6 +409,12 @@ class _ConfigDataNotation:
         [ "phaseAndVoiceNameToClefMap", "phaseAndVoiceNameToStaffListMap",
           "voiceNameToScoreNameMap" ]
 
+    _attributeNameToKindMap = {
+        "phaseAndVoiceNameToClefMap"      : "{}",
+        "phaseAndVoiceNameToStaffListMap" : "{}",
+        "voiceNameToScoreNameMap"         : "{}"
+    }
+    
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -417,15 +434,10 @@ class _ConfigDataNotation:
         """Returns the string representation of the notation
            attributes of <configData>"""
 
-        className = cls.__name__
-        st = (("%s("
-               + "phaseAndVoiceNameToClefMap = %s,"
-               + " phaseAndVoiceNameToStaffListMap = %s,"
-               + " voiceNameToScoreNameMap = %s)")
-              % (className,
-                 configData.phaseAndVoiceNameToClefMap,
-                 configData.phaseAndVoiceNameToStaffListMap,
-                 configData.voiceNameToScoreNameMap))
+        st = AttributeManager.convertToString(configData,
+                                              cls.__name__,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -491,16 +503,47 @@ class _ConfigDataSong:
        systematics, any configuration variable can be set per song."""
 
     _attributeNameList = \
-      [ "attenuationLevel", "audioVoiceNameSet",
-        "countInMeasureCount", "extractVoiceNameSet", "fileNamePrefix",
-        "includeFilePath", "intermediateFilesAreKept",
-        "measureToHumanizationStyleNameMap", "measureToTempoMap",
-        "midiVoiceNameList", "scoreVoiceNameList", "title",
+      [ "audioVoiceNameSet", "countInMeasureCount",
+        "extractVoiceNameSet", "fileNamePrefix", "includeFilePath",
+        "intermediateFilesAreKept", "measureToHumanizationStyleNameMap",
+        "measureToTempoMap", "midiVoiceNameList",
+        "scoreVoiceNameList", "title",
         "trackNumber", "voiceNameToChordsMap", "voiceNameToLyricsMap",
         "voiceNameToOverrideFileNameMap" ]
 
+    # attributes derived from other information and stored in object
+    _additionalAttributeNameList = \
+      [ "parallelTrackFilePath", "parallelTrackVolume", "shiftOffset",
+        "songComposerText", "songYear", "voiceNameList",
+        "voiceNameToVoiceDataMap" ]
+    
+    _attributeNameToKindMap = {
+        "audioVoiceNameSet"                 : "{}",
+        "countInMeasureCount"               : "I",
+        "extractVoiceNameSet"               : "{}",
+        "fileNamePrefix"                    : "S",
+        "includeFilePath"                   : "S",
+        "intermediateFilesAreKept"          : "B",
+        "measureToHumanizationStyleNameMap" : "{}",
+        "measureToTempoMap"                 : "{}",
+        "midiVoiceNameList"                 : "[]",
+        "parallelTrackFilePath"             : "S",
+        "parallelTrackVolume"               : "F",
+        "scoreVoiceNameList"                : "[]",
+        "shiftOffset"                       : "F",
+        "songComposerText"                  : "S",
+        "songYear"                          : "I",
+        "title"                             : "S",
+        "trackNumber"                       : "I",
+        "voiceNameList"                     : "[]",
+        "voiceNameToChordsMap"              : "{}",
+        "voiceNameToLyricsMap"              : "{}",
+        "voiceNameToOverrideFileNameMap"    : "{}",
+        "voiceNameToVoiceDataMap"           : "{}"
+    }
+    
     _voiceAttributeNameList = [
-        "audioLevelList", "midiChannelList", "midiInstrumentList",
+        "midiChannelList", "midiInstrumentList",
         "midiVolumeList", "panPositionList", "reverbLevelList",
         "soundVariantList", "voiceNameList"]
 
@@ -530,18 +573,18 @@ class _ConfigDataSong:
 
     @classmethod
     def _checkStringLists (cls, voiceNames, midiChannels, midiInstruments,
-                           midiVolumes, panPositions, audioLevels,
-                           reverbLevels, soundVariants):
+                           midiVolumes, panPositions, reverbLevels,
+                           soundVariants):
         """Checks whether data for voice list and voice data read from
            configuration file is okay."""
 
         Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
                       + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', audioLevels ='%s',"
-                      + " reverbLevels = '%s', soundVariants = '%s'",
+                      + " panPositions = '%s', reverbLevels = '%s',"
+                      + " soundVariants = '%s'",
                       voiceNames, midiChannels, midiInstruments,
-                      midiVolumes, panPositions, audioLevels,
-                      reverbLevels, soundVariants)
+                      midiVolumes, panPositions, reverbLevels,
+                      soundVariants)
 
         checkForRequiredLength = (lambda st, valueName, elementCount:
             ValidityChecker.isValid(cls._elementCountInString(st) == elementCount,
@@ -555,7 +598,6 @@ class _ConfigDataSong:
                                voiceCount)
         checkForRequiredLength(midiVolumes, "midiVolumeList", voiceCount)
         checkForRequiredLength(panPositions, "panPositionList", voiceCount)
-        checkForRequiredLength(audioLevels, "audioLevelList", voiceCount)
         checkForRequiredLength(soundVariants, "soundVariantList", voiceCount)
 
         if reverbLevels.strip() != "":
@@ -568,18 +610,18 @@ class _ConfigDataSong:
     @classmethod
     def _convertToVoiceMap (cls, configData,
                             voiceNames, midiChannels, midiInstruments,
-                            midiVolumes, panPositions, audioLevels,
-                            reverbLevels, soundVariants):
+                            midiVolumes, panPositions, reverbLevels,
+                            soundVariants):
         """Converts strings read from configuration file to voice name
            list and map to voice descriptors"""
 
         Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
                       + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', audioLevels ='%s',"
-                      + " reverbLevels = '%s', soundVariants = '%s'",
+                      + " panPositions = '%s', reverbLevels = '%s',"
+                      + " soundVariants = '%s'",
                       voiceNames, midiChannels, midiInstruments,
-                      midiVolumes, panPositions, audioLevels,
-                      reverbLevels, soundVariants)
+                      midiVolumes, panPositions, reverbLevels,
+                      soundVariants)
 
         configData.voiceNameList = convertStringToList(voiceNames)
 
@@ -587,7 +629,6 @@ class _ConfigDataSong:
         midiInstrumentList = convertStringToList(midiInstruments)
         midiVolumeList     = convertStringToList(midiVolumes, kind="I")
         panPositionList    = convertStringToList(panPositions)
-        audioLevelList     = convertStringToList(audioLevels, kind="F")
         reverbLevelList    = convertStringToList(reverbLevels, kind="F")
         soundVariantList   = convertStringToList(soundVariants)
 
@@ -601,7 +642,6 @@ class _ConfigDataSong:
             voiceDescriptor.midiInstrument = midiInstrumentList[i]
             voiceDescriptor.midiVolume     = midiVolumeList[i]
             voiceDescriptor.panPosition    = panPositionList[i]
-            voiceDescriptor.audioLevel     = audioLevelList[i]
             voiceDescriptor.reverbLevel    = reverbLevelList[i]
             voiceDescriptor.soundVariant   = soundVariantList[i]
             configData.voiceNameToVoiceDataMap[voiceName] = voiceDescriptor
@@ -705,7 +745,6 @@ class _ConfigDataSong:
     def initialize (cls, configData):
         """Initializes song related attributes of <configData>"""
 
-        configData.attenuationLevel                  = 0
         configData.audioVoiceNameSet                 = set()
         configData.countInMeasureCount               = 0
         configData.extractVoiceNameSet               = set()
@@ -736,40 +775,12 @@ class _ConfigDataSong:
         """Returns the string representation of the song related
            attributes of <configData>"""
 
-        st = (("%s("
-               + "attenuationLevel = %5.3f,  audioVoiceNameSet = %s,"
-               + " countInMeasureCount = %d,"
-               + " extractVoiceNameSet = %s, fileNamePrefix = %s,"
-               + " includeFilePath = '%s', intermediateFilesAreKept = %s,"
-               + " measureToHumanizationStyleNameMap = %s,"
-               + " measureToTempoMap = %s,  midiVoiceNameList = %s,"
-               + " parallelTrackFilePath = '%s', parallelTrackVolume = %4.3f,"
-               + " scoreVoiceNameList = %s, shiftOffset = %5.3f,"
-	       + " songComposerText = '%s', songYear = %d,"
-               + " title = '%s', trackNumber = %d,"
-               + " voiceNameList = %s, voiceNameToChordsMap = %s,"
-               + " voiceNameToLyricsMap = %s,"
-               + " voiceNameToOverrideFileNameMap = %s,"
-               + " voiceNameToVoiceDataMap = %s"
-               + ")")
-               % (cls.__name__,
-                  configData.attenuationLevel, configData.audioVoiceNameSet,
-                  configData.countInMeasureCount,
-                  configData.extractVoiceNameSet, configData.fileNamePrefix,
-                  configData.includeFilePath,
-                  configData.intermediateFilesAreKept,
-                  configData.measureToHumanizationStyleNameMap,
-                  configData.measureToTempoMap, configData.midiVoiceNameList,
-                  configData.parallelTrackFilePath,
-                  configData.parallelTrackVolume,
-                  configData.scoreVoiceNameList, configData.shiftOffset,
-                  configData.songComposerText, configData.songYear,
-                  configData.title, configData.trackNumber,
-                  configData.voiceNameList, configData.voiceNameToChordsMap,
-                  configData.voiceNameToLyricsMap,
-                  configData.voiceNameToOverrideFileNameMap,
-                  configData.voiceNameToVoiceDataMap))
-
+        attributeNameList = (cls._attributeNameList
+                             + cls._additionalAttributeNameList)
+        st = AttributeManager.convertToString(configData,
+                                              cls.__name__,
+                                              attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -808,7 +819,6 @@ class _ConfigDataSong:
                               getValueProc("midiInstrumentList"),
                               getValueProc("midiVolumeList"),
                               getValueProc("panPositionList"),
-                              getValueProc("audioLevelList"),
                               getValueProc("reverbLevelList"),
                               getValueProc("soundVariantList"))
 
@@ -874,8 +884,8 @@ class _ConfigDataSong:
         cls._convertToVoiceMap(configData,
                                c["voiceNameList"], c["midiChannelList"],
                                c["midiInstrumentList"], c["midiVolumeList"],
-                               c["panPositionList"], c["audioLevelList"],
-                               c["reverbLevelList"], c["soundVariantList"])
+                               c["panPositionList"], c["reverbLevelList"],
+                               c["soundVariantList"])
 
         # adapt the different lists (when empty)
         if len(configData.extractVoiceNameSet) == 0:
@@ -943,6 +953,15 @@ class _ConfigDataSongGroup:
         "audioTargetDirectoryPath",
         "audioTrackList", "targetFileNamePrefix" ]
 
+    _attributeNameToKindMap = {
+        "albumArtFilePath"         : "S",
+        "albumName"                : "S",
+        "artistName"               : "S",
+        "audioTargetDirectoryPath" : "S",
+        "audioTrackList"           : "S",
+        "targetFileNamePrefix"     : "S"   
+    }
+    
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -967,19 +986,10 @@ class _ConfigDataSongGroup:
         """Returns the string representation of the song
            group related attributes of <configData>"""
 
-        st = (("%s("
-               + "albumArtFilePath = '%s', albumName = '%s',"
-               + " artistName = '%s', audioGroupNameToVoiceNameSetMap = %s,"
-               + " audioTargetDirectoryPath = '%s', audioTrackList = %s,"
-               + " targetFileNamePrefix = %s)")
-              % (cls.__name__,
-                 configData.albumArtFilePath, configData.albumName,
-                 configData.artistName,
-                 configData.audioGroupNameToVoiceNameSetMap,
-                 configData.audioTargetDirectoryPath,
-                 configData.audioTrackList,
-                 configData.targetFileNamePrefix))
-
+        st = AttributeManager.convertToString(configData,
+                                              cls.__name__,
+                                              cls._attributeNameList,
+                                              cls._attributeNameToKindMap)
         return st
 
     #--------------------
@@ -1086,7 +1096,7 @@ class _LocalValidator:
         makeRegExp         = RegExpPattern.makeRegExp
 
         # common element patterns
-        noCommaPattern    = r"(?:'[^']*'|[^,'\s]+)"
+        noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
 
         fileNamePattern   = r"[/\w\-_\.]+"
         identifierPattern = RegExpPattern.identifierPattern
@@ -1096,7 +1106,7 @@ class _LocalValidator:
         # special element patterns
         audioProcessorKeyPattern = \
                       (r"(?:(?:mixing|padding|refinement)CommandLine"
-                       + r"|chainSeparator|redirector)")
+                       + r"|normalizationEffect|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
         clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
         fileNameListPattern = makeListPat(fileNamePattern, False)
@@ -1210,12 +1220,10 @@ class _LocalValidator:
                                           floatPattern + "/" + floatPattern)))
 
         # audio file generation
-        cls._setMap("attenuationLevel", 0.0, "FLOAT")
         cls._setMap("audioGroupToVoicesMap", None, "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           makeCompactListPat(identifierPattern),
                                           False)))
-        cls._setMap("audioLevelList", None, "REGEXP", floatListRegExp)
         cls._setMap("audioTargetDirectoryPath", ".", "WDIRECTORY")
         cls._setMap("audioTrackList", None, "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,

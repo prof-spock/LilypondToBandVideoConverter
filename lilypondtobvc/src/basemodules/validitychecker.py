@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # validitychecker - allows checking of validity of values (typically
 #                   of input parameters from the command line)
 #
@@ -11,8 +10,8 @@ import re
 import sys
 
 import basemodules.python2and3support
-from basemodules.simplelogging import Logging
-from basemodules.ttbase import iif
+from .simplelogging import Logging
+from .ttbase import iif
 
 python2and3support = basemodules.python2and3support
 
@@ -27,6 +26,14 @@ class ValidityChecker:
         result = "--: checking '%s' for being %s ('%s')"
         result = result % (valueName, typeName, value)
         return result
+     
+    #--------------------
+
+    @classmethod
+    def _checkForType (cls, type, typeName, valueName, value):
+        Logging.trace(cls._checkTemplate(typeName, valueName, value))
+        message = "'%s' must be %s: %s" % (valueName, typeName, repr(value))
+        cls.isValid(isinstance(value, type), message)
      
     #--------------------
 
@@ -51,9 +58,7 @@ class ValidityChecker:
         """Checks whether <value> of variable given by <valueName> is
            a boolean, otherwise exits program with a message."""
 
-        Logging.trace(cls._checkTemplate("a boolean", valueName, value))
-        message = "'%s' must be a boolean: %s" % (valueName, repr(value))
-        cls.isValid(isinstance(value, bool), message)
+        cls._checkForType(bool, "a boolean", valueName, value)
 
     #--------------------
 
@@ -86,9 +91,25 @@ class ValidityChecker:
         """Checks whether <value> of variable given by <valueName> is
            a float, otherwise exits program with a message."""
 
-        Logging.trace(cls._checkTemplate("a float", valueName, value))
-        message = "'%s' must be a float: %s" % (valueName, repr(value))
-        cls.isValid(isinstance(value, float), message)
+        cls._checkForType(float, "a float", valueName, value)
+
+    #--------------------
+
+    @classmethod
+    def isList (cls, value, valueName):
+        """Checks whether <value> of variable given by <valueName> is
+           a list, otherwise exits program with a message."""
+
+        cls._checkForType(list, "a list", valueName, value)
+
+    #--------------------
+
+    @classmethod
+    def isMap (cls, value, valueName):
+        """Checks whether <value> of variable given by <valueName> is
+           a map, otherwise exits program with a message."""
+
+        cls._checkForType(dict, "a map", valueName, value)
 
     #--------------------
 
@@ -118,8 +139,8 @@ class ValidityChecker:
         Logging.trace(">>: %s = '%s' (%s), floatIsOk = %s, rangeKind = '%s'",
                       valueName, value, type(value), floatIsAllowed, rangeKind)
 
-        floatRegexp   = re.compile(r"^[0-9]+(\.[0-9]*)?$")
-        integerRegexp = re.compile(r"^[0-9]+$")
+        floatRegexp   = re.compile(r"^\-?[0-9]+(\.[0-9]*)?$")
+        integerRegexp = re.compile(r"^\-?[0-9]+$")
 
         value = str(value)
         isOkay = (integerRegexp.match(value) is not None)
@@ -194,7 +215,8 @@ class ValidityChecker:
         """Checks whether <condition> holds, otherwise exits program
            with <message>."""
 
-        Logging.trace("--: checking condition (%s), otherwise failure is '%s'",
+        Logging.trace("--: checking condition (%s),"
+                      + " otherwise failure is '%s'",
                       repr(condition), message)
 
         if not condition:

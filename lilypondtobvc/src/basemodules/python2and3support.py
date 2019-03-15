@@ -1,6 +1,7 @@
-# -*- coding: utf-8-unix -*-
 # Python2And3Support - provides functions for supporting both
 #                      Python 2 and 3
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 

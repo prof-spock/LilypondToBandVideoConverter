@@ -9,8 +9,8 @@ import io
 import sys
 import time
 
-from basemodules.python2and3support import isPython2
-from basemodules.ttbase import iif
+from .python2and3support import isPython2
+from .ttbase import iif
 
 #====================
 

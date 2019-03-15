@@ -1,4 +1,3 @@
-# -*- coding: utf-8-unix -*-
 # audiotrackmanager -- generates audio tracks from midi file and provides
 #                      several transformations on it (e.g. instrument
 #                      postprocessing and mixdown
@@ -19,7 +18,8 @@ from basemodules.operatingsystem import OperatingSystem
 from basemodules.python2and3support import isString
 from basemodules.simplelogging import Logging
 from basemodules.stringutil import splitAndStrip, tokenize
-from basemodules.ttbase import adaptToRange, iif, iif3, isInRange, MyRandom
+from basemodules.ttbase import adaptToRange, iif, iif2, iif3, \
+                               isInRange, MyRandom
 from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
 
@@ -351,11 +351,12 @@ class AudioTrackManager:
        from a midi file."""
 
     _aacCommandLine                = None
+    _audioProcessorIsSox           = None
     _audioProcessorMap             = None
     _intermediateFilesAreKept      = None
     _ffmpegCommand                 = None
     _midiToWavRenderingCommandList = None
-    _soundStyleNameToCommandsMap   = None
+    _soundStyleNameToEffectsMap    = None
 
     #--------------------
     # LOCAL FEATURES
@@ -414,22 +415,22 @@ class AudioTrackManager:
 
     #--------------------
 
-    def _extractCommandSrcAndTgt (self, voiceName, chainPosition,
-                                  partPosition, debugFileCount,
-                                  commandTokenList):
+    def _extractEffectListSrcAndTgt (self, voiceName, chainPosition,
+                                     partPosition, debugFileCount,
+                                     effectTokenList):
         """Returns list of sources and single target from audio refinement
-           command token list <commandTokenList>; adapts
-           <commandTokenList> accordingly by deleting those tokens;
-           <voiceName> gives name of current voice; <chainPosition>
+           effect chain <effectTokenList>; adapts <effectTokenList>
+           accordingly by deleting those tokens; <voiceName> gives
+           name of current voice; <chainPosition> tells whether this
+           is a single, the first, last or other chain; <partPosition>
            tells whether this is a single, the first, last or other
-           chain; <partPosition> tells whether this is a single, the
-           first, last or other part; <debugFileCount> gives the
-           number of the next available tee file"""
+           part; <debugFileCount> gives the index of the next
+           available tee file"""
                 
         Logging.trace(">>: voice = %s, chainPosition = %s, partPosition = %s,"
-                      + " debugFileCount = %d, commands = %s",
+                      + " debugFileCount = %d, effects = %s",
                       voiceName, chainPosition, partPosition, debugFileCount,
-                      commandTokenList)
+                      effectTokenList)
 
         cls = self.__class__
 
@@ -446,10 +447,10 @@ class AudioTrackManager:
         # collect sources and targets and delete them from token list
         redirector = re.escape(cls._audioProcessorMap["redirector"])
         indicatorRegExp = re.compile(redirector + r"([A-Za-z]+)")
-        targetList = cls._extractMatchingElementsFromList(commandTokenList,
+        targetList = cls._extractMatchingElementsFromList(effectTokenList,
                                                           indicatorRegExp)
         indicatorRegExp = re.compile(r"([A-Za-z]*)" + redirector)
-        sourceList = cls._extractMatchingElementsFromList(commandTokenList,
+        sourceList = cls._extractMatchingElementsFromList(effectTokenList,
                                                           indicatorRegExp)
 
         # make simple plausibility checks
@@ -494,9 +495,9 @@ class AudioTrackManager:
             debugFileCount += 1
             target = teeFilePath(debugFileCount)
             
-        Logging.trace("<<: commands = %s, sources = %s, target = %s,"
+        Logging.trace("<<: effects = %s, sources = %s, target = %s,"
                       " debugFileCount = %d",
-                      commandTokenList, sourceList, target, debugFileCount)
+                      effectTokenList, sourceList, target, debugFileCount)
         return (sourceList, target, debugFileCount)
             
     #--------------------
@@ -547,58 +548,86 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, sourceFilePathList, volumeFactorList,
-                           attenuationLevel, targetFilePath):
+                           masteringEffectList, attenuationLevel,
+                           targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
            <volumeFactorList> with loudness attenuation given by
            <attenuationLevel> either externally or with slow internal
-           algorithm"""
+           algorithm; <masteringEffectList> gives the refinement
+           effects for this track (if any) to be applied after
+           mixdown"""
 
         Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
-                      + " level = %4.3f, targetFile = %s",
+                      + " masteringEffects = '%s', attenuation = %4.3f,"
+                      + " targetFile = %s",
                       sourceFilePathList, volumeFactorList,
-                      attenuationLevel, targetFilePath)
+                      masteringEffectList, attenuationLevel,
+                      targetFilePath)
 
         cls = self.__class__
         
-        if "mixingCommandLine" not in cls._audioProcessorMap:
-            _WavFile.mixdown(sourceFilePathList, volumeFactorList,
-                             attenuationLevel, targetFilePath)
-        else:
-            commandLine = cls._audioProcessorMap["mixingCommandLine"]
-            self._mixdownToWavFileExternally(commandLine,
-                                             sourceFilePathList,
+        if "mixingCommandLine" in cls._audioProcessorMap:
+            self._mixdownToWavFileExternally(sourceFilePathList,
                                              volumeFactorList,
+                                             masteringEffectList,
                                              attenuationLevel,
                                              targetFilePath)
+        else:
+            if masteringEffectList > "":
+                Logging.trace("--: WARNING - no mastering available"
+                              + " when using internal mixdown,"
+                              + " effects '%s' discarded",
+                              masteringEffectList)
+
+            _WavFile.mixdown(sourceFilePathList, volumeFactorList,
+                             attenuationLevel, targetFilePath)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def _mixdownToWavFileExternally (self, commandLine, sourceFilePathList,
-                                     volumeFactorList, attenuationLevel,
-                                     targetFilePath):
+    def _mixdownToWavFileExternally (self, sourceFilePathList,
+                                     volumeFactorList, masteringEffectList,
+                                     attenuationLevel, targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
            <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> using external command given by
-           <commandLine>"""
+           <attenuationLevel> using external command;
+           <masteringEffectList> gives the refinement effects for this
+           track (if any) to be applied after mixdown"""
 
-        Logging.trace(">>: commandLine = '%s',"
-                      + " sourceFiles = %s, volumeFactors = %s,"
-                      + " level = %4.3f, targetFile = %s",
-                      commandLine, sourceFilePathList, volumeFactorList,
-                      attenuationLevel, targetFilePath)
+        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
+                      + " masteringEffects = '%s', level = %4.3f,"
+                      + " targetFile = %s",
+                      sourceFilePathList, volumeFactorList,
+                      masteringEffectList, attenuationLevel,
+                      targetFilePath)
 
         cls = self.__class__
 
+        # some shorthands
+        audioProcMap     = cls._audioProcessorMap
+        replaceVariables = cls._replaceVariablesByValues
+
+        # check whether mastering is done after mixdown
+        masteringPassIsRequired = (attenuationLevel != 0
+                                   or masteringEffectList > "")
+        intermediateFilePath = self._audioDirectoryPath + "/result-mix.wav"
+        intermediateFilePath = iif(masteringPassIsRequired,
+                                   intermediateFilePath, targetFilePath)
+
+        Logging.trace("--: masteringPass = %s, intermediateFile = '%s'",
+                      masteringPassIsRequired, intermediateFilePath)
+
+        # do the mixdown of the audio sources
         commandRegexp = re.compile(r"([^\[]*)\[([^\]]+)\](.*)")
-        match = commandRegexp.search(commandLine)
+        mixingCommandLine = audioProcMap["mixingCommandLine"]
+        match = commandRegexp.search(mixingCommandLine)
 
         if match is None:
             Logging.trace("--: bad command line format for mix - '%s'",
-                          commandLine)
+                          mixingCommandLine)
         else:
             commandPrefix        = tokenize(match.group(1))
             commandRepeatingPart = tokenize(match.group(2))
@@ -612,35 +641,59 @@ class AudioTrackManager:
                 filePath     = sourceFilePathList[i]
                 variableMap  = { "factor" : volumeFactor,
                                  "infile" : filePath }
-                part = cls._replaceVariablesByValues(commandRepeatingPart,
-                                                     variableMap)
+                part = replaceVariables(commandRepeatingPart, variableMap)
                 command.extend(part)
 
             Logging.trace("--: repeating part = '%s'", command)
 
             commandList = commandPrefix + command + commandSuffix
-            variableMap = { "outfile" : targetFilePath }
-            command = cls._replaceVariablesByValues(commandList,
-                                                    variableMap)
+            variableMap = { "outfile" : intermediateFilePath }
+            command = replaceVariables(commandList, variableMap)
             OperatingSystem.executeCommand(command, True,
                                            stdout=OperatingSystem.nullDevice)
+
+        if masteringPassIsRequired:
+            # do mastering and normalization
+            normalizationEffect = audioProcMap["normalizationEffect"]
+            normalizationEffectTokenList = tokenize(normalizationEffect)
+            variableMap  = { "attenuationLevel" : attenuationLevel }
+            nmEffectPartList = replaceVariables(normalizationEffectTokenList,
+                                                variableMap)
+            effectList = (tokenize(masteringEffectList)
+                          + nmEffectPartList)
+
+            refinementCommandLine = audioProcMap["refinementCommandLine"]
+            refinementCommandList = tokenize(refinementCommandLine)
+            variableMap = { "infile"  : intermediateFilePath,
+                            "outfile" : targetFilePath,
+                            "effects" : effectList }
+            command = replaceVariables(refinementCommandList, variableMap)
+            OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
     #--------------------
 
     def _mixdownVoicesToWavFile (self, voiceNameList,
-                                 voiceNameToVolumeMap, parallelTrackFilePath,
-                                 attenuationLevel, targetFilePath):
+                                 voiceNameToAudioLevelMap,
+                                 parallelTrackFilePath,
+                                 masteringEffectList, attenuationLevel,
+                                 targetFilePath):
         """Constructs and executes a command for audio mixdown to target file
            with <targetFilePath> from given <voiceNameList>, the
-           mapping to volumes <voiceNameToVolumeMap> with loudness
-           attenuation given by <attenuationLevel>; if
+           mapping to volumes <voiceNameToAudioLevelMap> with loudness
+           attenuation given by <attenuationLevel>;
+           <masteringEffectList> gives the refinement effects for
+           this track (if any) to be applied after mixdown; if
            <parallelTrackPath> is not empty, the parallel track is
            added"""
 
-        Logging.trace(">>: voiceNames = %s, target = '%s'",
-                      voiceNameList, targetFilePath)
+        Logging.trace(">>: voiceNames = %s, audioLevels = %s"
+                      + " parallelTrack = '%s', masteringEffects = '%s'"
+                      + " attenuation = %5.3f, target = '%s'",
+                      voiceNameList, voiceNameToAudioLevelMap,
+                      parallelTrackFilePath, masteringEffectList,
+                      attenuationLevel, targetFilePath)
 
         cls = self.__class__
         sourceFilePathList = []
@@ -649,17 +702,18 @@ class AudioTrackManager:
         for voiceName in voiceNameList:
             audioFilePath = (_processedAudioFileTemplate
                              % (self._audioDirectoryPath, voiceName))
-            volumeFactor = voiceNameToVolumeMap.get(voiceName, 1)
+            volumeFactor = voiceNameToAudioLevelMap.get(voiceName, 1)
             sourceFilePathList.append(audioFilePath)
             volumeFactorList.append(volumeFactor)
 
         if parallelTrackFilePath != "":
-            volumeFactor = voiceNameToVolumeMap["parallel"]
+            volumeFactor = voiceNameToAudioLevelMap["parallel"]
             sourceFilePathList.append(parallelTrackFilePath)
             volumeFactorList.append(volumeFactor)
 
         self._mixdownToWavFile(sourceFilePathList, volumeFactorList,
-                               attenuationLevel, targetFilePath)
+                               masteringEffectList, attenuationLevel,
+                               targetFilePath)
         Logging.trace("<<")
 
     #--------------------
@@ -700,7 +754,7 @@ class AudioTrackManager:
 
         result = []
         variableList = variableMap.keys()
-        variableRegexp = re.compile(r"\$\{([a-z]+)\}")
+        variableRegexp = re.compile(r"\$\{([a-zA-Z]+)\}")
 
         for st in stringList:
             st = str(st)
@@ -805,17 +859,17 @@ class AudioTrackManager:
     def initialize (cls,
                     aacCommandLine, audioProcessorMap,
                     ffmpegCommand, midiToWavCommandLine,
-                    soundStyleNameToCommandsMap, intermediateFilesAreKept):
+                    soundStyleNameToEffectsMap, intermediateFilesAreKept):
         """Sets some global processing data like e.g. the command
            paths."""
 
         Logging.trace(">>: aac = '%s', audioProcessor = '%s',"
                       + " ffmpeg = '%s', midiToWavCommand = '%s',"
-                      + " soundStyleNameToCommandsMap = %s,"
+                      + " soundStyleNameToEffectsMap = %s,"
                       + " debugging = %s",
                       aacCommandLine, audioProcessorMap,
                       ffmpegCommand, midiToWavCommandLine,
-                      soundStyleNameToCommandsMap,
+                      soundStyleNameToEffectsMap,
                       intermediateFilesAreKept)
 
         cls._aacCommandLine                = aacCommandLine
@@ -823,8 +877,14 @@ class AudioTrackManager:
         cls._intermediateFilesAreKept      = intermediateFilesAreKept
         cls._ffmpegCommand                 = ffmpegCommand
         cls._midiToWavRenderingCommandList = tokenize(midiToWavCommandLine)
-        cls._soundStyleNameToCommandsMap   = soundStyleNameToCommandsMap
+        cls._soundStyleNameToEffectsMap    = soundStyleNameToEffectsMap
 
+        # check whether sox is used as audio processor
+        commandList = tokenize(cls._audioProcessorMap["refinementCommandLine"])
+        command = commandList[0].lower()
+        cls._audioProcessorIsSox = (command.endswith("sox")
+                                    or command.endswith("sox.exe"))
+        
         Logging.trace("<<")
 
     #--------------------
@@ -884,7 +944,10 @@ class AudioTrackManager:
 
             newEntry = (voiceNameSubset, albumName, songTitle,
                         targetFilePath, audioTrack.description,
-                        audioTrack.languageCode)
+                        audioTrack.languageCode,
+                        audioTrack.voiceNameToAudioLevelMap,
+                        audioTrack.masteringEffectList,
+                        audioTrack.attenuationLevel)
             Logging.trace("--: appending %s for track name %s",
                           newEntry, audioTrack.name)
             result.append(newEntry)
@@ -980,72 +1043,79 @@ class AudioTrackManager:
         OperatingSystem.showMessageOnConsole(message)
 
         # prepare list of audio processing commands
-        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
-        reverbCommands = iif(reverbLevel > 0, " reverb %d" % reverbLevel, "")
-
         if isCopyVariant:
-            audioProcessingCommands = ""
-        elif soundStyleName in cls._soundStyleNameToCommandsMap:
-            audioProcessingCommands = \
-                cls._soundStyleNameToCommandsMap[soundStyleName]
+            audioProcessingEffects = ""
+        elif soundStyleName in cls._soundStyleNameToEffectsMap:
+            audioProcessingEffects = \
+                cls._soundStyleNameToEffectsMap[soundStyleName]
         else:
-            audioProcessingCommands = ""
+            audioProcessingEffects = ""
             message = ("--: unknown variant %s replaced by copy default"
                        % soundVariant)
             Logging.trace(message)
             OperatingSystem.showMessageOnConsole(message)
 
-        audioProcessingCommands += reverbCommands
-        self._processAudioRefinement(voiceName, audioProcessingCommands)
+        # add reverb if applicable
+        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
+        reverbEffect = iif2(reverbLevel == 0, "",
+                            not cls._audioProcessorIsSox, "",
+                            " reverb %d" % reverbLevel)
+
+        if reverbLevel > 0 and not cls._audioProcessorIsSox:
+            message = "reverberation skipped, please use explicit reverb"
+            OperatingSystem.showMessageOnConsole(message)
+        
+        audioProcessingEffects += reverbEffect
+        self._processAudioRefinement(voiceName, audioProcessingEffects)
 
         Logging.trace("<<")
         
     #--------------------
 
-    def _processAudioRefinement (self, voiceName, audioProcessingCommands):
-        """Handles audio processing given by <audioProcessingCommands>"""
+    def _processAudioRefinement (self, voiceName, audioProcessingEffects):
+        """Handles audio processing given by <audioProcessingEffects>"""
 
-        Logging.trace(">>: voice = %s, commands = %s",
-                      voiceName, audioProcessingCommands)
+        Logging.trace(">>: voice = %s, effects = %s",
+                      voiceName, audioProcessingEffects)
         
         cls = self.__class__
 
         debugFileCount = 0
         separator = cls._audioProcessorMap["chainSeparator"]
-        chainCommandList = splitAndStrip(audioProcessingCommands, separator)
+        chainCommandList = splitAndStrip(audioProcessingEffects, separator)
         chainCommandCount = len(chainCommandList)
         commandList = tokenize(cls._audioProcessorMap["refinementCommandLine"])
 
-        for chainIndex, chainProcessingCommands in enumerate(chainCommandList):
+        for chainIndex, chainProcessingEffects in enumerate(chainCommandList):
             Logging.trace("--: chain[%d] = %s",
-                          chainIndex, chainProcessingCommands)
+                          chainIndex, chainProcessingEffects)
             chainPosition = iif3(chainCommandCount == 1, "SINGLE",
                                  chainIndex == 0, "FIRST",
                                  chainIndex == chainCommandCount - 1, "LAST",
                                  "OTHER")
-            chainPartCommandList = splitAndStrip(chainProcessingCommands,
+            chainPartCommandList = splitAndStrip(chainProcessingEffects,
                                                  "tee ")
             partCount = len(chainPartCommandList)
 
-            for partIndex, partProcessingCommands \
+            for partIndex, partProcessingEffects \
                 in enumerate(chainPartCommandList):
 
                 partPosition = iif3(partCount == 1, "SINGLE",
                                     partIndex == 0, "FIRST",
                                     partIndex == partCount - 1, "LAST",
                                     "OTHER")
-                partCommandTokenList = tokenize(partProcessingCommands)
+                partCommandTokenList = tokenize(partProcessingEffects)
                 sourceList, currentTarget, debugFileCount = \
-                    self._extractCommandSrcAndTgt(voiceName, chainPosition,
-                                                  partPosition,
-                                                  debugFileCount,
-                                                  partCommandTokenList)
+                    self._extractEffectListSrcAndTgt(voiceName, chainPosition,
+                                                     partPosition,
+                                                     debugFileCount,
+                                                     partCommandTokenList)
 
                 if partCommandTokenList[0] != "mix":
                     currentSource = sourceList[0]
                     variableMap = { "infile"   : currentSource,
                                     "outfile"  : currentTarget,
-                                    "commands" : partCommandTokenList }
+                                    "effects"  : partCommandTokenList }
                     command = cls._replaceVariablesByValues(commandList,
                                                             variableMap)
                     OperatingSystem.executeCommand(command, True)
@@ -1062,14 +1132,14 @@ class AudioTrackManager:
                                                            valueName, True)
                             volumeList[i] = float(volume)
 
-                        self._mixdownToWavFile(sourceList, volumeList, 1.0,
-                                               currentTarget)
+                        self._mixdownToWavFile(sourceList, volumeList,
+                                               "", 0.0, currentTarget)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def mixdown (self, configData, voiceNameToVolumeMap):
+    def mixdown (self, configData):
         """Combines the processed audio files for all voices in
            <configData.voiceNameList> into several combination files and
            converts them to aac format; <configData> defines the voice
@@ -1077,28 +1147,29 @@ class AudioTrackManager:
            voices as well as the tags and suffices for the final
            files"""
 
-        Logging.trace(">>: configData = %s, voiceNameToVolumeMap = %s",
-                      configData, voiceNameToVolumeMap)
+        Logging.trace(">>: configData = %s", configData)
 
         cls = self.__class__
-
-        if configData.parallelTrackFilePath != "":
-            voiceNameToVolumeMap["parallel"] = configData.parallelTrackVolume
 
         waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
         voiceProcessingList = \
             cls.constructSettingsForAudioTracks(configData)
 
-        attenuationLevel = configData.attenuationLevel
-
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, \
-              targetFilePath, _, _ = v
+              targetFilePath, _, _, voiceNameToAudioLevelMap, \
+              masteringEffectList, attenuationLevel = v
             OperatingSystem.showMessageOnConsole("== make mix file: %s"
                                                  % songTitle)
+            
+            if configData.parallelTrackFilePath != "":
+                parallelTrackVolume = configData.parallelTrackVolume
+                voiceNameToAudioLevelMap["parallel"] = parallelTrackVolume
+
             self._mixdownVoicesToWavFile(currentVoiceNameList,
-                                         voiceNameToVolumeMap,
+                                         voiceNameToAudioLevelMap,
                                          configData.parallelTrackFilePath,
+                                         masteringEffectList,
                                          attenuationLevel,
                                          waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,

@@ -1,6 +1,7 @@
-# -*- coding: utf-8-unix -*-
 # TTBase - provides several elementary functions like conditional
 #          expressions
+#
+# author: Dr. Thomas Tensi, 2014
 
 #====================
 

@@ -161,6 +161,11 @@ class Logging:
     def initialize (cls):
         """Starts logging"""
 
+        cls._referenceLevel = cls.Level_none
+        cls._fileName       = ""
+        cls._fileIsOpen     = False
+        cls._isEnabled      = True
+
         cls._writeLine("START LOGGING")
         atexit.register(cls._closeFileConditionally)
     

@@ -21,6 +21,8 @@ class ValidityChecker:
     """Provides checking of validity of values (typically command line
        parameters). Assumes that a check failure is fatal."""
 
+    #--------------------
+
     @classmethod
     def _checkTemplate (cls, typeName, valueName, value):
         result = "--: checking '%s' for being %s ('%s')"

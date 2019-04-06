@@ -69,7 +69,7 @@ for the LilypondToBandVideoConverter.
 
 Installation is done from the PyPi repository via
 
-    pip install lilypondToBVC
+    pip install lilypondToBandVideoConverter
 
 Make sure that the scripts directory of python is in the path for
 executables on your platform.

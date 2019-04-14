@@ -9,11 +9,9 @@ import os
 import re
 import sys
 
-import basemodules.python2and3support
+import basemodules.python2and3support as python2and3support
 from .simplelogging import Logging
 from .ttbase import iif
-
-python2and3support = basemodules.python2and3support
 
 #====================
 

@@ -62,7 +62,7 @@ class _LilypondIncludeFile:
            that a definition line consists of the name and an equals
            sign"""
 
-        Logging.trace(">>: %s", includeFileName)
+        Logging.trace(">>: %r", includeFileName)
 
         result = set()
 
@@ -79,7 +79,7 @@ class _LilypondIncludeFile:
                 macroName = matchResult.group(1)
                 result.update([ macroName ])
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
 #--------------------
@@ -99,7 +99,7 @@ class LilypondFile:
     def _addLyrics (self, voiceName):
         """adds all lyrics lines to current <voice>"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: %s", voiceName)
 
         target = self._phase
         lyricsMacroNamePrefix = "%sLyrics%s" % (voiceName, target.capitalize())
@@ -136,7 +136,7 @@ class LilypondFile:
         """adds a named voice definition line for a voice with lyrics
            (which can later be referenced by a lyrics line)"""
 
-        Logging.trace(">>: voiceName = '%s'", voiceName)
+        Logging.trace(">>: voiceName = %s", voiceName)
 
         voiceLabelCount = len(self._voiceToLabelMap) + 1
         currentVoiceLabel = "song" + "ABCDEFGHIJKLMNOPQR"[voiceLabelCount - 1]
@@ -152,7 +152,7 @@ class LilypondFile:
            not, several alternatives are tried in
            <alternativeMacroNameList>"""
 
-        Logging.trace(">>: macro = %s, alternativesList = %s",
+        Logging.trace(">>: macro = %r, alternativesList = %r",
                       macroName, alternativeMacroNameList)
         isFound = (macroName in self._includeFileMacroNameSet)
         hasAncestor = False
@@ -165,7 +165,7 @@ class LilypondFile:
                     hasAncestor = True
                     break
 
-        Logging.trace("<<: isFound = %s, hasAncestor = %s",
+        Logging.trace("<<: isFound = %r, hasAncestor = %r",
                       isFound, hasAncestor)
             
     #--------------------
@@ -176,8 +176,8 @@ class LilypondFile:
 
         embeddedMap = map.get(phase, {})
         result = embeddedMap.get(voiceName, defaultValue)
-        Logging.trace("--: voiceName = %s, phase = %s, result = %s,"
-                      + " map = %s, embeddedMap = %s",
+        Logging.trace("--: voiceName = %s, phase = %s, result = %r,"
+                      + " map = %r, embeddedMap = %r",
                       voiceName, phase, result, map, embeddedMap)
         return result
 
@@ -186,12 +186,12 @@ class LilypondFile:
     def _lilypondVoiceName (self, voiceName):
         """returns name of voice to be used within lilypond"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: %s", voiceName)
 
         result = iif(voiceName == "drums", "myDrums", voiceName)
         result = result.replace("Simple", "").replace("Extended", "")
 
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %s", result)
         return result
 
     #--------------------
@@ -199,7 +199,7 @@ class LilypondFile:
     def _lyricsCount (self, voiceName):
         """returns lyrics count for <voiceName> if any"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: %s", voiceName)
 
         result = 0
         target = self._phase
@@ -217,7 +217,7 @@ class LilypondFile:
         """generates the string with lilypond commands for single
            <voice> with <voiceStaff>"""
 
-        Logging.trace(">>: name = '%s', staff = %s", voiceName, voiceStaff)
+        Logging.trace(">>: name = %s, staff = %r", voiceName, voiceStaff)
 
         isDrumVoice       = (voiceStaff == "DrumStaff")
         isTabulatureVoice = (voiceStaff == "TabStaff")
@@ -259,7 +259,7 @@ class LilypondFile:
         voiceText = (iif(clefString == "", "", "\\clef \"%s\"" % clefString)
                      + voiceText)
 
-        Logging.trace("<<: '%s'", voiceText)
+        Logging.trace("<<: %r", voiceText)
         return voiceText
 
     #--------------------
@@ -277,11 +277,11 @@ class LilypondFile:
         if isBuffered:
             indentation = indentationPerLevel * cls._indentationLevel
             effectiveProcessingState = self._processingState
-            template = "--: /%d/ =>'%s'"
+            template = "--: /%d/ =>%r"
         else:
             indentation = ""
             effectiveProcessingState = cls._ProcessingState_beforeInclusion
-            template = "--: /%d/ <='%s'"
+            template = "--: /%d/ <=%r"
 
         Logging.trace(template, effectiveProcessingState, st.strip("\n"))
         st = indentation + st
@@ -319,7 +319,7 @@ class LilypondFile:
     def _writeChords (self, voiceName):
         """writes chords for voice with <voiceName> (if applicable)"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: %s", voiceName)
 
         target = self._phase
 
@@ -350,7 +350,7 @@ class LilypondFile:
         """writes the header of a lilypond file also including the
            music-file to <self>"""
 
-        Logging.trace(">>: lilypondFile = %s", self)
+        Logging.trace(">>: lilypondFile = %r", self)
 
         cls = self.__class__
 
@@ -400,7 +400,7 @@ class LilypondFile:
         """writes the header of a lilypond file based on <self>
            targetting for a MIDI file or a video"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         # print default count-in definition (two measures, four beats)
         self._printLine(0, "countIn = { R1*2\\mf }")
@@ -434,7 +434,7 @@ class LilypondFile:
     def _writePdfLayoutHeader (self):
         """writes all layout settings for a PDF output to <self>"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         self._printLine(0, "%===================")
         self._printLine(0, "%= GLOBAL SETTINGS =")
@@ -457,8 +457,8 @@ class LilypondFile:
            <voiceStaff>; <isSimpleStaff> tells whether this is the
            only staff for the instrument"""
 
-        Logging.trace(">>: file = %s, voiceName = %s, extension = %s,"
-                      + " voiceStaff = %s, isSimpleStaff = %s",
+        Logging.trace(">>: file = %r, voiceName = %s, extension = %s,"
+                      + " voiceStaff = %s, isSimpleStaff = %r",
                       self, voiceName, extension, voiceStaff, isSimpleStaff)
 
         isLyricsVoice     = (self._lyricsCount(voiceName) > 0)
@@ -511,7 +511,7 @@ class LilypondFile:
     def _writeScore (self):
         """puts out score depending on <self._phase>"""
 
-        Logging.trace(">>: self = %s", self)
+        Logging.trace(">>: %r", self)
 
         voiceName = self._voiceNameList[0]
         relevantVoiceNameList = iif(self._isExtractScore, [ voiceName ],
@@ -608,7 +608,7 @@ class LilypondFile:
     def _writeVoice (self, voiceName):
         """puts out the score part for <voiceName>"""
 
-        Logging.trace(">>: '%s'", voiceName)
+        Logging.trace(">>: %s", voiceName)
 
         voiceStaffList = self._getPVEntry(self._phaseAndVoiceNameToStaffListMap,
                                           self._phase, voiceName, [ "Staff" ])
@@ -665,7 +665,7 @@ class LilypondFile:
     def __init__ (self, fileName):
         """initializes lilypond file"""
 
-        Logging.trace(">>: '%s'", fileName)
+        Logging.trace(">>: %r", fileName)
         
         cls = self.__class__
 
@@ -700,18 +700,18 @@ class LilypondFile:
         self._isMidiScore                 = False
         self._isVideoScore                = False
 
-        Logging.trace("<<: %s", self)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
-    def __str__ (self):
-        st = (("LilypondFile(phase = '%s', title = '%s', composerText = '%s',"
-               + " includeFileName = '%s', lilypondVersion = '%s',"
-               + " voiceNameList = %s, voiceNameToChordsMap = %s,"
-               + " voiceNameToLyricsMap = %s, songMeasureToTempoMap = '%s',"
-               + " videoEffectiveResolution = %s, videoSystemSize = %s,"
-               + " videoTopBottomMargin = %s, videoPaperWidth = %s,"
-               + " videoPaperHeight = %s, videoLineWidth = %s)")
+    def __repr__ (self):
+        st = (("LilypondFile(phase = %r, title = %r, composerText = %r,"
+               + " includeFileName = %r, lilypondVersion = %s,"
+               + " voiceNameList = %r, voiceNameToChordsMap = %r,"
+               + " voiceNameToLyricsMap = %r, songMeasureToTempoMap = %r,"
+               + " videoEffectiveResolution = %r, videoSystemSize = %r,"
+               + " videoTopBottomMargin = %r, videoPaperWidth = %r,"
+               + " videoPaperHeight = %r, videoLineWidth = %r)")
               % (self._phase, self._title, self._composerText,
                  self._includeFileName, self._lilypondVersion,
                  self._voiceNameList, self._voiceNameToChordsMap,
@@ -727,7 +727,7 @@ class LilypondFile:
     def close (self):
         """finalizes lilypond file"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
         cls = self.__class__
 
         # write all buffers
@@ -751,15 +751,15 @@ class LilypondFile:
         """Sets parameters for generation and starts generation based
            on phase."""
 
-        Logging.trace(">>: includeFileName = '%s', lilypondVersion = '%s',"
-                      + " phase = '%s', voiceNameList = '%s',"
-                      + " title = '%s', composerText = '%s',"
-                      + " voiceNameToChordsMap = %s,"
-                      + " voiceNameToLyricsMap = %s,"
-                      + " voiceNameToScoreNameMap = %s,"
-                      + " measureToTempoMap = %s,"
-                      + " phaseAndVoiceNameToClefMap = %s,"
-                      + " phaseAndVoiceNameToStaffListMap = %s",
+        Logging.trace(">>: includeFileName = %r, lilypondVersion = %s,"
+                      + " phase = %s, voiceNameList = %r,"
+                      + " title = %r, composerText = %r,"
+                      + " voiceNameToChordsMap = %r,"
+                      + " voiceNameToLyricsMap = %r,"
+                      + " voiceNameToScoreNameMap = %r,"
+                      + " measureToTempoMap = %r,"
+                      + " phaseAndVoiceNameToClefMap = %r,"
+                      + " phaseAndVoiceNameToStaffListMap = %r",
                       includeFileName, lilypondVersion, phase,
                       voiceNameList, title, composerText,
                       voiceNameToChordsMap, voiceNameToLyricsMap,
@@ -793,7 +793,7 @@ class LilypondFile:
         self._includeFileMacroNameSet = \
             _LilypondIncludeFile.definedMacroNameSet(includeFileName)
 
-        Logging.trace("--: %s", self)
+        Logging.trace("--: %r", self)
 
         self._resetPrintIndentation()
         self._writeHeader()
@@ -809,7 +809,7 @@ class LilypondFile:
                             lineWidth):
         """Sets all parameters needed for subsequent video generation"""
         
-        Logging.trace(">>: deviceName = %s, effectiveResolution = %d,"
+        Logging.trace(">>: deviceName = %r, effectiveResolution = %d,"
                       + " systemSize = %d,"
                       + " topBottomMargin = %4.2f, paperWidth = %5.2f,"
                       + " paperHeight = %5.2f, lineWidth = %5.2f",

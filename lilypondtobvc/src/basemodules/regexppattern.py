@@ -153,9 +153,9 @@ class RegExpPattern:
            spaces) from <elementPattern> and <separator> for elements
            within list"""
 
-        Logging.trace(">>: elementPattern = '%s'", elementPattern)
+        Logging.trace(">>: elementPattern = %r", elementPattern)
         result = (r"%s(%s%s)*" % (elementPattern, separator, elementPattern))
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -167,13 +167,13 @@ class RegExpPattern:
            starts immediately; if <mayBeEmpty> is set, also allows
            empty lists"""
 
-        Logging.trace(">>: elementPattern = '%s', mayBeEmpty = %s",
+        Logging.trace(">>: elementPattern = %r, mayBeEmpty = %r",
                       elementPattern, mayBeEmpty)
 
         listPattern = cls._makeListPattern(elementPattern)
         result = iif(not mayBeEmpty, listPattern, "(?:%s|)" % listPattern)
 
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -185,14 +185,14 @@ class RegExpPattern:
            immediately; if <mayBeEmpty> is set, also allows
            empty maps"""
 
-        Logging.trace(">>: keyPattern = '%s', valuePattern = '%s',"
-                      + " mayBeEmpty = %s",
+        Logging.trace(">>: keyPattern = %r, valuePattern = %r,"
+                      + " mayBeEmpty = %r",
                       keyPattern, valuePattern, mayBeEmpty)
 
         mapPattern = cls._makeMapPattern(keyPattern, valuePattern)
         result = iif(not mayBeEmpty, mapPattern, "(?:%s|)" % mapPattern)
 
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------

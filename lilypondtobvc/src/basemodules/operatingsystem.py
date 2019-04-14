@@ -50,7 +50,7 @@ class OperatingSystem:
           system. When <abortOnFailure> is set, any non-zero
           return code aborts the program at once."""
 
-        Logging.trace(">>: %s", repr(command))
+        Logging.trace(">>: %r", command)
 
         completionCode = subprocess.call(command,
                                          stdin=stdin, stdout=stdout,
@@ -82,7 +82,7 @@ class OperatingSystem:
         Logging.trace(">>")
 
         result = os.path.expanduser("~")
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -92,7 +92,7 @@ class OperatingSystem:
         """Moves file with <sourceFileName> to either file or
            directory target with <targetName>."""
 
-        Logging.trace(">>: %s -> %s", sourceFileName, targetName)
+        Logging.trace(">>: %r -> %r", sourceFileName, targetName)
         shutil.copy(sourceFileName, targetName)
         os.remove(sourceFileName)
         Logging.trace("<<")
@@ -119,14 +119,14 @@ class OperatingSystem:
     def removeFile (cls, fileName, fileIsKept=False):
         """Removes file with <fileName> permanently."""
 
-        Logging.trace(">>: %s", fileName)
+        Logging.trace(">>: %r", fileName)
 
         if fileIsKept:
-            Logging.trace("--: not removed '%s'", fileName)
+            Logging.trace("--: not removed %r", fileName)
         elif not cls.hasFile(fileName):
-            Logging.trace("--: file already nonexisting '%s'", fileName)
+            Logging.trace("--: file already nonexisting %r", fileName)
         else:
-            Logging.trace("--: removing '%s'", fileName)
+            Logging.trace("--: removing %r", fileName)
             os.remove(fileName)
 
     #--------------------
@@ -139,7 +139,7 @@ class OperatingSystem:
 
         result = os.path.abspath(inspect.stack()[1][1])
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -150,7 +150,7 @@ class OperatingSystem:
            to user; <newlineIsAppended> tells whether a newline is added at
            the end of the message"""
 
-        Logging.trace("--: %s", message)
+        Logging.trace("--: %r", message)
         st = message + ("\n" if newlineIsAppended else "")
         sys.stderr.write(st)
         sys.stderr.flush()

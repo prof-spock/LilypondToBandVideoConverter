@@ -46,7 +46,7 @@ def _getStylesWithNamePrefix (prefix, configurationFile):
     allVariables = configurationFile.getKeySet()
     result = [x for x in allVariables if x.startswith(prefix)]
 
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
@@ -64,7 +64,7 @@ def _readStylesWithPrefix (prefix, configurationFile):
         style = configurationFile.getValue(styleName)
         result[styleName] = style
 
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
@@ -201,9 +201,9 @@ class _ConfigDataGlobal:
         redirector            = apmGet("redirector", "->")
         refinementCommandLine = apmGet("refinementCommandLine", "")
 
-        Logging.trace("--: chainSep = '%s', mixCmd = '%s',"
-                      + " normEffect = '%s', padCmd = '%s',"
-                      + " redirector = '%s', refCmd = '%s'",
+        Logging.trace("--: chainSep = %r, mixCmd = %r,"
+                      + " normEffect = %r, padCmd = %r,"
+                      + " redirector = %r, refCmd = %r",
                       chainSeparator, mixingCommandLine,
                       normalizationEffect, paddingCommandLine,
                       redirector, refinementCommandLine)
@@ -556,7 +556,7 @@ class _ConfigDataSong:
         """Changes in place the keys and values of <map>; <keyKind> tells the
            target kind of the keys, <valueKind> those of the values"""
 
-        Logging.trace(">>: map = %s, keyKind = %s, valueKind = %s",
+        Logging.trace(">>: map = %r, keyKind = %r, valueKind = %r",
                       map, keyKind, valueKind)
 
         otherMap = dict(map)
@@ -567,7 +567,7 @@ class _ConfigDataSong:
             newValue = adaptToKind(value, valueKind)
             map[newKey] = newValue
 
-        Logging.trace("<<: %s", map)
+        Logging.trace("<<: %r", map)
 
     #--------------------
 
@@ -578,17 +578,17 @@ class _ConfigDataSong:
         """Checks whether data for voice list and voice data read from
            configuration file is okay."""
 
-        Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
-                      + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', reverbLevels = '%s',"
-                      + " soundVariants = '%s'",
+        Logging.trace(">>: voiceNames = %r, midiChannels = %r,"
+                      + " midiInstruments = %r, midiVolumes = %r,"
+                      + " panPositions = %r, reverbLevels = %r,"
+                      + " soundVariants = %r",
                       voiceNames, midiChannels, midiInstruments,
                       midiVolumes, panPositions, reverbLevels,
                       soundVariants)
 
         checkForRequiredLength = (lambda st, valueName, elementCount:
             ValidityChecker.isValid(cls._elementCountInString(st) == elementCount,
-                                    ("'%s' must contain %d elements"
+                                    ("%r must contain %d elements"
                                      + " to match 'voiceNameList'")
                                     % (valueName, elementCount)))
 
@@ -615,10 +615,10 @@ class _ConfigDataSong:
         """Converts strings read from configuration file to voice name
            list and map to voice descriptors"""
 
-        Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
-                      + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', reverbLevels = '%s',"
-                      + " soundVariants = '%s'",
+        Logging.trace(">>: voiceNames = %r, midiChannels = %r,"
+                      + " midiInstruments = %r, midiVolumes = %r,"
+                      + " panPositions = %r, reverbLevels = %r,"
+                      + " soundVariants = %r",
                       voiceNames, midiChannels, midiInstruments,
                       midiVolumes, panPositions, reverbLevels,
                       soundVariants)
@@ -646,7 +646,7 @@ class _ConfigDataSong:
             voiceDescriptor.soundVariant   = soundVariantList[i]
             configData.voiceNameToVoiceDataMap[voiceName] = voiceDescriptor
 
-        Logging.trace("<<: %s", configData.voiceNameToVoiceDataMap)
+        Logging.trace("<<: %r", configData.voiceNameToVoiceDataMap)
 
     #--------------------
 
@@ -658,7 +658,7 @@ class _ConfigDataSong:
            target to lyrics line count, voice names for chords map to
            sets of targets"""
 
-        Logging.trace(">>: map = '%s', isLyrics = %s",
+        Logging.trace(">>: map = %r, isLyrics = %r",
                       mapAsString, isLyricsMap)
 
         targetAbbrevToNameMap = { "e": "extract", "m": "midi",
@@ -673,7 +673,7 @@ class _ConfigDataSong:
             for voiceName, value in map.items():
                 entry = iif(isLyricsMap, {}, set())
                 targetList = value.split("/")
-                Logging.trace("--: targetList(%s) = %s",
+                Logging.trace("--: targetList(%r) = %r",
                               voiceName, targetList)
 
                 for targetSpec in targetList:
@@ -681,7 +681,7 @@ class _ConfigDataSong:
 
                     if len(targetSpec) > 0:
                         target, rest = targetSpec[0], targetSpec[1:]
-                        Logging.trace("--: target = %s", target)
+                        Logging.trace("--: target = %r", target)
 
                         if target in "emsv":
                             target = targetAbbrevToNameMap[target]
@@ -696,7 +696,7 @@ class _ConfigDataSong:
 
                 result[voiceName] = entry
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -714,7 +714,7 @@ class _ConfigDataSong:
         """Splits string <parallelTrackInfo> given for parallel track
            into file path, track volume and shift offset"""
 
-        Logging.trace(">>: %s", parallelTrackInfo)
+        Logging.trace(">>: %r", parallelTrackInfo)
 
         defaultFilePath = ""
         defaultVolume   = 1.0
@@ -735,7 +735,7 @@ class _ConfigDataSong:
         configData.parallelTrackVolume   = float(partList[1])
         configData.shiftOffset           = float(partList[2])
 
-        Logging.trace("<<: %s", partList)
+        Logging.trace("<<: %r", partList)
 
     #--------------------
     # EXPORTED FEATURES
@@ -936,7 +936,7 @@ class _ConfigDataSong:
         configData.parallelTrackVolume = 0.0
         configData.shiftOffset         = 0.0
 
-        Logging.trace("<<: configData = %s", configData)
+        Logging.trace("<<: configData = %r", configData)
 
 #====================
 
@@ -1071,8 +1071,8 @@ class _LocalValidator:
            gives the validation regexp"""
 
         st = ("--" if regExp is None else regExp.pattern)
-        Logging.trace(">>: name = %s, default = '%s', kind = %s,"
-                      + " regExp = '%s'",
+        Logging.trace(">>: name = %r, default = %r, kind = %r,"
+                      + " regExp = %r",
                       name, defaultValue, kind, st)
 
         cls._map[name] = { "defaultValue" : defaultValue,
@@ -1260,7 +1260,7 @@ class _LocalValidator:
            <checkedName> is set, the syntax of that name is used
            instead"""
 
-        Logging.trace(">>: parameterName = %s, checkedName = %s",
+        Logging.trace(">>: parameterName = %r, checkedName = %r",
                       parameterName, checkedName)
         effectiveName = iif(checkedName is None, parameterName, checkedName)
 
@@ -1274,7 +1274,7 @@ class _LocalValidator:
             value = getValueProc(parameterName, defaultValue)
 
             if value is None:
-                errorMessage = "'%s' is not set" % parameterName
+                errorMessage = "%r is not set" % parameterName
                 ValidityChecker.isValid(False, errorMessage)
             elif kind == "STRING":
                 ValidityChecker.isString(value, parameterName)
@@ -1286,8 +1286,8 @@ class _LocalValidator:
                 ValidityChecker.isFloat(value, parameterName)
             elif kind == "REGEXP":
                 regExp = entry["regExp"]
-                Logging.trace("--: regexp = '%s'", regExp.pattern)
-                errorMessage = "'%s' has a bad syntax" % parameterName
+                Logging.trace("--: regexp = %r", regExp.pattern)
+                errorMessage = "%s has a bad syntax" % parameterName
                 ValidityChecker.isValid(regExp.match(value) is not None,
                                         errorMessage)
             elif value == "":
@@ -1299,7 +1299,7 @@ class _LocalValidator:
             elif kind == "WFILE":
                 ValidityChecker.isWritableFile(value, parameterName)
             else:
-                Logging.trace("--: no check, unknown kind '%s'", kind)
+                Logging.trace("--: no check, unknown kind %r", kind)
 
         Logging.trace("<<")
 
@@ -1311,7 +1311,7 @@ class _LocalValidator:
            default value from internal map (if any); assumes that
            correctness check has been done before"""
 
-        Logging.trace(">>: %s", name)
+        Logging.trace(">>: %r", name)
 
         if name not in cls._map:
             result = getValueProc(name)
@@ -1320,7 +1320,7 @@ class _LocalValidator:
             defaultValue = entry["defaultValue"]
             result = getValueProc(name, defaultValue)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
 #====================
@@ -1385,7 +1385,7 @@ class LTBVC_ConfigurationData:
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         """Returns the string representation of <self>"""
 
         className = self.__class__.__name__
@@ -1428,7 +1428,7 @@ class LTBVC_ConfigurationData:
             # used
             selectedVoiceNameSet.update(self.voiceNameList)
 
-        Logging.trace("<<: '%s'", self)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
@@ -1436,12 +1436,12 @@ class LTBVC_ConfigurationData:
         """Gets data from configuration file read into <self> at
            <parameterName>"""
 
-        Logging.trace(">>: %s", parameterName)
+        Logging.trace(">>: %r", parameterName)
 
         getValueProc = self._configurationFile.getValue
         result = _LocalValidator.get(parameterName, getValueProc)
 
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -1450,15 +1450,15 @@ class LTBVC_ConfigurationData:
         """Reads data from configuration file with <configurationFilePath>
            into <self>"""
 
-        Logging.trace(">>: '%s'", configurationFilePath)
+        Logging.trace(">>: %r", configurationFilePath)
 
         cls = self.__class__
 
         separator = OperatingSystem.pathSeparator
         configSuffix = separator + "config"
 
-        Logging.trace("--: scriptFilePath = '%s', scriptDirectory = '%s',"
-                      + " homeDirectory = '%s'",
+        Logging.trace("--: scriptFilePath = %r, scriptDirectory = %r,"
+                      + " homeDirectory = %r",
                       cls._scriptFilePath, cls._scriptDirectoryPath,
                       cls._homeDirectoryPath)
 

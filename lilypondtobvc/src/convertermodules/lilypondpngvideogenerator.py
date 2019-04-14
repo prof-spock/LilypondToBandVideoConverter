@@ -62,9 +62,9 @@ class Assertion:
         """Checks whether file with <fileName> exists, otherwise gives
            error message about file kind mentioning file name."""
 
-        Logging.trace(">>: name = '%s', kind = '%s'", fileName, fileKind)
+        Logging.trace(">>: name = %r, kind = %s", fileName, fileKind)
 
-        errorTemplate = "%s file does not exist - %s"
+        errorTemplate = "%s file does not exist - %r"
         errorMessage = errorTemplate % (fileKind, fileName)
         cls.check(OperatingSystem.hasFile(fileName), errorMessage)
 
@@ -81,7 +81,7 @@ class Assertion:
         Logging.trace(">>: '%s %s'", programName, option)
 
         cls.check(OperatingSystem.programIsAvailable(programPath, option),
-                  ("cannot execute %s program - path %s'"
+                  ("cannot execute %s program - path %r'"
                    % (programName, programPath)))
 
         Logging.trace("<<")
@@ -102,7 +102,7 @@ class DurationManager:
            tempo track in <measureToTempoMap> and the number of
            <countInMeasures>."""
 
-        Logging.trace(">>: measureToTempoMap = %s, countInMeasures = %d,"
+        Logging.trace(">>: measureToTempoMap = %r, countInMeasures = %d,"
                       + " lastMeasureNumber = %d",
                       measureToTempoMap, countInMeasures, lastMeasureNumber)
 
@@ -128,7 +128,7 @@ class DurationManager:
                                           firstMeasureOffset))
             result[measureNumber] = currentMeasureDuration
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -139,7 +139,7 @@ class DurationManager:
            measures <pageToMeasureMap> and the mapping of measures to
            durations <measureToDurationMap>"""
 
-        Logging.trace(">>: pToM = %s, mToD = %s",
+        Logging.trace(">>: pToM = %r, mToD = %r",
                       pageToMeasureMap, measureToDurationMap)
 
         result = []
@@ -162,7 +162,7 @@ class DurationManager:
                 result.append(pageDuration)
                 previousPageMeasureNumber = currentPageMeasureNumber
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -186,7 +186,7 @@ class DurationManager:
         """Adjusts <durationList> such that it conforms to
            <frameRate>."""
 
-        Logging.trace(">>: durations = %s, frameRate = %f",
+        Logging.trace(">>: durations = %r, frameRate = %f",
                       durationList, frameRate)
 
         frameDuration = 1.0 / frameRate
@@ -199,7 +199,7 @@ class DurationManager:
             unallocatedDuration = duration - effectiveDuration
             durationList[i] = effectiveDuration
 
-        Logging.trace("<<: %s", durationList)
+        Logging.trace("<<: %r", durationList)
 
 #============================================================
 
@@ -230,7 +230,7 @@ class PostscriptFile:
     def setName (cls, name):
         """Sets name of postscript file."""
 
-        Logging.trace(">>: %s", name)
+        Logging.trace(">>: %r", name)
 
         Assertion.ensureFileExistence(name, "postscript")
         cls._fileName = name
@@ -325,7 +325,7 @@ class PostscriptFile:
         lastMeasureNumber = maximumMeasureNumber + 8
         result[maximumPageNumber] = lastMeasureNumber
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
 #============================================================
@@ -391,7 +391,7 @@ class MP4Video:
     def cleanUpConditionally (cls, filesAreKept):
         """Deletes all intermediate files when <filesAreKept> is unset"""
 
-        Logging.trace(">>: %s", filesAreKept)
+        Logging.trace(">>: %r", filesAreKept)
 
         for page in range(1, cls._pageCount + 1):
             Logging.trace("--: %d", page)
@@ -415,7 +415,7 @@ class MP4Video:
         """Generate an MP4 video from durations in <pageDurationList>
            and generated PNG images."""
 
-        Logging.trace(">>: %s", pageDurationList)
+        Logging.trace(">>: %r", pageDurationList)
 
         # for each page an MP4 fragment file is generated and finally
         # concatenated into the target file
@@ -475,7 +475,7 @@ class MP4Video:
         """Sets file name for MP4 generation to <fileName>; if empty, some
            temporary name will be used."""
 
-        Logging.trace(">>: '%s'", fileName)
+        Logging.trace(">>: %r", fileName)
 
         if fileName == "":
             fileName = cls._tempFileName
@@ -519,7 +519,7 @@ class SubtitleFile:
         """Generates SRT subtitle file from <measureToDuration> and
            <countInMeasures>."""
 
-        Logging.trace(">>: mToDMap = %s, countIn = %d",
+        Logging.trace(">>: mToDMap = %r, countIn = %d",
                       measureToDurationMap, countInMeasures)
 
         measureNumberList = list(measureToDurationMap.keys())
@@ -553,7 +553,7 @@ class SubtitleFile:
     def setName (cls, name):
         """Sets name of subtitle file."""
 
-        Logging.trace(">>: '%s'", name)
+        Logging.trace(">>: %r", name)
 
         if name == "":
             name = cls._tempFileName
@@ -569,7 +569,7 @@ class SubtitleFile:
         """Cleans up subtitle file if <filesAreKept> is unset,
            otherwise moves it to directory given by <targetPath>"""
 
-        Logging.trace(">>: %s", filesAreKept)
+        Logging.trace(">>: %r", filesAreKept)
 
         if cls.fileName == cls._tempFileName:
             OperatingSystem.removeFile(cls.fileName, filesAreKept)
@@ -589,7 +589,7 @@ class LilypondPngVideoGenerator:
         """Checks whether data given is plausible for subsequent
            processing."""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         # check the executables
         Assertion.ensureProgramAvailability("lilypond", self._lilypondCommand,
@@ -619,7 +619,7 @@ class LilypondPngVideoGenerator:
         """Initializes other data in different classes from current
            object."""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         # set commands
         MP4Video._ffmpegCommand = self._ffmpegCommand
@@ -657,7 +657,7 @@ class LilypondPngVideoGenerator:
         """Generates postscript file and picture files from lilypond
            file."""
 
-        Logging.trace(">>: '%s'", self._lilypondFileName)
+        Logging.trace(">>: %r", self._lilypondFileName)
 
         command = (self._lilypondCommand,
                    "-l", "WARNING",
@@ -678,7 +678,7 @@ class LilypondPngVideoGenerator:
     def initialize (cls, ffmpegCommand, lilypondCommand):
         """Sets module-specific configuration variables"""
 
-        Logging.trace(">>: ffmpeg = '%s', lilypond = '%s'",
+        Logging.trace(">>: ffmpeg = %r, lilypond = %r",
                       ffmpegCommand, lilypondCommand)
         globals()['_ffmpegCommand']   = ffmpegCommand
         globals()['_lilypondCommand'] = lilypondCommand
@@ -693,13 +693,13 @@ class LilypondPngVideoGenerator:
                   intermediateFilesAreKept=False):
         """Initializes generator"""
 
-        Logging.trace(">>: lilypondFileName = '%s', targetMp4FileName = '%s',"
-                      + " targetSubtitleFileName = '%s',"
-                      + " measureToTempoMap = %s, countInMeasures = %s,"
-                      + " frameRate = %s, scalingFactor = %d,"
-                      + " ffmpegPresetName = %s,"
-                      + " intermediateFileDirectoryPath = %s,"
-                      + " intermediateFilesAreKept = %s",
+        Logging.trace(">>: lilypondFileName = %r, targetMp4FileName = %r,"
+                      + " targetSubtitleFileName = %r,"
+                      + " measureToTempoMap = %r, countInMeasures = %r,"
+                      + " frameRate = %r, scalingFactor = %d,"
+                      + " ffmpegPresetName = %r,"
+                      + " intermediateFileDirectoryPath = %r,"
+                      + " intermediateFilesAreKept = %r",
                       lilypondFileName, targetMp4FileName,
                       targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
@@ -731,23 +731,23 @@ class LilypondPngVideoGenerator:
         # -- check consistency of data
         self._checkParameters()
 
-        Logging.trace("<<: %s", self)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         """Returns strings representation of <self>."""
 
         className = self.__class__.__name__
-        result = (("%s(ffmpegCommand = '%s', lilypondCommand = '%s',"
-                   + " lilypondFileName = '%s', pictureFileStem = '%s',"
-                   + " postscriptFileName = '%s', targetMp4FileName = '%s',"
-                   + " targetSubtitleFileName = '%s',"
-                   + " measureToTempoMap = %s, countInMeasures = %s,"
-                   + " frameRate = %s, scaleFactor = %s,"
-                   + " ffmpegPresetName = %s,"
-                   + " intermediateFileDirectoryPath = %s,"
-                   + " intermediateFilesAreKept = %s)") %
+        result = (("%s(ffmpegCommand = %r, lilypondCommand = %r,"
+                   + " lilypondFileName = %r, pictureFileStem = %r,"
+                   + " postscriptFileName = %r, targetMp4FileName = %r,"
+                   + " targetSubtitleFileName = %r,"
+                   + " measureToTempoMap = %r, countInMeasures = %r,"
+                   + " frameRate = %r, scaleFactor = %r,"
+                   + " ffmpegPresetName = %r,"
+                   + " intermediateFileDirectoryPath = %r,"
+                   + " intermediateFilesAreKept = %r)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
                    self._postscriptFileName, self._targetMp4FileName,
@@ -777,7 +777,7 @@ class LilypondPngVideoGenerator:
     def process (self):
         """Coordinates the processing of all other modules."""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         try:
             self._processLilypondFile()

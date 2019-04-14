@@ -34,7 +34,7 @@ def _setToDefault (currentMap, key, defaultValue):
     """sets entry <key> in <map> to <defaultValue> if undefined"""
 
     originalValue = currentMap.get(key, None)
-    Logging.trace(">>: key = %s, originalValue = %s, default = %s",
+    Logging.trace(">>: key = %s, originalValue = %r, default = %r",
                   key, originalValue, defaultValue)
 
     if key not in currentMap:
@@ -49,7 +49,7 @@ def generateObjectListFromString (st, prototypeObject):
        external representation <st> describing a mapping from
        object name to object value"""
 
-    Logging.trace(">>: %s", st)
+    Logging.trace(">>: %r", st)
 
     result = []
     table = convertStringToMap(st)
@@ -57,13 +57,13 @@ def generateObjectListFromString (st, prototypeObject):
     for name in table.keys():
         attributeNameToValueMap = table[name]
         attributeNameToValueMap["name"] = name
-        Logging.trace("--: converting %s = %s",
+        Logging.trace("--: converting %s = %r",
                       name, attributeNameToValueMap)
         currentObject = deepcopy(prototypeObject)
         currentObject.checkAndSetFromMap(attributeNameToValueMap)
         result.append(currentObject)
 
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
@@ -73,20 +73,20 @@ def generateObjectMapFromString (st, prototypeObject):
        external representation <st> describing a mapping from
        object name to object value"""
 
-    Logging.trace(">>: %s", st)
+    Logging.trace(">>: %r", st)
 
     result = {}
     table = convertStringToMap(st)
 
     for name, attributeNameToValueMap in table.items():
         attributeNameToValueMap["name"] = name
-        Logging.trace("--: converting %s = %s",
+        Logging.trace("--: converting %s = %r",
                       name, attributeNameToValueMap)
         currentObject = deepcopy(prototypeObject)
         currentObject.checkAndSetFromMap(attributeNameToValueMap)
         result[name] = currentObject
 
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
@@ -142,11 +142,6 @@ class AudioTrack:
     #--------------------
 
     def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
         cls = self.__class__
         clsName = cls.__name__
         st = AttributeManager.convertToString(self, clsName,
@@ -179,7 +174,7 @@ class AudioTrack:
         # adapt values
         self.audioGroupList = convertStringToList(self.audioGroupList, "/")
         self.attenuationLevel = float(self.attenuationLevel)
-        Logging.trace("--: vntalm = %s", self.voiceNameToAudioLevelMap)
+        Logging.trace("--: vntalm = %r", self.voiceNameToAudioLevelMap)
         self.voiceNameToAudioLevelMap = \
             { key : float(value)
               for (key, value) in self.voiceNameToAudioLevelMap.items() }
@@ -222,7 +217,7 @@ class TempoTrack:
            Note that intermediate measures just maintain the previous
            tempo and length indication (as expected)."""
 
-        Logging.trace(">>: %s", tempoMap)
+        Logging.trace(">>: %r", tempoMap)
 
         result = {}
         separator = "/"
@@ -252,7 +247,7 @@ class TempoTrack:
                           measure, measureLength, tempo)
             result[measure] = (tempo, measureLength)
 
-        Logging.trace("<<: %s", repr(result))
+        Logging.trace("<<: %r", result)
         return result
 
 #====================
@@ -306,11 +301,6 @@ class VideoFileKind:
     #--------------------
 
     def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
         cls = self.__class__
         clsName = cls.__name__
         st = AttributeManager.convertToString(self, clsName,
@@ -401,11 +391,6 @@ class VideoTarget:
     #--------------------
 
     def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
         cls = self.__class__
         clsName = cls.__name__
         st = AttributeManager.convertToString(self, clsName,
@@ -469,15 +454,10 @@ class VoiceDescriptor:
     #--------------------
 
     def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
         className = self.__class__.__name__
         st = (("%s("
-               + "voice = %s, midiChannel = %s, midiInstrument = %s,"
-               + " midiVolume = %s, panPosition = %s, reverb = %s,"
+               + "voice = %s, midiChannel = %r, midiInstrument = %s,"
+               + " midiVolume = %r, panPosition = %s, reverb = %s,"
                + " soundVariant = %s)")
                % (className,
                   self.voiceName, self.midiChannel, self.midiInstrument,

@@ -51,7 +51,7 @@ class MP4TagManager:
         """Adjusts <value> for given <tagName> and returns adjusted
            value"""
 
-        Logging.trace(">>: tagName = '%s', value = '%s'", tagName, value)
+        Logging.trace(">>: tagName = %r, value = %r", tagName, value)
 
         if tagName in cls._tagNameAndValueToNewValueMap:
             # map value to one character encoding
@@ -73,7 +73,7 @@ class MP4TagManager:
 
         resultRepresentation = iif(tagName != "cover",
                                    result, str(result)[:100] + "...")
-        Logging.trace("<<: '%s' (%s)", resultRepresentation, type(result))
+        Logging.trace("<<: %r (%s)", resultRepresentation, type(result))
         return result
 
     #--------------------
@@ -85,7 +85,7 @@ class MP4TagManager:
         """Tags MP4 video or audio file in <filePath> with MP4 tags
            from <tagToValueMap>"""
 
-        Logging.trace(">>: fileName = '%s', map = %s", filePath,
+        Logging.trace(">>: fileName = %r, map = %r", filePath,
                       tagToValueMap)
 
         tagList = MP4(filePath)
@@ -94,7 +94,7 @@ class MP4TagManager:
         for tagName in tagNameList:
             isOkay = (tagName in tagToValueMap
                       and tagToValueMap[tagName] is not None)
-            Logging.trace("--: tagName = '%s', changed = %s",
+            Logging.trace("--: tagName = %r, changed = %r",
                           tagName, isOkay)
 
             if isOkay:

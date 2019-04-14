@@ -43,7 +43,7 @@ class _SubtitleShifter:
         result = ("%02d:%02d:%02d,%03d"
                   % (hours, minutes, seconds, milliseconds))
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -53,7 +53,7 @@ class _SubtitleShifter:
         """Returns time in seconds in SRT format with HH:MM:SS,000
            as float seconds."""
 
-        Logging.trace(">>: %s", timeString)
+        Logging.trace(">>: %r", timeString)
 
         hours        = int(timeString[0:2])
         minutes      = int(timeString[3:5])
@@ -73,7 +73,7 @@ class _SubtitleShifter:
     def applyShift (cls, lineList, duration):
         """Shifts SRT subtitle data in <lineList> by <duration>"""
 
-        Logging.trace(">>: lineList = %s, duration = %7.3f",
+        Logging.trace(">>: lineList = %r, duration = %7.3f",
                       lineList, duration)
 
         timeLineRegexp = re.compile(r"([0-9:,]+)\s*-->\s*([0-9:,]+)")
@@ -94,7 +94,7 @@ class _SubtitleShifter:
 
             result.append(line)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
 #====================
@@ -123,8 +123,8 @@ class VideoAudioCombiner:
         # TODO: this ffmpeg rendering does not produce quicktime
         # compliant videos
 
-        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
-                      + " audioTracks = %s, subtitleFile = '%s'",
+        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+                      + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
         
@@ -154,7 +154,7 @@ class VideoAudioCombiner:
                    + ["-vcodec", "copy", "-acodec", "copy",
                       "-scodec", "mov_text", "-y", targetVideoFilePath ])
 
-        Logging.trace("<<: %s", command)
+        Logging.trace("<<: %r", command)
         return command
 
     #--------------------
@@ -167,8 +167,8 @@ class VideoAudioCombiner:
            <targetVideoFilePath>; if <subtitleFilePath> is not empty,
            a subtile is added"""
 
-        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
-                      + " audioTracks = %s, subtitleFile = '%s'",
+        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+                      + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
         
@@ -186,7 +186,7 @@ class VideoAudioCombiner:
 
         command.extend([ "-out", targetVideoFilePath ])
 
-        Logging.trace("<<: %s", command)
+        Logging.trace("<<: %r", command)
         return command
 
     #--------------------
@@ -197,7 +197,7 @@ class VideoAudioCombiner:
     def initialize (cls, ffmpegCommand, mp4boxCommand):
         """Sets the internal command names"""
 
-        Logging.trace(">>: ffmpegCommand = '%s', mp4boxCommand = '%s'",
+        Logging.trace(">>: ffmpegCommand = %r, mp4boxCommand = %r",
                       ffmpegCommand, mp4boxCommand)
 
         cls._ffmpegCommand = ffmpegCommand
@@ -218,9 +218,9 @@ class VideoAudioCombiner:
            is added as an additional track; <voiceNameList> gives the
            list of all voices"""
 
-        Logging.trace(">>: voiceNameList = %s, trackDataList = %s,"
-                      + " sourceVideo = '%s', targetVideo = '%s',"
-                      + " subtitleFilePath = %s",
+        Logging.trace(">>: voiceNameList = %r, trackDataList = %r,"
+                      + " sourceVideo = %r, targetVideo = %r,"
+                      + " subtitleFilePath = %r",
                       voiceNameList, trackDataList, sourceVideoFilePath,
                       targetVideoFilePath, subtitleFilePath)
 
@@ -268,9 +268,9 @@ class VideoAudioCombiner:
            <subtitleColor> the RGB color of the subtitle,
            <subtitleFontSize> the size in pixels"""
 
-        Logging.trace(">>: sourceVideo = '%s', subtitleFile = '%s',"
-                      + " targetVideo = '%s', subtitleFontSize = %d,"
-                      + " subtitleColor = %d, ffmpegPreset = %s",
+        Logging.trace(">>: sourceVideo = %r, subtitleFile = %r,"
+                      + " targetVideo = %r, subtitleFontSize = %d,"
+                      + " subtitleColor = %d, ffmpegPreset = %r",
                       sourceVideoFilePath, subtitleFilePath,
                       targetVideoFilePath, subtitleFontSize,
                       subtitleColor, ffmpegPresetName)
@@ -278,7 +278,7 @@ class VideoAudioCombiner:
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
 
-        st = "== hardcoding subtitles for %s" % sourceVideoFilePath
+        st = "== hardcoding subtitles for %r" % sourceVideoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
         subtitleOption = (("subtitles=%s:force_style='PrimaryColour=%d,"
@@ -309,8 +309,8 @@ class VideoAudioCombiner:
         """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and stores
            result in file with <targetSubtitleFilePath>"""
 
-        Logging.trace(">>: subtitleFilePath = '%s', shiftOffset = %7.3f,"
-                      + " targetSubtitleFilePath ='%s'",
+        Logging.trace(">>: subtitleFilePath = %r, shiftOffset = %7.3f,"
+                      + " targetSubtitleFilePath =%r",
                       subtitleFilePath, shiftOffset, targetSubtitleFilePath)
 
         ValidityChecker.isReadableFile(subtitleFilePath, "subtitle file")
@@ -335,11 +335,11 @@ class VideoAudioCombiner:
         """Adds some quicktime/MP4 tags to video file with
            <videoFilePath>"""
 
-        Logging.trace(">>: '%s'", videoFilePath)
+        Logging.trace(">>: %r", videoFilePath)
 
         ValidityChecker.isReadableFile(videoFilePath, "source video file")
 
-        st = "== tagging %s" % videoFilePath
+        st = "== tagging %r" % videoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
         tagToValueMap = {}

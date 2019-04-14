@@ -256,7 +256,7 @@ def splitAndStrip (st, separator):
 def tokenize (st):
     """Returns a list of tokens also taking care of strings"""
 
-    Logging.trace(">>: %s", st)
+    Logging.trace(">>: %r", st)
 
     whiteSpaceCharacterList = " "
     quoteCharacterList = "'"""
@@ -316,6 +316,6 @@ def tokenize (st):
     if parseState != ParseState_inLimbo:
         result.append(token)
 
-    Logging.trace("--: accumulatedTrace = %s", fsaTrace)
-    Logging.trace("<<: %s", result)
+    Logging.trace("--: accumulatedTrace = %r", fsaTrace)
+    Logging.trace("<<: %r", result)
     return result

@@ -24,7 +24,7 @@ class AttributeManager:
            whether elements in <attributeNameToValueMap> occur in
            <attributeNameToKindMap> and have correct types"""
 
-        Logging.trace(">>: name = '%s', kind = '%s', attributeMap = %s"
+        Logging.trace(">>: name = %r, kind = %r, attributeMap = %s"
                       + " referenceMap = %s",
                       objectName, objectKind,
                       attributeNameToValueMap, attributeNameToKindMap)
@@ -56,8 +56,8 @@ class AttributeManager:
     @classmethod
     def convertToString (cls, object, className, attributeNameList,
                          attributeNameToKindMap=None):
-        """Returns a string representation of <object> belonging to class with
-           <className> using explicit metadata given by
+        """Returns a string representation of <object> belonging to class
+           with <className> using explicit metadata given by
            <attributeNameList> and <attributeNameToKindMap>"""
 
         templateString = "%s("
@@ -70,8 +70,8 @@ class AttributeManager:
                                + attributeName + " = "
                                + iif3(kind == "F", "%5.3f",
                                       kind == "I", "%d",
-                                      kind == "S", "'%s'",
-                                      "%s"))
+                                      kind == "S", "%r",
+                                      "%r"))
  
         templateString += ")"
         st = templateString % tuple(valueList)
@@ -86,7 +86,7 @@ class AttributeManager:
            <attributeNameToValueMap>; if <attributeNameToKindMap> is
            defined, then appropriate type mappings are done."""
 
-        Logging.trace(">>: nameToValueMap = %s, nameToKindMap = %s",
+        Logging.trace(">>: nameToValueMap = %r, nameToKindMap = %r",
                       attributeNameToValueMap, attributeNameToKindMap)
 
         for attributeName in attributeNameToValueMap.keys():
@@ -100,5 +100,3 @@ class AttributeManager:
             setattr(object, attributeName, value)
 
         Logging.trace("<<")
-
-

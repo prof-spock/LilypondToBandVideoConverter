@@ -90,7 +90,7 @@ class _CommandLineOptions:
                                "extract", "score", "midi", "silentvideo",
                                "rawaudio", "refinedaudio", "mix",
                                "finalvideo"])
-        Logging.trace("--: given phase set %s, allowed phase set %s",
+        Logging.trace("--: given phase set %r, allowed phase set %r",
                       processingPhaseSet, allowedPhaseSet)
         ValidityChecker.isValid(processingPhaseSet.issubset(allowedPhaseSet),
                                 "bad phases - %s"
@@ -142,8 +142,8 @@ class _CommandLineOptions:
         processingPhaseSet = set(convertStringToList(argumentList.phases, "/"))
         intermediateFilesAreKept = argumentList.keepFiles
 
-        Logging.trace("<<: arguments = %s, processingPhaseSet = %s,"
-                      + " selectedVoiceNameSet = %s",
+        Logging.trace("<<: arguments = %r, processingPhaseSet = %r,"
+                      + " selectedVoiceNameSet = %r",
                       argumentList, processingPhaseSet, selectedVoiceNameSet)
         return argumentList
 
@@ -174,7 +174,7 @@ class _LilypondProcessor:
         for i in range(len(configData.voiceNameList)):
             voiceName       = configData.voiceNameList[i]
             voiceDescriptor = configData.voiceNameToVoiceDataMap[voiceName]
-            Logging.trace("--: %s", voiceDescriptor)
+            Logging.trace("--: %r", voiceDescriptor)
 
             midiChannel    = voiceDescriptor.midiChannel
             midiVolume     = voiceDescriptor.midiVolume
@@ -186,7 +186,7 @@ class _LilypondProcessor:
             else:
                 suffix      = panPosition[-1]
                 offset      = int(float(panPosition[0:-1]) * 63)
-                Logging.trace("--: panPosition = %s, pan = %d, suffix = %s",
+                Logging.trace("--: panPosition = %r, pan = %d, suffix = %r",
                               panPosition, offset, suffix)
                 panPosition = iif(suffix == "L", 63 - offset, 65 + offset)
 
@@ -208,7 +208,7 @@ class _LilypondProcessor:
 
             result[voiceName] = trackSettingsEntry
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -221,7 +221,7 @@ class _LilypondProcessor:
         overriddenVoiceNameSet = \
           set(configData.voiceNameToOverrideFileNameMap.keys())
 
-        Logging.trace(">>: overriddenVoiceSet = %s, voiceSet = %s",
+        Logging.trace(">>: overriddenVoiceSet = %r, voiceSet = %r",
                       overriddenVoiceNameSet, voiceNameSet)
 
         overriddenVoiceNameSet = (set(voiceNameSet)
@@ -229,7 +229,7 @@ class _LilypondProcessor:
         voiceNameSet = (voiceNameSet - set(overriddenVoiceNameSet))
         result = (overriddenVoiceNameSet, voiceNameSet)
 
-        Logging.trace("<<: result = %s", result)
+        Logging.trace("<<: result = %r", result)
         return result
 
     #--------------------
@@ -240,7 +240,7 @@ class _LilypondProcessor:
         """Processes lilypond file and generates extract or score PDF
            file."""
 
-        Logging.trace(">>: targetFilePrefix = '%s', voiceNameList='%s'",
+        Logging.trace(">>: targetFilePrefix = %r, voiceNameList=%r",
                       targetFileNamePrefix, voiceNameList)
 
         tempLilypondFilePath = configData.tempLilypondFilePath
@@ -271,7 +271,7 @@ class _LilypondProcessor:
         """Processes <lilypondFilePath> and stores result in file with
            <targetFileNamePrefix>."""
 
-        Logging.trace(">>: lilyFile = '%s', targetFileNamePrefix='%s'",
+        Logging.trace(">>: lilyFile = %r, targetFileNamePrefix=%r",
                       lilypondFilePath, targetFileNamePrefix)
 
         OperatingSystem.showMessageOnConsole("== processing "
@@ -298,7 +298,7 @@ class _LilypondProcessor:
                                 & configData.extractVoiceNameSet)
 
         for voiceName in relevantVoiceNameSet:
-            Logging.trace("--: processing '%s'", voiceName)
+            Logging.trace("--: processing %s", voiceName)
             singleVoiceNameList = [ voiceName ]
             targetFileNamePrefix = "%s-%s" % (configData.fileNamePrefix,
                                               voiceName)
@@ -616,8 +616,8 @@ def conditionalExecuteHandlerProc (processingPhase, processingPhaseSet,
        <isPreprocessing>) and executes <handlerProc> when processing
        phase matches"""
 
-    Logging.trace(">>: processingPhase = %s, processingPhaseSet = %s,"
-                  + " isPreprocessing = %s",
+    Logging.trace(">>: processingPhase = %r, processingPhaseSet = %r,"
+                  + " isPreprocessing = %r",
                   processingPhase, processingPhaseSet, isPreprocessing)
 
     allowedPhaseSet = set([ "all", processingPhase,
@@ -643,7 +643,7 @@ def initialize ():
     configurationFile = configData.readFile(configurationFilePath)
 
     if configurationFile is None:
-        Logging.trace("--: cannot process configuration file '%s'",
+        Logging.trace("--: cannot process configuration file %r",
                       configurationFilePath)
         isOkay = False
     else:
@@ -677,7 +677,7 @@ def initialize ():
                                    configData.humanizationStyleNameToTextMap,
                                    configData.humanizedVoiceNameSet)
 
-    Logging.trace("<<: %s", isOkay)
+    Logging.trace("<<: %r", isOkay)
     return isOkay
 
 #--------------------
@@ -692,7 +692,7 @@ def main ():
     isOkay = initialize()
 
     if isOkay:
-        Logging.trace("--: processingPhaseSet = %s", processingPhaseSet)
+        Logging.trace("--: processingPhaseSet = %r", processingPhaseSet)
 
         actionList = \
             (("extract",      True,  _LilypondProcessor.processExtract),

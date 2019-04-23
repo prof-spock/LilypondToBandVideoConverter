@@ -25,13 +25,13 @@ class Assertion:
     def _internalCheck (cls, condition, checkKind, errorMessage):
         """Checks whether <condition> holds, otherwise exits with
            <errorMessage> containing <checkKind>."""
-        
+
         if cls.isActive:
             if not condition:
                 Logging.trace("--: %s FAILED - %s", checkKind, errorMessage)
                 programName = os.path.basename(sys.argv[0])
                 sys.exit(programName + ": ERROR - " + errorMessage)
-    
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -60,4 +60,3 @@ class Assertion:
            <errorMessage> on failure."""
 
         cls._internalCheck(condition, "PRECONDITION", errorMessage)
-

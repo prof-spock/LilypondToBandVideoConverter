@@ -5,10 +5,6 @@
 
 #====================
 
-import sys
-
-#====================
-
 missingValue = "@!XYZZY"
 
 #====================
@@ -17,9 +13,11 @@ def iif (condition, trueValue, falseValue):
     """Emulates conditional expressions with full value evaluation."""
 
     if condition:
-        return trueValue
+        result = trueValue
     else:
-        return falseValue
+        result = falseValue
+
+    return result
 
 #--------------------
 
@@ -59,7 +57,7 @@ def isInRange (x, lowBound, highBound):
     """Tells whether x lies in the range from <lowBound> to
        <highBound>."""
 
-    return (x >= lowBound and x <= highBound)
+    return (lowBound <= x <= highBound)
 
 #--------------------
 
@@ -88,10 +86,10 @@ def adaptToRange (x, lowBound, highBound, isCyclic=False):
 
 #--------------------
 
-def intListToHex (list):
-    """Returns hex representation of integer <list>"""
+def intListToHex (currentList):
+    """Returns hex representation of integer <currentList>"""
 
-    return "".join(map(lambda x: ("%02X" % x), list))
+    return "".join(map(lambda x: ("%02X" % x), currentList))
 
 #====================
 
@@ -105,6 +103,7 @@ class MyRandom:
 
     @classmethod
     def initialize (cls):
+        """Initializes seed to predefined value"""
         cls.value = 0.123456789
 
     #--------------------

@@ -18,6 +18,7 @@ from .ttbase import iif, missingValue
 class _Token:
     """Simple token within table definition string parser"""
 
+    # kind of token within table definition string parser
     Kind_number        = "number"
     Kind_string        = "string"
     Kind_operator      = "operator"
@@ -32,7 +33,7 @@ class _Token:
         self.start = start
         self.kind  = kind
         self.value = value
-        
+
     #--------------------
 
     def __repr__ (self):
@@ -40,7 +41,7 @@ class _Token:
 
         st = "_Token(%r, %s, %r)" % (self.start, self.kind, self.value)
         return st
-        
+
 #====================
 
 class ConfigurationFile:
@@ -84,10 +85,10 @@ class ConfigurationFile:
             result = float(value)
         else:
             result = cls._parseFragmentedString(value)
-            
+
         Logging.trace("<<: %r", result)
         return result
-        
+
     #--------------------
 
     def _expandVariables (self, value):
@@ -146,7 +147,7 @@ class ConfigurationFile:
         if parseState == ParseState_inIdentifier:
             identifierValue = self._findIdentifierValue(identifier)
             result += identifierValue
-            
+
         Logging.trace("--: accumulatedFSATrace = %s", fsaTrace)
         Logging.trace("<<: %r", result)
         return result
@@ -202,7 +203,7 @@ class ConfigurationFile:
 
         Logging.trace("<<: %r", result)
         return result
-    
+
     #--------------------
 
     @classmethod
@@ -370,7 +371,7 @@ class ConfigurationFile:
         ParseState_atValue    = 3
         ParseState_afterValue = 4
         ParseState_done       = 5
-        
+
         parseState = ParseState_inLimbo
 
         currentKey   = None
@@ -399,18 +400,18 @@ class ConfigurationFile:
                     # value is a table itself => recursion
                     errorPosition, errorMessage = \
                         cls._mustHave(token, [ _Token.Kind_operator ], "{")
-                    
+
                     if errorPosition < 0:
                         errorPosition, errorMessage, currentValue, position = \
                              cls._parseTableString(tokenList, position)
-                        
+
                 table[currentKey] = currentValue
             elif parseState == ParseState_afterValue:
                 errorPosition, errorMessage = \
                     cls._mustHave(token, [ _Token.Kind_operator ], ",}")
                 nextParseState = iif(token.value == "}", ParseState_done,
                                      ParseState_atKey)
-                
+
             parseState = iif(errorPosition >= 0, ParseState_done,
                              nextParseState)
             position += iif(parseState == ParseState_done, 0, 1)
@@ -487,7 +488,7 @@ class ConfigurationFile:
 
         Logging.trace("<<: %r, %r", isOkay, errorMessage)
         return isOkay
-            
+
     #--------------------
 
     @classmethod
@@ -569,7 +570,7 @@ class ConfigurationFile:
         result = (errorPosition, errorMessage, tokenList)
         Logging.trace("<<: %r", result)
         return result
-        
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -593,7 +594,7 @@ class ConfigurationFile:
         self._keyToValueMap = {}
         visitedFileSet = set()
         lineList = []
-        isOkay = self._readFile(fileName, lineList, visitedFileSet)
+        self._readFile(fileName, lineList, visitedFileSet)
         self._parseConfiguration(lineList)
 
         Logging.trace("<<")
@@ -646,7 +647,7 @@ class ConfigurationFile:
         errorPosition, errorMessage, tokenList = cls._tokenizeTableString(st)
 
         if errorPosition < 0:
-            errorPosition, errorMessage, table, newPosition = \
+            errorPosition, errorMessage, table, _ = \
                 cls._parseTableString(tokenList, 0)
 
         errorPosition = errorPosition + iif(errorPosition > 0, -1, 0)

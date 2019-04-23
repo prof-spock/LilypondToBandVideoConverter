@@ -21,7 +21,7 @@ class Logging:
     Level_error    = 1
     Level_standard = 2
     Level_verbose  = 3
-    
+
     _referenceLevel    = Level_none
     _fileName          = ""
     _fileIsOpen        = None
@@ -84,7 +84,7 @@ class Logging:
     def _closeFileConditionally (cls):
         if cls._fileIsOpen:
             cls._file.close()
-        
+
     #--------------------
 
     @classmethod
@@ -92,13 +92,13 @@ class Logging:
         """Returns current time of day in seconds as string"""
 
         currentTimestamp = time.time()
-        
+
         if currentTimestamp != cls._previousTimestamp:
             cls._previousTimestamp = currentTimestamp
             cls._timeOfDayString   = time.strftime("%H%M%S")
 
         return cls._timeOfDayString
-        
+
     #--------------------
 
     @classmethod
@@ -116,7 +116,7 @@ class Logging:
                                 encoding="utf-8", errors='replace')
 
         cls._fileIsOpen = (cls._file is not None)
-  
+
     #--------------------
 
     @classmethod
@@ -125,7 +125,7 @@ class Logging:
 
         if cls._isEnabled:
             st = st + '\n'
-            
+
             if cls._fileName == "":
                 # no output file => put line to buffer
                 cls._buffer.append(st)
@@ -150,7 +150,7 @@ class Logging:
 
         if isPython2:
             st = unicode(st)
-            
+
         cls._file.write(st)
 
     #--------------------
@@ -168,7 +168,7 @@ class Logging:
 
         cls._writeLine("START LOGGING")
         atexit.register(cls._closeFileConditionally)
-    
+
     #--------------------
 
     @classmethod
@@ -236,7 +236,7 @@ class Logging:
            equal to the reference level."""
 
         if cls._referenceLevel >= level:
-            # log message is significant 
+            # log message is significant
             cls._writeLine(st)
 
     #--------------------

@@ -23,7 +23,7 @@ class RegExpPattern:
     identifierPattern = r"[a-zA-Z]+"
     integerPattern    = r"\d+"
     floatPattern      = r"\d+(\.\d+)?"
-   
+
     #--------------
     # LOCAL METHODS
     #--------------
@@ -76,10 +76,6 @@ class RegExpPattern:
            <keyPattern> for keys and <valuePattern> for values with
            atomic groups starting at <firstGroupIndex>; assumes that
            map starts immediately"""
-
-        patternA, patternB = cls._shiftGroupsForPair(keyPattern,
-                                                     valuePattern,
-                                                     firstGroupIndex + 1)
 
         elementPattern = r"%s\s*:\s*%s" % (keyPattern, valuePattern)
         listPattern = cls._makeListPattern(elementPattern)
@@ -202,4 +198,4 @@ class RegExpPattern:
         """Constructs regular expression from <pattern> with leading
            whitespace and trailing end-of-string"""
 
-        return re.compile("^\s*%s\s*$" % pattern)
+        return re.compile(r"^\s*%s\s*$" % pattern)

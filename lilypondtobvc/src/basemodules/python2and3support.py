@@ -18,10 +18,10 @@ def isInteger (value):
     """Python version independent version of integer type check"""
 
     isOkay = isinstance(value, int)
-    
+
     if isPython2 and not isOkay:
         isOkay = isinstance(value, long)
-        
+
     return isOkay
 
 #--------------------

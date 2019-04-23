@@ -26,15 +26,15 @@ class ValidityChecker:
         result = "--: checking %r for being %s (%r)"
         result = result % (valueName, typeName, value)
         return result
-     
+
     #--------------------
 
     @classmethod
-    def _checkForType (cls, type, typeName, valueName, value):
-        Logging.trace(cls._checkTemplate(typeName, valueName, value))
-        message = "%r must be %s: %s" % (valueName, typeName, value)
-        cls.isValid(isinstance(value, type), message)
-     
+    def _checkForType (cls, kind, kindName, valueName, value):
+        Logging.trace(cls._checkTemplate(kindName, valueName, value))
+        message = "%r must be %s: %s" % (valueName, kindName, value)
+        cls.isValid(isinstance(value, kind), message)
+
     #--------------------
 
     @classmethod
@@ -82,7 +82,7 @@ class ValidityChecker:
 
         Logging.trace(cls._checkTemplate("an integer", valueName, value))
         message = "%s must be an integer: %r" % (valueName, value)
-        cls.isValid(ttbase.isInteger(value), message)
+        cls.isValid(python2and3support.isInteger(value), message)
 
     #--------------------
 
@@ -120,9 +120,9 @@ class ValidityChecker:
            program with a message.  When <zeroIsIncluded> is set, also
            zero is acceptable."""
 
-        typeName = "a " + iif(zeroIsIncluded, "", "positive ") + "natural"
-        Logging.trace(cls._checkTemplate(typeName, valueName, value))
-        message = ("%s must be %s: %r" % (valueName, typeName, value))
+        kindName = "a " + iif(zeroIsIncluded, "", "positive ") + "natural"
+        Logging.trace(cls._checkTemplate(kindName, valueName, value))
+        message = ("%s must be %s: %r" % (valueName, kindName, value))
         cls.isValid(python2and3support.isInteger(value)
                     and (value > 0 or value == 0 and zeroIsIncluded),
                     message)

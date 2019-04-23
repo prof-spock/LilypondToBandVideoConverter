@@ -6,7 +6,7 @@
 #====================
 
 from .simplelogging import Logging
-from .ttbase import iif
+from .ttbase import iif, intListToHex
 
 #====================
 
@@ -30,9 +30,9 @@ def adaptToKind (st, kind):
 def stringToIntList (st):
     """Returns integer list for string <st>"""
 
-    list = [ ord(st[i]) for i in range(len(st)) ]
-    return list
-    
+    intList = [ ord(st[i]) for i in range(len(st)) ]
+    return intList
+
 #--------------------
 
 def stringToHex (st):
@@ -97,7 +97,7 @@ def _convertStringToList (st, startPosition, separator):
                 currentElement = ch
                 parseState = ParseState_inElement
         elif parseState == ParseState_inElement:
-            if ch != " " and ch != separator and ch != listEndCharacter:
+            if ch not in [" ", separator, listEndCharacter]:
                 currentElement += ch
             else:
                 result.append(currentElement)
@@ -182,8 +182,7 @@ def _convertStringToMap (st, startPosition, separator):
                 currentElement = ch
                 parseState += 1
         elif parseState in [ParseState_inKey, ParseState_inValue]:
-            if (ch != " " and ch != separator and ch != ":"
-                and ch != mapEndCharacter):
+            if ch not in [" ", separator, ":", mapEndCharacter]:
                 currentElement += ch
             else:
                 parseState += 2
@@ -214,7 +213,7 @@ def _convertStringToMap (st, startPosition, separator):
         position += 1
 
     return (position, result)
-            
+
 #--------------------
 
 def convertStringToList (st, separator=",", kind="S"):
@@ -223,7 +222,7 @@ def convertStringToList (st, separator=",", kind="S"):
        <kind> is 'I' or 'F' the elements are transformed into ints or
        floats"""
 
-    position, result = _convertStringToList("[" + st + "]", 0, separator)
+    _, result = _convertStringToList("[" + st + "]", 0, separator)
     result = list(map(lambda x: adaptToKind(x, kind), result))
     return result
 
@@ -240,7 +239,7 @@ def convertStringToMap (st, separator=","):
     if not st.startswith("{"):
         st = "{" + st + "}"
 
-    position, result = _convertStringToMap(st, 0, separator)
+    _, result = _convertStringToMap(st, 0, separator)
     return result
 
 #--------------------

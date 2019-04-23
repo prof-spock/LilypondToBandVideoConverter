@@ -15,7 +15,7 @@ import basemodules.simpleassertion
 from basemodules.simplelogging import Logging
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.ttbase import iif
-from basemodules.utf8file import UTF8File 
+from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
 
 simpleassertion = basemodules.simpleassertion
@@ -209,7 +209,7 @@ class PostscriptFile:
        page."""
 
     _fileName = None
-    
+
     # relevant constants for analyzing the postscript file
     _barLineColourSettingText   = " 0.0030 0.0020 0.0010 setrgbcolor"
     _barNumberColourSettingText = " 0.0010 0.0020 0.0030 setrgbcolor"
@@ -606,7 +606,7 @@ class LilypondPngVideoGenerator:
                                        floatIsAllowed=True, rangeKind=">0")
         Assertion.check(len(self._measureToTempoMap) > 0,
                         "at least one tempo must be specified")
-        
+
         self._countInMeasures = float(self._countInMeasures)
         self._frameRate       = float(self._frameRate)
 
@@ -769,7 +769,7 @@ class LilypondPngVideoGenerator:
         OperatingSystem.removeFile(self._postscriptFileName, filesAreKept)
         MP4Video.cleanUpConditionally(filesAreKept)
         SubtitleFile.cleanUpConditionally(filesAreKept)
-        
+
         Logging.trace("<<")
 
     #--------------------

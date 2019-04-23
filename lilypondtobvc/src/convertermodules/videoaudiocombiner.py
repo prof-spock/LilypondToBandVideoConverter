@@ -8,13 +8,11 @@
 #====================
 
 import re
-import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
-from basemodules.stringutil import convertStringToList
 from basemodules.ttbase import iif
-from basemodules.utf8file import UTF8File 
+from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
 
 from .mp4tagmanager import MP4TagManager
@@ -127,7 +125,7 @@ class VideoAudioCombiner:
                       + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
-        
+
         trackFilePathList    = []
         mapDefinitionList    = []
         metadataSettingsList = []
@@ -171,7 +169,7 @@ class VideoAudioCombiner:
                       + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
-        
+
         command = [ cls._mp4boxCommand,
                     "-isma", "-ipod", "-strict-error",
                     sourceVideoFilePath ]
@@ -207,7 +205,7 @@ class VideoAudioCombiner:
 
     #--------------------
     #--------------------
-    
+
     @classmethod
     def combine (cls, voiceNameList, trackDataList, sourceVideoFilePath,
                  targetVideoFilePath, subtitleFilePath):
@@ -232,7 +230,7 @@ class VideoAudioCombiner:
 
         audioTrackDataList = []
 
-        for i, audioTrackData in enumerate(trackDataList):
+        for _, audioTrackData in enumerate(trackDataList):
             _, _, _, audioFilePath, description,\
               languageCode, _, _, _ = audioTrackData
             element = (audioFilePath, languageCode, description)
@@ -353,5 +351,5 @@ class VideoAudioCombiner:
         tagToValueMap["year"]            = year
 
         MP4TagManager.tagFile(videoFilePath, tagToValueMap)
-        
+
         Logging.trace("<<")

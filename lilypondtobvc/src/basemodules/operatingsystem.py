@@ -108,7 +108,7 @@ class OperatingSystem:
         try:
             callResult = subprocess.call([programName, option],
                                          stdout=nullDevice)
-        except:
+        except Exception:
             callResult = 1
 
         return (callResult == 0)

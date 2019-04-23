@@ -41,7 +41,7 @@ def _setToDefault (currentMap, key, defaultValue):
         currentMap[key] = defaultValue
 
     Logging.trace("<<")
-    
+
 #====================
 
 def generateObjectListFromString (st, prototypeObject):
@@ -54,8 +54,7 @@ def generateObjectListFromString (st, prototypeObject):
     result = []
     table = convertStringToMap(st)
 
-    for name in table.keys():
-        attributeNameToValueMap = table[name]
+    for name, attributeNameToValueMap in table.items():
         attributeNameToValueMap["name"] = name
         Logging.trace("--: converting %s = %r",
                       name, attributeNameToValueMap)
@@ -130,14 +129,15 @@ class AudioTrack:
     #--------------------
 
     def __init__ (self):
-        self.name                    = "XXX"
-        self.audioGroupList          = []
-        self.audioFileTemplate       = "%"
-        self.songNameTemplate        = "%"
-        self.albumName               = "[ALBUM NAME]"
-        self.description             = "XXX"
-        self.languageCode            = "eng"
+        self.name                     = "XXX"
+        self.audioGroupList           = []
+        self.audioFileTemplate        = "%"
+        self.songNameTemplate         = "%"
+        self.albumName                = "[ALBUM NAME]"
+        self.description              = "XXX"
+        self.languageCode             = "eng"
         self.voiceNameToAudioLevelMap = ""
+        self.attenuationLevel         = 0.0
 
     #--------------------
 
@@ -196,8 +196,6 @@ class AudioTrack:
 class AudioGroup:
     """Represents information about the audio groups
        combining voices."""
-
-    pass
 
 #====================
 
@@ -278,7 +276,7 @@ class VideoFileKind:
     _attributeNameList = \
         [ "name", "target", "fileNameSuffix", "directoryPath",
           "voiceNameList" ]
-    
+
     _attributeNameToKindMap = {
         "directoryPath"  : "S",
         "fileNameSuffix" : "S",

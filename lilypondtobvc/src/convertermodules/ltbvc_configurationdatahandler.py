@@ -8,7 +8,6 @@
 #====================
 
 import datetime
-import re
 
 from basemodules.attributemanager import AttributeManager
 from basemodules.configurationfile import ConfigurationFile
@@ -22,8 +21,8 @@ from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import generateObjectListFromString, \
                                  generateObjectMapFromString, \
-                                 AudioTrack, TempoTrack, \
-                                 VideoFileKind, VideoTarget, VoiceDescriptor
+                                 AudioTrack, VideoFileKind, \
+                                 VideoTarget, VoiceDescriptor
 
 #====================
 
@@ -69,15 +68,15 @@ def _readStylesWithPrefix (prefix, configurationFile):
 
 #--------------------
 
-def _readAttributesFromConfigFile (object, attributeNameList,
+def _readAttributesFromConfigFile (currentObject, attributeNameList,
                                    configurationFile):
-    """Traverses <attributeNameList> and sets attribute in <object> to
-       value read from <configurationFile>."""
+    """Traverses <attributeNameList> and sets attribute in <currentObject>
+       to value read from <configurationFile>"""
 
     for attributeName in attributeNameList:
         value = _LocalValidator.get(attributeName,
                                     configurationFile.getValue)
-        setattr(object, attributeName, value)
+        setattr(currentObject, attributeName, value)
 
 #====================
 # TYPE DEFINITIONS
@@ -216,7 +215,7 @@ class _ConfigDataGlobal:
             "'audioProcessor.redirector' must be non-empty")
         ValidityChecker.isValid(refinementCommandLine > "",
             "'audioProcessor.refinementCommandLine' must be defined")
-        
+
         # additional checks
         aacCommandLine = getValueProc("aacCommandLine")
         commandNameMap = { "aacCommandLine" : aacCommandLine }
@@ -239,8 +238,7 @@ class _ConfigDataGlobal:
         """Adapts strings in <configData> into final list or map form."""
 
         Logging.trace(">>")
-        cstl = convertStringToList
-        
+
         configData.videoFileKindMap = \
             generateObjectMapFromString(configData.videoFileKindMap,
                                         VideoFileKind())
@@ -253,7 +251,7 @@ class _ConfigDataGlobal:
 
         defaultMap = { "chainSeparator": ";", "mixingCommandLine" : "",
                        "paddingCommandLine": "", "redirector": "->" }
-                
+
         for key, defaultValue in defaultMap.items():
             if key not in audioProcessorMap:
                 audioProcessorMap[key] = defaultValue
@@ -310,7 +308,7 @@ class _ConfigDataMidiHumanization:
         "humanizedVoiceNameSet"          : "{}",
         "voiceNameToVariationFactorMap"  : "{}"
     }
-    
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -365,16 +363,16 @@ class _ConfigDataMidiHumanization:
         """Adapts strings in <configData> into final list or map form."""
 
         Logging.trace(">>")
-        
+
         vntvfMap = {}
         tempMap = convertStringToMap(configData.voiceNameToVariationFactorMap)
 
         for voiceName, factors in tempMap.items():
-            scalingFactors = list(map(lambda x: float(x), factors.split("/")))
+            scalingFactors = list(map(float, factors.split("/")))
             vntvfMap[voiceName] = scalingFactors
 
         configData.voiceNameToVariationFactorMap = vntvfMap
-        
+
         configData.humanizedVoiceNameSet = \
             set(convertStringToList(configData.humanizedVoiceNameSet))
 
@@ -414,7 +412,7 @@ class _ConfigDataNotation:
         "phaseAndVoiceNameToStaffListMap" : "{}",
         "voiceNameToScoreNameMap"         : "{}"
     }
-    
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -460,7 +458,7 @@ class _ConfigDataNotation:
         """Adapts strings in <configData> into final list or map form."""
 
         Logging.trace(">>")
-        
+
         pAVnToStaffListMap = \
             convertStringToMap(configData.phaseAndVoiceNameToStaffListMap)
 
@@ -472,7 +470,7 @@ class _ConfigDataNotation:
                 updatedMap[voiceName] = staffList
 
             pAVnToStaffListMap[phase] = updatedMap
-                
+
         configData.phaseAndVoiceNameToClefMap = \
             convertStringToMap(configData.phaseAndVoiceNameToClefMap)
         configData.phaseAndVoiceNameToStaffListMap = pAVnToStaffListMap
@@ -516,7 +514,7 @@ class _ConfigDataSong:
       [ "parallelTrackFilePath", "parallelTrackVolume", "shiftOffset",
         "songComposerText", "songYear", "voiceNameList",
         "voiceNameToVoiceDataMap" ]
-    
+
     _attributeNameToKindMap = {
         "audioVoiceNameSet"                 : "{}",
         "countInMeasureCount"               : "I",
@@ -541,7 +539,7 @@ class _ConfigDataSong:
         "voiceNameToOverrideFileNameMap"    : "{}",
         "voiceNameToVoiceDataMap"           : "{}"
     }
-    
+
     _voiceAttributeNameList = [
         "midiChannelList", "midiInstrumentList",
         "midiVolumeList", "panPositionList", "reverbLevelList",
@@ -552,22 +550,23 @@ class _ConfigDataSong:
     #--------------------
 
     @classmethod
-    def _adaptMap (cls, map, keyKind='S', valueKind='S'):
-        """Changes in place the keys and values of <map>; <keyKind> tells the
-           target kind of the keys, <valueKind> those of the values"""
+    def _adaptMap (cls, currentMap, keyKind='S', valueKind='S'):
+        """Changes in place the keys and values of <currentMap>; <keyKind>
+           tells the target kind of the keys, <valueKind> those of the
+           values"""
 
         Logging.trace(">>: map = %r, keyKind = %r, valueKind = %r",
-                      map, keyKind, valueKind)
+                      currentMap, keyKind, valueKind)
 
-        otherMap = dict(map)
-        map.clear()
+        otherMap = dict(currentMap)
+        currentMap.clear()
 
         for key, value in otherMap.items():
             newKey   = adaptToKind(key,   keyKind)
             newValue = adaptToKind(value, valueKind)
-            map[newKey] = newValue
+            currentMap[newKey] = newValue
 
-        Logging.trace("<<: %r", map)
+        Logging.trace("<<: %r", currentMap)
 
     #--------------------
 
@@ -602,7 +601,7 @@ class _ConfigDataSong:
 
         if reverbLevels.strip() != "":
             checkForRequiredLength(reverbLevels, "reverbLevelList", voiceCount)
-            
+
         Logging.trace("<<")
 
     #--------------------
@@ -663,14 +662,14 @@ class _ConfigDataSong:
 
         targetAbbrevToNameMap = { "e": "extract", "m": "midi",
                                   "s": "score",   "v": "video" }
-        map = convertStringToMap(mapAsString)
+        currentMap = convertStringToMap(mapAsString)
 
-        if map is None:
+        if currentMap is None:
             result = None
         else:
             result = {}
-            
-            for voiceName, value in map.items():
+
+            for voiceName, value in currentMap.items():
                 entry = iif(isLyricsMap, {}, set())
                 targetList = value.split("/")
                 Logging.trace("--: targetList(%r) = %r",
@@ -794,7 +793,7 @@ class _ConfigDataSong:
 
         _checkVariableList(cls._attributeNameList, configurationFile)
         _checkVariableList(cls._voiceAttributeNameList, configurationFile)
-        
+
         getValueProc = \
             lambda name : _LocalValidator.get(name,
                                               configurationFile.getValue)
@@ -832,7 +831,7 @@ class _ConfigDataSong:
 
         Logging.trace(">>")
         cstl = convertStringToList
-        
+
         configData.audioVoiceNameSet = \
           set(cstl(configData.audioVoiceNameSet))
         configData.extractVoiceNameSet = \
@@ -853,7 +852,7 @@ class _ConfigDataSong:
         # in <parallelTrackInfo>
         cls._splitParallelTrackInfo(configData,
                                     configData.parallelTrackInfo)
-        
+
         # the tempo map maps the measure into a pair of tempo and
         # measure length in quarters
         tempoMap = convertStringToMap(configData.measureToTempoMap)
@@ -879,7 +878,7 @@ class _ConfigDataSong:
         if c["reverbLevelList"].strip() == "":
             voiceCount = cls._elementCountInString(c["voiceNameList"])
             c["reverbLevelList"] = "0, " * (voiceCount - 1) + "0"
-        
+
         # the voice data map is synthesized from several lists
         cls._convertToVoiceMap(configData,
                                c["voiceNameList"], c["midiChannelList"],
@@ -913,7 +912,7 @@ class _ConfigDataSong:
 
         _readAttributesFromConfigFile(configData, cls._attributeNameList,
                                       configurationFile)
-        
+
         getValueProc = \
             lambda name : _LocalValidator.get(name,
                                               configurationFile.getValue)
@@ -959,9 +958,9 @@ class _ConfigDataSongGroup:
         "artistName"               : "S",
         "audioTargetDirectoryPath" : "S",
         "audioTrackList"           : "S",
-        "targetFileNamePrefix"     : "S"   
+        "targetFileNamePrefix"     : "S"
     }
-    
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -1018,8 +1017,7 @@ class _ConfigDataSongGroup:
         audioGroupToVoicesMap = \
             convertStringToMap(configData.audioGroupNameToVoiceNameSetMap)
 
-        for audioGroupName in audioGroupToVoicesMap.keys():
-            st = audioGroupToVoicesMap[audioGroupName]
+        for audioGroupName, st in audioGroupToVoicesMap.items():
             voiceNameSet = set(convertStringToList(st, "/"))
             audioGroupToVoicesMap[audioGroupName] = voiceNameSet
 
@@ -1098,7 +1096,6 @@ class _LocalValidator:
         # common element patterns
         noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
 
-        fileNamePattern   = r"[/\w\-_\.]+"
         identifierPattern = RegExpPattern.identifierPattern
         integerPattern    = RegExpPattern.integerPattern
         floatPattern      = RegExpPattern.floatPattern
@@ -1109,7 +1106,6 @@ class _LocalValidator:
                        + r"|normalizationEffect|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
         clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
-        fileNameListPattern = makeListPat(fileNamePattern, False)
         humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
         humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
                                     % (floatPattern, floatPattern))
@@ -1127,7 +1123,6 @@ class _LocalValidator:
 
         # regular expressions for lists of standard elements
         emptyFloatListRegExp = makeRegExp(makeListPat(floatPattern, True))
-        floatListRegExp = makeRegExp(makeListPat(floatPattern, False))
         identifierListRegExp = makeRegExp(makeListPat(identifierPattern,
                                                       False))
         emptyIdentifierListRegExp = makeRegExp(makeListPat(identifierPattern,
@@ -1382,6 +1377,7 @@ class LTBVC_ConfigurationData:
         _ConfigDataNotation.initialize(self)
         _ConfigDataSong.initialize(self)
         _ConfigDataSongGroup.initialize(self)
+        self._configurationFile = ""
 
     #--------------------
 
@@ -1419,7 +1415,7 @@ class LTBVC_ConfigurationData:
 
         self._deserializeObjects()
 
-        for videoFileKindName, videoFileKind in self.videoFileKindMap.items():
+        for _, videoFileKind in self.videoFileKindMap.items():
             if len(videoFileKind.voiceNameList) == 0:
                 videoFileKind.voiceNameList = list(self.voiceNameList)
 

@@ -15,6 +15,10 @@ from .ttbase import iif, iif3
 #====================
 
 class AttributeManager:
+    """provides services for checking and setting attributes from
+       name-to-value maps"""
+
+    #--------------------
 
     @classmethod
     def checkForTypesAndCompleteness (cls, objectName, objectKind,
@@ -50,21 +54,21 @@ class AttributeManager:
 
         Logging.trace("<<")
 
-        
+
     #--------------------
 
     @classmethod
-    def convertToString (cls, object, className, attributeNameList,
+    def convertToString (cls, currentObject, className, attributeNameList,
                          attributeNameToKindMap=None):
-        """Returns a string representation of <object> belonging to class
-           with <className> using explicit metadata given by
+        """Returns a string representation of <currentObject> belonging to
+           class with <className> using explicit metadata given by
            <attributeNameList> and <attributeNameToKindMap>"""
 
         templateString = "%s("
         valueList = [ className ]
 
         for i, attributeName in enumerate(attributeNameList):
-            valueList.append(getattr(object, attributeName))
+            valueList.append(getattr(currentObject, attributeName))
             kind = attributeNameToKindMap[attributeName]
             templateString += (iif(i > 0, ", ", "")
                                + attributeName + " = "
@@ -72,7 +76,7 @@ class AttributeManager:
                                       kind == "I", "%d",
                                       kind == "S", "%r",
                                       "%r"))
- 
+
         templateString += ")"
         st = templateString % tuple(valueList)
         return st
@@ -80,11 +84,12 @@ class AttributeManager:
     #--------------------
 
     @classmethod
-    def setAttributesFromMap (cls, object, attributeNameToValueMap,
+    def setAttributesFromMap (cls, currentObject, attributeNameToValueMap,
                               attributeNameToKindMap=None):
-        """Sets corresponding attributes in <object> to associated values in
-           <attributeNameToValueMap>; if <attributeNameToKindMap> is
-           defined, then appropriate type mappings are done."""
+        """Sets corresponding attributes in <currentObject> to associated
+           values in <attributeNameToValueMap>; if
+           <attributeNameToKindMap> is defined, then appropriate type
+           mappings are done."""
 
         Logging.trace(">>: nameToValueMap = %r, nameToKindMap = %r",
                       attributeNameToValueMap, attributeNameToKindMap)
@@ -97,6 +102,6 @@ class AttributeManager:
                 kind = attributeNameToKindMap[attributeName]
                 value = adaptToKind(value, kind)
 
-            setattr(object, attributeName, value)
+            setattr(currentObject, attributeName, value)
 
         Logging.trace("<<")

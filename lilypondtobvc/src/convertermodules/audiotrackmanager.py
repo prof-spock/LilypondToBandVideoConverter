@@ -36,7 +36,7 @@ _ffmpegLogLevel = "error"
 
 class _WavFile:
     """This class provides services for WAV files like shifting, mixing of
-       several files or normalization and aggregated services like mixdown"""
+       several files or amplification and aggregated services like mixdown"""
 
     _chunkSize = 128  # number of frames to be read from wave file in one step
     maximumSampleValue = 32767
@@ -165,16 +165,16 @@ class _WavFile:
 
     @classmethod
     def mixdown (cls, sourceFilePathList, volumeFactorList,
-                 attenuationLevel, targetFilePath):
+                 amplificationLevel, targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> via Python modules only"""
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> via Python modules only"""
 
         Logging.trace(">>: sourceFiles = %r, volumeFactors = %r,"
                       + " level = %4.3f, targetFile = %r",
                       sourceFilePathList, volumeFactorList,
-                      attenuationLevel, targetFilePath)
+                      amplificationLevel, targetFilePath)
 
         OperatingSystem.showMessageOnConsole("  MIX", False)
         sourceFileList = [cls(name, "r") for name in sourceFilePathList]
@@ -192,9 +192,9 @@ class _WavFile:
 
         maximumVolume = cls.maximumVolume(resultSampleList)
         maxValue = cls.maximumSampleValue
-        attenuationFactor = pow(2.0, attenuationLevel / 6.0)
+        amplificationFactor = pow(2.0, amplificationLevel / 6.0206)
         scalingFactor = (1.0 if maximumVolume < (maxValue // 10)
-                         else (maxValue * attenuationFactor) / maximumVolume)
+                         else (maxValue * amplificationFactor) / maximumVolume)
         Logging.trace("--: maxVolume = %d, factor = %4.3f",
                       maximumVolume, scalingFactor)
         OperatingSystem.showMessageOnConsole(" S")
@@ -520,8 +520,8 @@ class AudioTrackManager:
             element = elementList[i]
 
             if elementRegExp.match(element):
-                normalizedElement = elementRegExp.match(element).group(1)
-                result = [ normalizedElement ] + result
+                amplifiedElement = elementRegExp.match(element).group(1)
+                result = [ amplifiedElement ] + result
                 del elementList[i]
 
         Logging.trace("<<: %r", result)
@@ -551,21 +551,21 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, sourceFilePathList, volumeFactorList,
-                           masteringEffectList, attenuationLevel,
+                           masteringEffectList, amplificationLevel,
                            targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> either externally or with slow internal
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> either externally or with slow internal
            algorithm; <masteringEffectList> gives the refinement
            effects for this track (if any) to be applied after
            mixdown"""
 
         Logging.trace(">>: sourceFiles = %r, volumeFactors = %r,"
-                      + " masteringEffects = %r, attenuation = %4.3f,"
+                      + " masteringEffects = %r, amplification = %4.3f,"
                       + " targetFile = %r",
                       sourceFilePathList, volumeFactorList,
-                      masteringEffectList, attenuationLevel,
+                      masteringEffectList, amplificationLevel,
                       targetFilePath)
 
         cls = self.__class__
@@ -574,7 +574,7 @@ class AudioTrackManager:
             self._mixdownToWavFileExternally(sourceFilePathList,
                                              volumeFactorList,
                                              masteringEffectList,
-                                             attenuationLevel,
+                                             amplificationLevel,
                                              targetFilePath)
         else:
             if masteringEffectList > "":
@@ -584,7 +584,7 @@ class AudioTrackManager:
                               masteringEffectList)
 
             _WavFile.mixdown(sourceFilePathList, volumeFactorList,
-                             attenuationLevel, targetFilePath)
+                             amplificationLevel, targetFilePath)
 
         Logging.trace("<<")
 
@@ -592,11 +592,11 @@ class AudioTrackManager:
 
     def _mixdownToWavFileExternally (self, sourceFilePathList,
                                      volumeFactorList, masteringEffectList,
-                                     attenuationLevel, targetFilePath):
+                                     amplificationLevel, targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> using external command;
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> using external command;
            <masteringEffectList> gives the refinement effects for this
            track (if any) to be applied after mixdown"""
 
@@ -604,7 +604,7 @@ class AudioTrackManager:
                       + " masteringEffects = %r, level = %4.3f,"
                       + " targetFile = %r",
                       sourceFilePathList, volumeFactorList,
-                      masteringEffectList, attenuationLevel,
+                      masteringEffectList, amplificationLevel,
                       targetFilePath)
 
         cls = self.__class__
@@ -614,7 +614,7 @@ class AudioTrackManager:
         replaceVariables = cls._replaceVariablesByValues
 
         # check whether mastering is done after mixdown
-        masteringPassIsRequired = (attenuationLevel != 0
+        masteringPassIsRequired = (amplificationLevel != 0
                                    or masteringEffectList > "")
         intermediateFilePath = self._audioDirectoryPath + "/result-mix.wav"
         intermediateFilePath = iif(masteringPassIsRequired,
@@ -656,11 +656,11 @@ class AudioTrackManager:
                                            stdout=OperatingSystem.nullDevice)
 
         if masteringPassIsRequired:
-            # do mastering and normalization
-            normalizationEffect = audioProcMap["normalizationEffect"]
-            normalizationEffectTokenList = tokenize(normalizationEffect)
-            variableMap  = { "attenuationLevel" : attenuationLevel }
-            nmEffectPartList = replaceVariables(normalizationEffectTokenList,
+            # do mastering and amplification
+            amplificationEffect = audioProcMap["amplificationEffect"]
+            amplificationEffectTokenList = tokenize(amplificationEffect)
+            variableMap  = { "amplificationLevel" : amplificationLevel }
+            nmEffectPartList = replaceVariables(amplificationEffectTokenList,
                                                 variableMap)
             effectList = (tokenize(masteringEffectList)
                           + nmEffectPartList)
@@ -672,6 +672,8 @@ class AudioTrackManager:
                             "effects" : effectList }
             command = replaceVariables(refinementCommandList, variableMap)
             OperatingSystem.executeCommand(command, True)
+            OperatingSystem.removeFile(intermediateFilePath,
+                                       cls._intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -680,12 +682,12 @@ class AudioTrackManager:
     def _mixdownVoicesToWavFile (self, voiceNameList,
                                  voiceNameToAudioLevelMap,
                                  parallelTrackFilePath,
-                                 masteringEffectList, attenuationLevel,
+                                 masteringEffectList, amplificationLevel,
                                  targetFilePath):
         """Constructs and executes a command for audio mixdown to target file
            with <targetFilePath> from given <voiceNameList>, the
            mapping to volumes <voiceNameToAudioLevelMap> with loudness
-           attenuation given by <attenuationLevel>;
+           amplification given by <amplificationLevel>;
            <masteringEffectList> gives the refinement effects for
            this track (if any) to be applied after mixdown; if
            <parallelTrackPath> is not empty, the parallel track is
@@ -693,10 +695,10 @@ class AudioTrackManager:
 
         Logging.trace(">>: voiceNames = %r, audioLevels = %r"
                       + " parallelTrack = %r, masteringEffects = %r"
-                      + " attenuation = %5.3f, target = %r",
+                      + " amplification = %5.3f, target = %r",
                       voiceNameList, voiceNameToAudioLevelMap,
                       parallelTrackFilePath, masteringEffectList,
-                      attenuationLevel, targetFilePath)
+                      amplificationLevel, targetFilePath)
 
         sourceFilePathList = []
         volumeFactorList   = []
@@ -714,7 +716,7 @@ class AudioTrackManager:
             volumeFactorList.append(volumeFactor)
 
         self._mixdownToWavFile(sourceFilePathList, volumeFactorList,
-                               masteringEffectList, attenuationLevel,
+                               masteringEffectList, amplificationLevel,
                                targetFilePath)
         Logging.trace("<<")
 
@@ -949,7 +951,7 @@ class AudioTrackManager:
                         audioTrack.languageCode,
                         audioTrack.voiceNameToAudioLevelMap,
                         audioTrack.masteringEffectList,
-                        audioTrack.attenuationLevel)
+                        audioTrack.amplificationLevel)
             Logging.trace("--: appending %r for track name %r",
                           newEntry, audioTrack.name)
             result.append(newEntry)
@@ -1052,22 +1054,25 @@ class AudioTrackManager:
                 cls._soundStyleNameToEffectsMap[soundStyleName]
         else:
             audioProcessingEffects = ""
-            message = ("--: unknown variant %s replaced by copy default"
+            message = ("unknown variant %s replaced by copy default"
                        % soundVariant)
-            Logging.trace(message)
+            Logging.trace("--: " + message)
             OperatingSystem.showMessageOnConsole(message)
+            isCopyVariant = True
 
-        # add reverb if applicable
-        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
-        reverbEffect = iif2(reverbLevel == 0, "",
-                            not cls._audioProcessorIsSox, "",
-                            " reverb %d" % reverbLevel)
+        if not isCopyVariant:
+            # add reverb if applicable
+            reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
+            reverbEffect = iif2(reverbLevel == 0, "",
+                                not cls._audioProcessorIsSox, "",
+                                " reverb %d" % reverbLevel)
 
-        if reverbLevel > 0 and not cls._audioProcessorIsSox:
-            message = "reverberation skipped, please use explicit reverb"
-            OperatingSystem.showMessageOnConsole(message)
+            if reverbLevel > 0 and not cls._audioProcessorIsSox:
+                message = "reverberation skipped, please use explicit reverb"
+                OperatingSystem.showMessageOnConsole(message)
 
-        audioProcessingEffects += reverbEffect
+            audioProcessingEffects += reverbEffect
+
         self._processAudioRefinement(voiceName, audioProcessingEffects)
 
         Logging.trace("<<")
@@ -1113,7 +1118,8 @@ class AudioTrackManager:
                                                      debugFileCount,
                                                      partCommandTokenList)
 
-                if partCommandTokenList[0] != "mix":
+                if (len(partCommandTokenList) == 0
+                    or partCommandTokenList[0] != "mix"):
                     currentSource = sourceList[0]
                     variableMap = { "infile"   : currentSource,
                                     "outfile"  : currentTarget,
@@ -1145,7 +1151,7 @@ class AudioTrackManager:
         """Combines the processed audio files for all voices in
            <configData.voiceNameList> into several combination files and
            converts them to aac format; <configData> defines the voice
-           volumes, the relative normalization level, the optional
+           volumes, the relative amplification level, the optional
            voices as well as the tags and suffices for the final
            files"""
 
@@ -1153,14 +1159,15 @@ class AudioTrackManager:
 
         cls = self.__class__
 
-        waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
         voiceProcessingList = \
             cls.constructSettingsForAudioTracks(configData)
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, \
-              targetFilePath, _, _, voiceNameToAudioLevelMap, \
-              masteringEffectList, attenuationLevel = v
+              targetFilePath, _, languageCode, voiceNameToAudioLevelMap, \
+              masteringEffectList, amplificationLevel = v
+            waveIntermediateFilePath = ("%s/result_%s.wav"
+                                        % (self._audioDirectoryPath, languageCode))
             OperatingSystem.showMessageOnConsole("== make mix file: %s"
                                                  % songTitle)
 
@@ -1172,13 +1179,13 @@ class AudioTrackManager:
                                          voiceNameToAudioLevelMap,
                                          configData.parallelTrackFilePath,
                                          masteringEffectList,
-                                         attenuationLevel,
+                                         amplificationLevel,
                                          waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,
                                 targetFilePath)
             cls._tagAudio(targetFilePath, configData, songTitle, albumName)
 
-            OperatingSystem.removeFile(waveIntermediateFilePath,
-                                       cls._intermediateFilesAreKept)
+            #OperatingSystem.removeFile(waveIntermediateFilePath,
+            #                           cls._intermediateFilesAreKept)
 
         Logging.trace("<<")

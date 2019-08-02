@@ -399,10 +399,10 @@ def MasteringBox_makeAll =
   Box_make(masteringBoxA, "B",
            btex \stkB{mastering${}_A$~via}{\tt masteringCommandList} etex
            rotated 90);
-  Box_make(attenuationBoxA, "B",
-           btex \stkB{attenuation${}_A$~by}{\tt attenuationLevel} etex
+  Box_make(amplificationBoxA, "B",
+           btex \stkB{amplification${}_A$~by}{\tt amplificationLevel} etex
            rotated 90);
-  MasteringBox_layoutSingleTrack(mixerBoxA, masteringBoxA, attenuationBoxA)
+  MasteringBox_layoutSingleTrack(mixerBoxA, masteringBoxA, amplificationBoxA)
                                 (masteringGroupA,
                                  MasteringGroupA_centerPosition,
                                  MasteringGroupA_size,
@@ -411,8 +411,8 @@ def MasteringBox_makeAll =
   Box_make(masteringGroupK, "B", "");
   Box_make(mixerBoxK, "B", btex mixdown${}_K$ etex rotated 90);
   Box_make(masteringBoxK, "B", btex mastering${}_K$ etex rotated 90);
-  Box_make(attenuationBoxK, "B", btex attenuation${}_K$ etex rotated 90);
-  MasteringBox_layoutSingleTrack(mixerBoxK, masteringBoxK, attenuationBoxK)
+  Box_make(amplificationBoxK, "B", btex amplification${}_K$ etex rotated 90);
+  MasteringBox_layoutSingleTrack(mixerBoxK, masteringBoxK, amplificationBoxK)
                                 (masteringGroupK,
                                  MasteringGroupK_centerPosition,
                                  MasteringGroupK_size,
@@ -455,11 +455,11 @@ def VoiceAndMasteringBox_setEdges =
   endfor
 
   addForwardFlow(mixerBoxA, masteringBoxA);
-  addForwardFlow(masteringBoxA, attenuationBoxA);
-  addForwardFlow(attenuationBoxA, trackBoxA);
+  addForwardFlow(masteringBoxA, amplificationBoxA);
+  addForwardFlow(amplificationBoxA, trackBoxA);
   addForwardFlow(mixerBoxK, masteringBoxK);
-  addForwardFlow(masteringBoxK, attenuationBoxK);
-  addForwardFlow(attenuationBoxK, trackBoxK);
+  addForwardFlow(masteringBoxK, amplificationBoxK);
+  addForwardFlow(amplificationBoxK, trackBoxK);
 enddef;
 
 %========================================

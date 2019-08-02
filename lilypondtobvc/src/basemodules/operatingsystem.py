@@ -12,6 +12,7 @@ import shutil
 import sys
 import subprocess
 
+from .python2and3support import isString
 from .simplelogging import Logging
 
 #====================
@@ -71,7 +72,15 @@ class OperatingSystem:
     def hasFile (cls, fileName):
         """Tells whether <fileName> signifies a file."""
 
-        return os.path.isfile(fileName)
+        return isString(fileName) and os.path.isfile(fileName)
+
+    #--------------------
+
+    @classmethod
+    def hasDirectory (cls, directoryName):
+        """Tells whether <directoryName> signifies a directory."""
+
+        return isString(directoryName) and os.path.isdir(directoryName)
 
     #--------------------
 
@@ -108,7 +117,7 @@ class OperatingSystem:
         try:
             callResult = subprocess.call([programName, option],
                                          stdout=nullDevice)
-        except Exception:
+        except:
             callResult = 1
 
         return (callResult == 0)

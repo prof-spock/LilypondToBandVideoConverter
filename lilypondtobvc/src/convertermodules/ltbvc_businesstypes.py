@@ -109,11 +109,11 @@ class AudioTrack:
         [ "name", "audioGroupList", "audioFileTemplate", "songNameTemplate",
           "albumName", "description", "languageCode",
           "voiceNameToAudioLevelMap", "masteringEffectList",
-          "attenuationLevel" ]
+          "amplificationLevel" ]
 
     _attributeNameToKindMap = {
         "albumName"                : "S",
-        "attenuationLevel"         : "F",
+        "amplificationLevel"       : "F",
         "audioFileTemplate"        : "S",
         "audioGroupList"           : "S",
         "description"              : "S",
@@ -137,7 +137,7 @@ class AudioTrack:
         self.description              = "XXX"
         self.languageCode             = "eng"
         self.voiceNameToAudioLevelMap = ""
-        self.attenuationLevel         = 0.0
+        self.amplificationLevel       = 0.0
 
     #--------------------
 
@@ -159,7 +159,7 @@ class AudioTrack:
         cls = self.__class__
 
         # set optional attributes to default values
-        _setToDefault(attributeNameToValueMap, "attenuationLevel", 0.0)
+        _setToDefault(attributeNameToValueMap, "amplificationLevel", 0.0)
         _setToDefault(attributeNameToValueMap, "description", "")
         _setToDefault(attributeNameToValueMap, "masteringEffectList", "")
 
@@ -173,7 +173,7 @@ class AudioTrack:
 
         # adapt values
         self.audioGroupList = convertStringToList(self.audioGroupList, "/")
-        self.attenuationLevel = float(self.attenuationLevel)
+        self.amplificationLevel = float(self.amplificationLevel)
         Logging.trace("--: vntalm = %r", self.voiceNameToAudioLevelMap)
         self.voiceNameToAudioLevelMap = \
             { key : float(value)

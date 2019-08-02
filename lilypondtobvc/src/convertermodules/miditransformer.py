@@ -34,6 +34,18 @@ def sign (x):
 
     return iif2(x == 0, 0, x < 0, -1, 1)
 
+#--------------------
+
+def _canonicalTrackName (trackName):
+    """Returns track name without any suffixes appended for
+       multiple MIDI tracks of the same instrument."""
+
+    for suffix in ["Bottom", "Middle", "Top"]:
+        if trackName.endswith(suffix):
+            trackName = trackName.replace(suffix, "")
+
+    return trackName
+
 #====================
 
 class _LineBuffer:
@@ -891,16 +903,6 @@ class _Humanizer:
 
     #--------------------
 
-    @classmethod
-    def _findCanonicalTrackName (cls, trackName):
-        """Returns track name without any suffixes appended for
-           multiple MIDI tracks of the same instrument."""
-
-        # TODO: something must be done here
-        return trackName
-
-    #--------------------
-
     def _findEventPositionInMeasure (self, musicTime):
         """Finds position of event within measure and returns it as
            a float value"""
@@ -1129,7 +1131,7 @@ class _Humanizer:
                       trackName, measureToHumanizationStyleMap)
 
         cls = self.__class__
-        canonicalTrackName = cls._findCanonicalTrackName(trackName)
+        canonicalTrackName = _canonicalTrackName(trackName)
         timeToAdjustedTimeMap = \
             self._canonicalTrackNameToTimingMap.get(canonicalTrackName, {})
 
@@ -1494,7 +1496,6 @@ class MidiTransformer:
     #--------------------
 
     def addProcessingDateToTracks (self, trackNameList):
-
         """Tags all instrument tracks in <self> having a track name in
            <trackNameList> with a meta text with the processing date"""
 
@@ -1522,11 +1523,15 @@ class MidiTransformer:
                 elif cls._trackNameRegExp.search(currentLine):
                     matchResult = cls._trackNameRegExp.search(currentLine)
                     trackName = matchResult.group(1)
-                    Logging.trace("--: trackName = %r", trackName)
+                    canonicalTrackName = _canonicalTrackName(trackName)
+                    Logging.trace("--: trackName = %r, canonical = %r",
+                                  trackName, canonicalTrackName)
 
-                    if trackName in trackNameList:
+                    if canonicalTrackName in trackNameList:
+                        isHumanized = (canonicalTrackName
+                                       in _humanizedTrackNameSet)
                         tagLine = (tagLinePrefix
-                                   + iif(trackName in _humanizedTrackNameSet,
+                                   + iif(isHumanized,
                                          "humanized", "processed")
                                    + tagLineSuffix)
                         Logging.trace("--: tagLine = %r", tagLine)
@@ -1658,9 +1663,13 @@ class MidiTransformer:
                     elif cls._trackNameRegExp.search(currentLine):
                         matchResult = cls._trackNameRegExp.search(currentLine)
                         trackName = matchResult.group(1)
-                        Logging.trace("--: trackName = %r", trackName)
-                        trackKind = iif(trackName in _humanizedTrackNameSet,
+                        canonicalTrackName = _canonicalTrackName(trackName)
+                        isHumanized = (canonicalTrackName
+                                       in _humanizedTrackNameSet)
+                        trackKind = iif(isHumanized,
                                         TrackKind_instrument, TrackKind_other)
+                        Logging.trace("--: trackName = %r, kind = %r",
+                                      canonicalTrackName, trackKind)
 
             self._lineList = lineList
 

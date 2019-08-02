@@ -313,9 +313,9 @@
   if missing, mixing will be done by (slow) internal routines
 }
 
-\newcommand{\DESCaudioProcessorNormalizationEffect}{%
-  audio processor command for normalizing audio to a dbFS value
-  containing \placeholder{attenuationLevel} as placeholder
+\newcommand{\DESCaudioProcessorAmplificationEffect}{%
+  audio processor command for amplifying audio by some dB value
+  containing \placeholder{amplificationLevel} as placeholder
 }
 
 \newcommand{\DESCaudioProcessorPaddingCommandLine}{%
@@ -347,7 +347,7 @@
   an embedded dollar-sign is replaced by the global album name)
 }
 
-\newcommand{\DESCaudioTrackAttenuationLevel}{%
+\newcommand{\DESCaudioTrackAmplificationLevel}{%
   decimal value in decibels telling the volume change to be applied to
   a track audio file; this is helpful to adjust volume levels of
   different songs within an album
@@ -1506,9 +1506,9 @@ Two entries are special: \embeddedCode{aacCommandLine} and
                 placeholders with the repeating group of factor and
                 infile embraced by parentheses,
 
-          \item the effect for attenuating an audio file by some factor
-                given in dB containing \placeholder{attenuationLevel} as
-                placeholder,
+          \item the effect for amplifying an audio file by some factor
+                given in dB containing
+                \placeholder{amplificationLevel} as placeholder,
 
           \item the command line for padding an audio files with leading
                 silence containing \placeholder{duration} (in seconds),
@@ -1560,14 +1560,14 @@ Two entries are special: \embeddedCode{aacCommandLine} and
 \begin{centeredFigure}
   \begin{variableDescriptionTableShort}
 
+    \varDescriptionShort{amplificationEffect}
+                        {\DESCaudioProcessorAmplificationEffect}
+
     \varDescriptionShort{chainSeparator}
                         {\DESCaudioProcessorChainSeparator}
 
     \varDescriptionShort{mixingCommandLine}
                         {\DESCaudioProcessorMixingCommandLine}
-
-    \varDescriptionShort{normalizationEffect}
-                        {\DESCaudioProcessorNormalizationEffect}
 
     \varDescriptionShort{paddingCommandLine}
                         {\DESCaudioProcessorPaddingCommandLine}
@@ -1607,7 +1607,7 @@ figure~\ref{figure:configFileAudioProcessorVariables}.
   audioProcessor = \
     "{ redirector: '->'," \
     "  chainSeparator: ';'," \
-    "  normalizationEffect: 'norm ${attenuationLevel}'," \
+    "  amplificationEffect: 'gain ${amplificationLevel}'," \
     "  mixingCommandLine: '" _sox \
          " -m [-v ${factor} ${infile} ] ${outfile}'," \
     "  paddingCommandLine: '" _sox \
@@ -2994,9 +2994,9 @@ The ``mix'' phase combines the refined audio files into one or
 more audio file with all voices and in aac audio format.
 
 Audio levels of the individual voices, mastering effects and a final
-attenuation factor are specified in the configuration.  Hence the
+amplification factor are specified in the configuration.  Hence the
 audio voices are mixed with those levels, have the mastering audio
-processing applied and finally are attenuated by the given factor
+processing applied and finally are amplified by the given factor
 before the result is compressed into an AAC file.
 
 The target file is stored in the
@@ -3042,7 +3042,7 @@ consists of a list of the several groups to be combined, templates for
 the audio file and the song name, an album name, and some description
 and a language code for the video track.  Also there is some audio
 information about the specific volume levels for each voice, the
-mastering effects for this voice and the final attenuation level.
+mastering effects for this voice and the final amplification level.
 
 \begin{centeredFigure}
   \begin{variableDescriptionTableShort}
@@ -3071,8 +3071,8 @@ mastering effects for this voice and the final attenuation level.
     \varDescriptionShort{masteringEffectList}
                         {\DESCaudioTrackMasteringEffectList}
 
-    \varDescriptionShort{attenuationLevel}
-                        {\DESCaudioTrackAttenuationLevel}
+    \varDescriptionShort{amplificationLevel}
+                        {\DESCaudioTrackAmplificationLevel}
 
   \end{variableDescriptionTableShort}
 
@@ -3100,7 +3100,7 @@ and some language name.  So you must be creative\dots
 The final stage of audio processing is described by the attributes
 \embeddedCode{voiceNameToAudioLevelMap},
 \embeddedCode{masteringEffectList} and
-\embeddedCode{attenuationLevel}.  Figure~\ref{figure:trackMixdown}
+\embeddedCode{amplificationLevel}.  Figure~\ref{figure:trackMixdown}
 illustrates how the audio voice files from the ``refinedaudio'' phase
 are combined into the several audio tracks by the mix phase.  In
 principle the mix levels per voice can be individual per audio track
@@ -3123,7 +3123,7 @@ audio processing:
       " guitar : 0.6, drums : 1.2, percussion : 1.0" \
     "}"
   _masteringEffectList = ""
-  _attenuationLevel = -1.2
+  _amplificationLevel = -1.2
 \end{configurationFileCode}
 
 They are used in the audio track list definition.
@@ -3138,7 +3138,7 @@ They are used in the audio track list definition.
    " languageCode             : eng," \
    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"," \
    " masteringEffectList      : "_masteringEffectList"," \
-   " attenuationLevel         : "_attenuationLevel"}," \
+   " amplificationLevel       : "_amplificationLevel"}," \
    "novoc : { audioGroupList   : base/gtr/drm," \
    " audioFileTemplate        : '$-novoc'," \
    " songNameTemplate         : '$ [-V]'," \
@@ -3146,8 +3146,8 @@ They are used in the audio track list definition.
    " description              : 'no vocals'," \
    " languageCode             : deu," \
    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"," \
-   " masteringEffectList     : "_masteringEffectList"," \
-   " attenuationLevel         : "_attenuationLevel"}," \
+   " masteringEffectList      : "_masteringEffectList"," \
+   " amplificationLevel       : "_amplificationLevel"}," \
    ...
   "}"
 \end{configurationFileCode}
@@ -3527,7 +3527,7 @@ also use slashes as path separators for Windows.
   audioProcessor = "{" \
     "mixingCommandLine: '" _sox \
         " -m [-v ${factor} ${infile} ] ${outfile}'," \
-    "normalizationCommand: 'norm ${attenuationLevel}'," \
+    "amplificationCommand: 'gain ${amplificationLevel}'," \
     "paddingCommandLine: '" _sox \
         " ${infile} ${outfile} pad ${duration}'," \
     "refinementCommandLine: '" _sox \
@@ -3776,7 +3776,7 @@ part.
 
 Note that the audio level map is defined in a separate variable
 \embeddedCode{\_voiceNameToAudioLevelMap}; there is no special
-mastering and all attenuation levels are (the default) 0dB.
+mastering and all amplification levels are (the default) 0dB.
 
 %--------------------------------
 \section{Putting it All Together}
@@ -4012,6 +4012,11 @@ been mentioned first in the current document.
                         {\mandatory}
                         {Mix}
 
+    \varDescriptionFinal{audioProcessor\bdot amplificationEffect}
+                        {\DESCaudioProcessorAmplificationEffect}
+                        {empty, then no amplification is done}
+                        {AudioProcessor}
+
     \varDescriptionFinal{audioProcessor\bdot chainSeparator}
                         {\DESCaudioProcessorChainSeparator}
                         {";"}
@@ -4020,11 +4025,6 @@ been mentioned first in the current document.
     \varDescriptionFinal{audioProcessor\bdot mixingCommandLine}
                         {\DESCaudioProcessorMixingCommandLine}
                         {empty, uses (slow) internal routine}
-                        {AudioProcessor}
-
-    \varDescriptionFinal{audioProcessor\bdot normalizationEffect}
-                        {\DESCaudioProcessorNormalizationEffect}
-                        {empty, then no attenuation is done}
                         {AudioProcessor}
 
     \varDescriptionFinal{audioProcessor\bdot paddingCommandLine}
@@ -4052,8 +4052,8 @@ been mentioned first in the current document.
                         {albumName}
                         {AudioTrack}
 
-    \varDescriptionFinal{audioTrack\bdot attenuationLevel}
-                        {\DESCaudioTrackAttenuationLevel}
+    \varDescriptionFinal{audioTrack\bdot amplificationLevel}
+                        {\DESCaudioTrackAmplificationLevel}
                         {0}
                         {Mix}
 

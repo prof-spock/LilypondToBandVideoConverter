@@ -195,22 +195,22 @@ class _ConfigDataGlobal:
 
         chainSeparator        = apmGet("chainSeparator", ";")
         mixingCommandLine     = apmGet("mixingCommandLine", "")
-        normalizationEffect   = apmGet("normalizationEffect", "")
+        amplificationEffect   = apmGet("amplificationEffect", "")
         paddingCommandLine    = apmGet("paddingCommandLine", "")
         redirector            = apmGet("redirector", "->")
         refinementCommandLine = apmGet("refinementCommandLine", "")
 
         Logging.trace("--: chainSep = %r, mixCmd = %r,"
-                      + " normEffect = %r, padCmd = %r,"
+                      + " amplifEffect = %r, padCmd = %r,"
                       + " redirector = %r, refCmd = %r",
                       chainSeparator, mixingCommandLine,
-                      normalizationEffect, paddingCommandLine,
+                      amplificationEffect, paddingCommandLine,
                       redirector, refinementCommandLine)
 
         ValidityChecker.isValid(chainSeparator > "",
             "'audioProcessor.chainSeparator' must be non-empty")
-        ValidityChecker.isValid(normalizationEffect > "",
-            "'audioProcessor.normalizationEffect' must be non-empty")
+        ValidityChecker.isValid(amplificationEffect > "",
+            "'audioProcessor.amplificationEffect' must be non-empty")
         ValidityChecker.isValid(redirector > "",
             "'audioProcessor.redirector' must be non-empty")
         ValidityChecker.isValid(refinementCommandLine > "",
@@ -221,7 +221,7 @@ class _ConfigDataGlobal:
         commandNameMap = { "aacCommandLine" : aacCommandLine }
 
         for key, commandLine in audioProcessorMap.items():
-            if key not in ["chainSeparator", "normalizationEffect",
+            if key not in ["chainSeparator", "amplificationEffect",
                            "redirector"]:
                 commandNameMap["audioProcessor." + key] = commandLine
 
@@ -1103,7 +1103,7 @@ class _LocalValidator:
         # special element patterns
         audioProcessorKeyPattern = \
                       (r"(?:(?:mixing|padding|refinement)CommandLine"
-                       + r"|normalizationEffect|chainSeparator|redirector)")
+                       + r"|amplificationEffect|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
         clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
         humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern

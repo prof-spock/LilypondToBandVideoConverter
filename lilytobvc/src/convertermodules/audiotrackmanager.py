@@ -567,9 +567,13 @@ class AudioTrackManager:
 
         cls = self.__class__
         
+        # convert volume factors from decibels to float values
+        rawVolumeFactorList = [10 ** (volumeFactorInDecibels / 20)
+                               for volumeFactorInDecibels in volumeFactorList]
+
         if "mixingCommandLine" in cls._audioProcessorMap:
             self._mixdownToWavFileExternally(sourceFilePathList,
-                                             volumeFactorList,
+                                             rawVolumeFactorList,
                                              masteringEffectList,
                                              attenuationLevel,
                                              targetFilePath)
@@ -580,7 +584,7 @@ class AudioTrackManager:
                               + " effects '%s' discarded",
                               masteringEffectList)
 
-            _WavFile.mixdown(sourceFilePathList, volumeFactorList,
+            _WavFile.mixdown(sourceFilePathList, rawVolumeFactorList,
                              attenuationLevel, targetFilePath)
 
         Logging.trace("<<")

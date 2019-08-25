@@ -388,8 +388,9 @@
 \newcommand{\DESCaudioTrackVoiceNameToAudioLevelMap}{%
   mapping from voice names to volume factors used for mixing the
   refined audio files into cumulated audio file for given track; the
-  factors are decimal values (where 1.0 means that the refined voice
-  file is taken without change)
+  factors are decimal values in decibels (where 0.0 means that the
+  refined voice file is taken without change with a conversion of
+  \(10^{{\rm dBValue}/20}\))
 }
 
 \newcommand{\DESCaudioTrackList}{%
@@ -2935,10 +2936,11 @@ In principle this could be handled by introducing an artificial voice
 only used for audio, but for convenience there is another variable
 called \embeddedCode{parallelTrack} for a single additional track.  It
 contains comma-separated data for an audio file name, a volume factor
-and offset relative to the start of the song in seconds as follows:
+in decibels and offset relative to the start of the song in seconds as
+follows:
 
 \begin{configurationFileCode}
-  parallelTrack = " parallelFile.wav, 1.0, 2.8"
+  parallelTrack = " parallelFile.wav, -2, 2.8"
 \end{configurationFileCode}
 
 Note that it is only possible to have a single parallel track.
@@ -3114,9 +3116,9 @@ audio processing:
 
 \begin{configurationFileCode}
   _voiceNameToAudioLevelMap = "{" \
-      " bass : 0.5, keyboard : 0.3, keyboardSimple : 0.2," \
-      " strings : 0.8, vocals : 1.0, bgVocals : 0.9," \
-      " guitar : 0.6, drums : 1.2, percussion : 1.0" \
+      " bass : -6, keyboard : -10.5, keyboardSimple : -14," \
+      " strings : -2, vocals : 0, bgVocals : -1," \
+      " guitar : -4.5, drums : 1.6, percussion : 0" \
     "}"
   _masteringEffectList = ""
   _attenuationLevel = -1.2
@@ -3712,7 +3714,7 @@ relative levels are identical in all mixes.
 
 \begin{configurationFileCode}
   _voiceNameToAudioLevelMap = \
-    "{ vocals : 1.0, bass : 0.83, guitar : 0.33, drums : 1.48 }"
+    "{ vocals : 0, bass : -1.6, guitar : -9.7, drums : 3.5 }"
 \end{configurationFileCode}
 
 Note that the above definition must come before the

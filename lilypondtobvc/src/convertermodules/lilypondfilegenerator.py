@@ -146,18 +146,18 @@ class LilypondFile:
         Logging.trace(">>: macro = %r, alternativesList = %r",
                       macroName, alternativeMacroNameList)
         isFound = (macroName in self._includeFileMacroNameSet)
-        hasAncestor = False
+        ancestor = None
 
         if not isFound:
             for otherMacroName in iter(alternativeMacroNameList):
                 if otherMacroName in self._includeFileMacroNameSet:
                     st = "%s = { \\%s }" % (macroName, otherMacroName)
                     self._printLine(0, st, False)
-                    hasAncestor = True
+                    ancestor = otherMacroName
                     break
 
-        Logging.trace("<<: isFound = %r, hasAncestor = %r",
-                      isFound, hasAncestor)
+        Logging.trace("<<: isFound = %r, ancestor = %r",
+                      isFound, ancestor)
 
     #--------------------
 
@@ -176,12 +176,16 @@ class LilypondFile:
     #--------------------
 
     @classmethod
-    def _lilypondVoiceName (cls, voiceName):
-        """returns name of voice to be used within lilypond"""
+    def _lilypondVoiceName (cls, voiceName, drumsNameIsExpanded=False):
+        """Returns name of voice to be used within lilypond; if
+           <drumsNameIsExpanded> is set, then a plain "drums" name is
+           replaced by "myDrums" """
 
-        Logging.trace(">>: %s", voiceName)
+        Logging.trace(">>: voiceName= %s, drumsNameIsExpanded = %r",
+                      voiceName, drumsNameIsExpanded)
 
-        result = iif(voiceName == "drums", "myDrums", voiceName)
+        result = iif(voiceName == "drums" and drumsNameIsExpanded,
+                     "myDrums", voiceName)
         result = result.replace("Simple", "").replace("Extended", "")
 
         Logging.trace("<<: %s", result)
@@ -215,10 +219,12 @@ class LilypondFile:
         cls = self.__class__
         isDrumVoice       = (voiceStaff == "DrumStaff")
         isTabulatureVoice = (voiceStaff == "TabStaff")
-
-        lilypondVoiceName = cls._lilypondVoiceName(voiceName)
+        drumsNameIsExpanded = (self._phase == "score")
+        lilypondVoiceName = cls._lilypondVoiceName(voiceName,
+                                                   drumsNameIsExpanded)
         voiceMacroName = lilypondVoiceName + self._phase.capitalize()
-        alternativeMacroNameList = [ lilypondVoiceName ]
+        plainLilypondVoiceName = cls._lilypondVoiceName(voiceName, True)
+        alternativeMacroNameList = [ plainLilypondVoiceName ]
         self._ensureMacroAvailability(voiceMacroName,
                                       alternativeMacroNameList)
 

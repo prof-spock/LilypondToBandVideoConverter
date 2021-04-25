@@ -9,8 +9,10 @@ import io
 import sys
 import time
 
-from .python2and3support import isPython2
-from .ttbase import iif
+from .ttbase import adaptToRange, iif
+
+# support for python version 2
+toUnicodeString = unicode if sys.version_info[0] == 2 else str
 
 #====================
 
@@ -21,16 +23,19 @@ class Logging:
     Level_error    = 1
     Level_standard = 2
     Level_verbose  = 3
-
-    _referenceLevel    = Level_none
-    _fileName          = ""
-    _fileIsOpen        = None
-    _fileIsKeptOpen    = None
-    _file              = None
-    _isEnabled         = True
-    _timeIsLogged      = True
-    _previousTimestamp = 0
-    _timeOfDayString   = ""
+    
+    _referenceLevel             = Level_none
+    _fileName                   = ""
+    _fileIsOpen                 = None
+    _fileIsKeptOpen             = None
+    _file                       = None
+    _isEnabled                  = True
+    _timeIsLogged               = True
+    _timeFactor                 = 1
+    _timeFractionalPartTemplate = ""
+    _timeFractionalDigitCount   = 0
+    _previousTimestamp          = 0
+    _timeOfDayString            = ""
 
     _buffer = []
     # buffers log data before log file is opened, otherwise a
@@ -84,7 +89,7 @@ class Logging:
     def _closeFileConditionally (cls):
         if cls._fileIsOpen:
             cls._file.close()
-
+        
     #--------------------
 
     @classmethod
@@ -92,13 +97,20 @@ class Logging:
         """Returns current time of day in seconds as string"""
 
         currentTimestamp = time.time()
-
+        
         if currentTimestamp != cls._previousTimestamp:
             cls._previousTimestamp = currentTimestamp
-            cls._timeOfDayString   = time.strftime("%H%M%S")
+            st = time.strftime("%H%M%S")
+
+            if cls._timeFractionalDigitCount > 0:
+                fractionalPart = currentTimestamp - int(currentTimestamp)
+                fractionalPart *= cls._timeFactor
+                st += cls._timeFractionalPartTemplate % fractionalPart
+                
+            cls._timeOfDayString = st
 
         return cls._timeOfDayString
-
+        
     #--------------------
 
     @classmethod
@@ -116,7 +128,7 @@ class Logging:
                                 encoding="utf-8", errors='replace')
 
         cls._fileIsOpen = (cls._file is not None)
-
+  
     #--------------------
 
     @classmethod
@@ -125,7 +137,7 @@ class Logging:
 
         if cls._isEnabled:
             st = st + '\n'
-
+            
             if cls._fileName == "":
                 # no output file => put line to buffer
                 cls._buffer.append(st)
@@ -148,9 +160,7 @@ class Logging:
     def _writeStringDirectly (cls, st):
         """Writes <st> to logging file"""
 
-        if isPython2:
-            st = unicode(st)
-
+        st = toUnicodeString(st)
         cls._file.write(st)
 
     #--------------------
@@ -166,9 +176,9 @@ class Logging:
         cls._fileIsOpen     = False
         cls._isEnabled      = True
 
-        cls._writeLine("START LOGGING")
+        cls._writeLine("START LOGGING -*- coding:utf-8 -*-")
         atexit.register(cls._closeFileConditionally)
-
+    
     #--------------------
 
     @classmethod
@@ -223,10 +233,18 @@ class Logging:
     #--------------------
 
     @classmethod
-    def setTracingWithTime (cls, timeIsLogged):
-        """Sets logging of time when tracing to active or inactive"""
+    def setTracingWithTime (cls, timeIsLogged, fractionalDigitCount=0):
+        """Sets logging of time when tracing to active or inactive;
+           <fractionalDigitCount> gives the number of fractional
+           digits for the time logged"""
 
-        cls._timeIsLogged = timeIsLogged
+        fractionalDigitCount = adaptToRange(fractionalDigitCount, 0, 3)
+
+        cls._timeIsLogged               = timeIsLogged
+        cls._timeFractionalDigitCount   = fractionalDigitCount
+        cls._timeFactor                 = 10 ** fractionalDigitCount
+        cls._timeFractionalPartTemplate = \
+            ".%0" + "%1d" % fractionalDigitCount + "d"
 
     #--------------------
 
@@ -236,7 +254,7 @@ class Logging:
            equal to the reference level."""
 
         if cls._referenceLevel >= level:
-            # log message is significant
+            # log message is significant 
             cls._writeLine(st)
 
     #--------------------

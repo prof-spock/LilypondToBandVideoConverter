@@ -8,7 +8,6 @@
 
 from mutagen.mp4 import MP4, MP4Cover
 
-from basemodules.python2and3support import isPython2
 from basemodules.simplelogging import Logging
 from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File
@@ -100,10 +99,6 @@ class MP4TagManager:
                 newValue = tagToValueMap[tagName]
                 newValue = cls._adjustValueForSpecialTags(tagName, newValue)
                 technicalTagName = cls._nameToIdMap[tagName]
-
-                if isPython2:
-                    technicalTagName = technicalTagName.encode("latin-1")
-
                 tagList[technicalTagName] = newValue
 
         tagList.save()

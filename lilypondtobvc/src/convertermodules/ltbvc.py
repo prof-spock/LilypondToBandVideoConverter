@@ -702,8 +702,7 @@ def main ():
 
     Logging.initialize()
     Logging.setLevel(Logging.Level_verbose)
-    Logging.setTracingWithTime(True)
-    #Logging.setFileName("/temp/logs/test.log")
+    #Logging.setTracingWithTime(True)
     Logging.trace(">>")
 
     isOkay, processingPhaseSet = initialize()

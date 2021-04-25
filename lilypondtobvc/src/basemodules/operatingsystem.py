@@ -12,7 +12,7 @@ import shutil
 import sys
 import subprocess
 
-from .python2and3support import isString
+from .typesupport import isString
 from .simplelogging import Logging
 
 #====================
@@ -29,9 +29,16 @@ class OperatingSystem:
     def basename (cls, fileName, extensionIsShown=False):
         """Returns <fileName> without leading path."""
 
-        shortFileName = os.path.basename(fileName)
-        partList = os.path.splitext(shortFileName)
-        result = (shortFileName if extensionIsShown else partList[0])
+        pathSeparatorPosition = max(fileName.rfind("/"),
+                                    fileName.rfind("\\"))
+        shortFileName = fileName[pathSeparatorPosition + 1:]
+
+        if extensionIsShown:
+            result = shortFileName
+        else:
+            dotPosition = shortFileName.rfind(".")
+            result = shortFileName[:dotPosition]
+
         return result
 
     #--------------------
@@ -137,6 +144,8 @@ class OperatingSystem:
         else:
             Logging.trace("--: removing %r", fileName)
             os.remove(fileName)
+
+        Logging.trace("<<")
 
     #--------------------
 

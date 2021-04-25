@@ -14,10 +14,10 @@ import struct
 import wave
 
 from basemodules.operatingsystem import OperatingSystem
-from basemodules.python2and3support import isString
 from basemodules.simplelogging import Logging
 from basemodules.stringutil import splitAndStrip, tokenize
 from basemodules.ttbase import adaptToRange, iif, iif2, iif3
+from basemodules.typesupport import isString
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import humanReadableVoiceName

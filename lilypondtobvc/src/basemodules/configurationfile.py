@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 # configurationfile - provides reading from a configuration file containing
 #                     comments and assignment to variables
 #
@@ -9,16 +10,33 @@ import io
 import re
 
 from .operatingsystem import OperatingSystem
-from .python2and3support import isString
+from .typesupport import isString
 from .simplelogging import Logging
 from .ttbase import iif, missingValue
 
 #====================
 
+def reprOfStringToValueMap (self):
+    """String representation for a string to value map <self>"""
+
+    entrySeparator = u"§"
+    entryTemplate = "%s: %s"
+    keyList = sorted(list(self.keys()))
+    result = ""
+    
+    for key in keyList:
+        value = self[key] 
+        result += (iif(result == "", "", entrySeparator)
+                   + entryTemplate % (key, value))
+    
+    result = "{" + result + "}";
+    return result
+        
+#====================
+
 class _Token:
     """Simple token within table definition string parser"""
 
-    # kind of token within table definition string parser
     Kind_number        = "number"
     Kind_string        = "string"
     Kind_operator      = "operator"
@@ -27,21 +45,24 @@ class _Token:
 
     #--------------------
 
-    def __init__ (self, start, kind, value):
-        """Initializes token with start position, token kind and value"""
+    def __init__ (self, start, text, kind, value):
+        """Initializes token with start position, token text, token kind and
+           value"""
 
         self.start = start
+        self.text  = text
         self.kind  = kind
         self.value = value
-
+        
     #--------------------
 
     def __repr__ (self):
         """String representation for token <self>"""
 
-        st = "_Token(%r, %s, %r)" % (self.start, self.kind, self.value)
+        st = ("_Token(%r, '%s', %s, %r)"
+              % (self.start, self.text, self.kind, self.value))
         return st
-
+        
 #====================
 
 class ConfigurationFile:
@@ -71,8 +92,8 @@ class ConfigurationFile:
 
     @classmethod
     def _adaptConfigurationValue (cls, value):
-        """Takes string valued <value> and constructs either a
-           boolean, a numeric value or a sanitized string."""
+        """Takes string <value> and constructs either a boolean, a numeric
+           value or a sanitized string."""
 
         Logging.trace(">>: %r", value)
         uppercasedValue = value.upper()
@@ -85,16 +106,16 @@ class ConfigurationFile:
             result = float(value)
         else:
             result = cls._parseFragmentedString(value)
-
+            
         Logging.trace("<<: %r", result)
         return result
-
+        
     #--------------------
 
-    def _expandVariables (self, value):
-        """Expands all variables embedded in <value>."""
+    def _expandVariables (self, st):
+        """Expands all variables embedded in <st>."""
 
-        Logging.trace(">>: %r", value)
+        Logging.trace(">>: %r", st)
         cls = self.__class__
 
         # collect identifiers embedded in value and replace them by
@@ -111,11 +132,11 @@ class ConfigurationFile:
         identifier = ""
         fsaTrace = ""
 
-        for ch in value:
+        for ch in st:
             # process finite state automaton with three states based
             # on next character in string
             fsaTrace += (iif(fsaTrace == "", "", " ")
-                         + "[%r] %r" % (parseStateToString[parseState], ch))
+                         + "[%s] %s" % (parseStateToString[parseState], ch))
 
             if parseState == ParseState_inLimbo:
                 if cls._identifierCharRegExp.search(ch):
@@ -147,7 +168,7 @@ class ConfigurationFile:
         if parseState == ParseState_inIdentifier:
             identifierValue = self._findIdentifierValue(identifier)
             result += identifierValue
-
+            
         Logging.trace("--: accumulatedFSATrace = %s", fsaTrace)
         Logging.trace("<<: %r", result)
         return result
@@ -189,9 +210,9 @@ class ConfigurationFile:
         cls = self.__class__
         result = None
         separator = OperatingSystem.pathSeparator
+        simpleFileName = OperatingSystem.basename(originalFileName, True)
 
         for directoryName in cls._searchPathList:
-            simpleFileName = OperatingSystem.basename(originalFileName, True)
             fileName = iif(directoryName == ".", originalFileName,
                             directoryName + separator + simpleFileName)
             isFound = OperatingSystem.hasFile(fileName)
@@ -203,7 +224,7 @@ class ConfigurationFile:
 
         Logging.trace("<<: %r", result)
         return result
-
+    
     #--------------------
 
     @classmethod
@@ -308,9 +329,9 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def _parseFragmentedString (cls, value):
+    def _parseFragmentedString (cls, st):
         """Parses - possibly fragmented - external representation of a
-           string given by <value> and returns sanitized string."""
+           string given by <st> and returns sanitized string."""
 
         ParseState_inLimbo   = 0
         ParseState_inString  = 1
@@ -320,7 +341,7 @@ class ConfigurationFile:
         parseState = ParseState_inLimbo
         result = ""
 
-        for ch in value:
+        for ch in st:
             # process finite state automaton with three states based
             # on next character in string
             # Logging.trace("--: (%d) character: %r", parseState, ch)
@@ -371,7 +392,7 @@ class ConfigurationFile:
         ParseState_atValue    = 3
         ParseState_afterValue = 4
         ParseState_done       = 5
-
+        
         parseState = ParseState_inLimbo
 
         currentKey   = None
@@ -400,18 +421,18 @@ class ConfigurationFile:
                     # value is a table itself => recursion
                     errorPosition, errorMessage = \
                         cls._mustHave(token, [ _Token.Kind_operator ], "{")
-
+                    
                     if errorPosition < 0:
                         errorPosition, errorMessage, currentValue, position = \
                              cls._parseTableString(tokenList, position)
-
+                        
                 table[currentKey] = currentValue
             elif parseState == ParseState_afterValue:
                 errorPosition, errorMessage = \
                     cls._mustHave(token, [ _Token.Kind_operator ], ",}")
                 nextParseState = iif(token.value == "}", ParseState_done,
                                      ParseState_atKey)
-
+                
             parseState = iif(errorPosition >= 0, ParseState_done,
                              nextParseState)
             position += iif(parseState == ParseState_done, 0, 1)
@@ -422,13 +443,13 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _readFile (self, fileName, lineList, visitedFileSet):
+    def _readFile (self, fileName, lineList, visitedFileNameSet):
         """Appends lines of configuration file with <fileName> to <lineList>;
-           also handles embedded imports of files; <visitedFileSet>
+           also handles embedded imports of files; <visitedFileNameSet>
            tells which files have already been visited"""
 
         Logging.trace(">>: fileName = %r, visitedFiles = %r",
-                      fileName, visitedFileSet)
+                      fileName, visitedFileNameSet)
 
         cls = self.__class__
         errorMessage = ""
@@ -440,10 +461,10 @@ class ConfigurationFile:
         if fileName is None:
             errorMessage = "cannot find %r" % originalFileName
             isOkay = False
-        elif fileName in visitedFileSet:
+        elif fileName in visitedFileNameSet:
             Logging.trace("--: file already included %r", originalFileName)
         else:
-            visitedFileSet.update(fileName)
+            visitedFileNameSet.update(fileName)
 
             with io.open(fileName, "rt",
                          encoding="utf-8") as configurationFile:
@@ -478,7 +499,7 @@ class ConfigurationFile:
                         Logging.trace("--: IMPORT %r", importedFileName)
 
                         isOkay = self._readFile(importedFileName, lineList,
-                                                visitedFileSet)
+                                                visitedFileNameSet)
                         if not isOkay:
                             Logging.trace("--:import failed for %r in %r",
                                           importedFileName,
@@ -488,7 +509,7 @@ class ConfigurationFile:
 
         Logging.trace("<<: %r, %r", isOkay, errorMessage)
         return isOkay
-
+            
     #--------------------
 
     @classmethod
@@ -507,13 +528,14 @@ class ConfigurationFile:
 
         tokenList = []
         errorPosition, errorMessage = -1, ""
-        tokenStart, tokenKind, tokenValue = None, None, None
+        tokenStart, tokenText, tokenKind, tokenValue = None, None, None, None
         scanState = ScanState_inLimbo
         i = 0
 
         while i < len(st):
             ch = st[i]
             tokenIsDone = False
+            isQuoteCharacter = (ch == "'")
 
             if scanState == ScanState_inLimbo:
                 if ch == " ":
@@ -525,9 +547,10 @@ class ConfigurationFile:
                     break
                 else:
                     tokenStart = i
-                    tokenValue = iif(ch == "'", "", ch)
+                    tokenText = ch
+                    tokenValue = iif(isQuoteCharacter, "", ch)
 
-                    if ch == "'":
+                    if isQuoteCharacter:
                         tokenKind = _Token.Kind_string
                         scanState = ScanState_inString
                     elif ch in operators:
@@ -537,15 +560,19 @@ class ConfigurationFile:
                         tokenKind = _Token.Kind_integerNumber
                         scanState = ScanState_inNumber
             elif scanState == ScanState_inString:
-                if ch != "'":
+                tokenText += ch
+
+                if not isQuoteCharacter:
                     tokenValue += ch
                 else:
                     tokenIsDone = True
             elif scanState == ScanState_inNumber:
                 if ch in digits:
+                    tokenText  += ch
                     tokenValue += ch
                 elif ch == ".":
                     tokenKind = _Token.Kind_floatNumber
+                    tokenText  += ch
                     tokenValue += ch
                 else:
                     i -= 1
@@ -555,7 +582,7 @@ class ConfigurationFile:
                     tokenKind = _Token.Kind_number
 
             if tokenIsDone:
-                token = _Token(tokenStart, tokenKind, tokenValue)
+                token = _Token(tokenStart, tokenText, tokenKind, tokenValue)
                 Logging.trace("--: adding %r", token)
                 tokenList.append(token)
                 tokenValue = None
@@ -570,7 +597,7 @@ class ConfigurationFile:
         result = (errorPosition, errorMessage, tokenList)
         Logging.trace("<<: %r", result)
         return result
-
+        
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -592,12 +619,14 @@ class ConfigurationFile:
         Logging.trace(">>: %r", fileName)
 
         self._keyToValueMap = {}
-        visitedFileSet = set()
+
+        visitedFileNameSet = set()
         lineList = []
-        self._readFile(fileName, lineList, visitedFileSet)
+        isOkay = self._readFile(fileName, lineList, visitedFileNameSet)
         self._parseConfiguration(lineList)
 
-        Logging.trace("<<")
+        Logging.trace("<<: %s",
+                      reprOfStringToValueMap(self._keyToValueMap))
 
     #--------------------
 
@@ -647,7 +676,7 @@ class ConfigurationFile:
         errorPosition, errorMessage, tokenList = cls._tokenizeTableString(st)
 
         if errorPosition < 0:
-            errorPosition, errorMessage, table, _ = \
+            errorPosition, errorMessage, table, newPosition = \
                 cls._parseTableString(tokenList, 0)
 
         errorPosition = errorPosition + iif(errorPosition > 0, -1, 0)

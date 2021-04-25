@@ -537,7 +537,13 @@ class LilypondFile:
 
         # make score footing
         if self._isMidiScore:
-            self._printLine(0, "\\midi {}")
+            self._printLine(0, "\\midi {")
+            # move dynamic performer to staff context for correct
+            # output of embedded voices
+            template = "\\context { \\%s \\%s \"Dynamic_performer\" }"
+            self._printLine(+1, template % ("Staff", "consists"))
+            self._printLine(0,  template % ("Voice", "remove  "))
+            self._printLine(-1, "}")
         elif not self._isVideoScore:
             self._printLine(0, "\\layout {}")
         else:

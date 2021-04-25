@@ -1157,8 +1157,8 @@ class _LocalValidator:
         cls._setMap("tempLilypondFilePath", "./temp.ly", "WFILE")
 
         # song group properties
-        cls._setMap("artistName", u"[ARTIST]", "STRING")
-        cls._setMap("albumName", u"[ALBUM]", "STRING")
+        cls._setMap("artistName", "[ARTIST]", "STRING")
+        cls._setMap("albumName", "[ALBUM]", "STRING")
 
         # general song properties
         cls._setMap("composerText", "", "STRING")

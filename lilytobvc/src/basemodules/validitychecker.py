@@ -9,11 +9,9 @@ import os
 import re
 import sys
 
-import basemodules.python2and3support
+import basemodules.typesupport as typesupport
 from .simplelogging import Logging
 from .ttbase import iif
-
-python2and3support = basemodules.python2and3support
 
 #====================
 
@@ -23,18 +21,18 @@ class ValidityChecker:
 
     @classmethod
     def _checkTemplate (cls, typeName, valueName, value):
-        result = "--: checking '%s' for being %s ('%s')"
+        result = "--: checking %r for being %s (%r)"
         result = result % (valueName, typeName, value)
         return result
-     
+
     #--------------------
 
     @classmethod
-    def _checkForType (cls, type, typeName, valueName, value):
-        Logging.trace(cls._checkTemplate(typeName, valueName, value))
-        message = "'%s' must be %s: %s" % (valueName, typeName, repr(value))
-        cls.isValid(isinstance(value, type), message)
-     
+    def _checkForType (cls, kind, kindName, valueName, value):
+        Logging.trace(cls._checkTemplate(kindName, valueName, value))
+        message = "%r must be %s: %s" % (valueName, kindName, value)
+        cls.isValid(isinstance(value, kind), message)
+
     #--------------------
 
     @classmethod
@@ -51,6 +49,41 @@ class ValidityChecker:
 
     #--------------------
     # EXPORTED FEATURES
+    #--------------------
+
+    @classmethod
+    def isOfKind (cls, value, valueName, kind):
+        """Checks whether <value> named <valueName> has <kind>; otherwise
+           exits program with an appropriate message"""
+
+        Logging.trace(">>: value = %r, valueName = %r, kind = %r",
+                      value, valueName, kind)
+
+        if kind == "B":
+            cls.isBoolean(value, valueName)
+        elif kind == "N":
+            cls.isInteger(value, valueName)
+        elif kind == "PN":
+            cls.isInteger(value, valueName)
+        elif kind == "I":
+            cls.isInteger(value, valueName)
+        elif kind == "F":
+            cls.isFloat(value, valueName)
+        elif kind == "S":
+            cls.isString(value, valueName)
+        elif kind == "SL":
+            cls.isStringList(value, valueName)
+        elif kind == "SM":
+            cls.isStringMap(value, valueName)
+        elif kind == "RF":
+            cls.isReadableFile(value, valueName)
+        elif kind == "WF":
+            cls.isWritableFile(value, valueName)
+        elif kind == "WD":
+            cls.isDirectory(value, valueName)
+
+        Logging.trace("<<")
+    
     #--------------------
 
     @classmethod
@@ -81,8 +114,8 @@ class ValidityChecker:
            message."""
 
         Logging.trace(cls._checkTemplate("an integer", valueName, value))
-        message = "'%s' must be an integer: %s" % (valueName, repr(value))
-        cls.isValid(ttbase.isInteger(value), message)
+        message = "%s must be an integer: %r" % (valueName, value)
+        cls.isValid(typesupport.isInteger(value), message)
 
     #--------------------
 
@@ -120,10 +153,10 @@ class ValidityChecker:
            program with a message.  When <zeroIsIncluded> is set, also
            zero is acceptable."""
 
-        typeName = "a " + iif(zeroIsIncluded, "", "positive ") + "natural"
-        Logging.trace(cls._checkTemplate(typeName, valueName, value))
-        message = ("'%s' must be %s: %s" % (valueName, typeName, repr(value)))
-        cls.isValid(python2and3support.isInteger(value)
+        kindName = "a " + iif(zeroIsIncluded, "", "positive ") + "natural"
+        Logging.trace(cls._checkTemplate(kindName, valueName, value))
+        message = ("%s must be %s: %r" % (valueName, kindName, value))
+        cls.isValid(typesupport.isInteger(value)
                     and (value > 0 or value == 0 and zeroIsIncluded),
                     message)
 
@@ -136,7 +169,7 @@ class ValidityChecker:
            whether non-integer values are okay, <rangeKind> gives an
            boundary condition about the range."""
 
-        Logging.trace(">>: %s = '%s' (%s), floatIsOk = %s, rangeKind = '%s'",
+        Logging.trace(">>: %s = %r (%s), floatIsOk = %r, rangeKind = %r",
                       valueName, value, type(value), floatIsAllowed, rangeKind)
 
         floatRegexp   = re.compile(r"^\-?[0-9]+(\.[0-9]*)?$")
@@ -161,11 +194,11 @@ class ValidityChecker:
                 errorTemplate = "positive or zero"
                 isOkay = (float(value) >= 0)
 
-            errorTemplate = "%s must be " + errorTemplate + " - %s"
+            errorTemplate = "%s must be " + errorTemplate + " - %r"
 
-        cls.isValid(isOkay, errorTemplate % (valueName, repr(value)))
+        cls.isValid(isOkay, errorTemplate % (valueName, value))
 
-        Logging.trace("<<: %s", isOkay)
+        Logging.trace("<<: %r", isOkay)
 
     #--------------------
 
@@ -189,8 +222,8 @@ class ValidityChecker:
 
         Logging.trace(cls._checkTemplate("a (unicode) string",
                                          valueName, value))
-        message = "'%s' must be a string: %s" % (valueName, repr(value))
-        cls.isValid(python2and3support.isString(value), message)
+        message = "%r must be a string: %r" % (valueName, value)
+        cls.isValid(typesupport.isString(value), message)
 
     #--------------------
 
@@ -205,7 +238,7 @@ class ValidityChecker:
         message = cls._constructErrorMessage(template, pathName, valueName)
         directoryName = os.path.dirname(pathName)
         directoryName = iif(directoryName == "", ".", directoryName)
-        Logging.trace("--: dir = %s", directoryName)
+        Logging.trace("--: dir = %r", directoryName)
         cls.isValid(os.path.isdir(directoryName), message)
 
     #--------------------
@@ -216,7 +249,7 @@ class ValidityChecker:
            with <message>."""
 
         Logging.trace("--: checking condition (%s),"
-                      + " otherwise failure is '%s'",
+                      + " otherwise failure is %r",
                       repr(condition), message)
 
         if not condition:

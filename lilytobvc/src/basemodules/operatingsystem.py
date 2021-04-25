@@ -12,6 +12,7 @@ import shutil
 import sys
 import subprocess
 
+from .typesupport import isString
 from .simplelogging import Logging
 
 #====================
@@ -28,9 +29,16 @@ class OperatingSystem:
     def basename (cls, fileName, extensionIsShown=False):
         """Returns <fileName> without leading path."""
 
-        shortFileName = os.path.basename(fileName)
-        partList = os.path.splitext(shortFileName)
-        result = (shortFileName if extensionIsShown else partList[0])
+        pathSeparatorPosition = max(fileName.rfind("/"),
+                                    fileName.rfind("\\"))
+        shortFileName = fileName[pathSeparatorPosition + 1:]
+
+        if extensionIsShown:
+            result = shortFileName
+        else:
+            dotPosition = shortFileName.rfind(".")
+            result = shortFileName[:dotPosition]
+
         return result
 
     #--------------------
@@ -44,17 +52,26 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def executeCommand (cls, command, commandIsShownOnly=False,
+    def executeCommand (cls, command, abortOnFailure=False,
                         stdin=None, stdout=None, stderr=None):
         """Processes <command> (specified as list) in operating
-          system. When <commandIsShownOnly> is set, there is only logging,
-          no execution."""
+          system. When <abortOnFailure> is set, any non-zero
+          return code aborts the program at once."""
 
-        Logging.trace("--: executing '%s'", repr(command))
+        Logging.trace(">>: %r", command)
 
-        if not commandIsShownOnly:
-            subprocess.call(command,
-                            stdin=stdin, stdout=stdout, stderr=stderr)
+        completionCode = subprocess.call(command,
+                                         stdin=stdin, stdout=stdout,
+                                         stderr=stderr)
+
+        if abortOnFailure and completionCode != 0:
+            message = ("ERROR: return code %d for %s"
+                       % (completionCode, " ".join(command)))
+            Logging.log(message)
+            sys.exit(message)
+
+        Logging.trace("<<")
+        return completionCode
 
     #--------------------
 
@@ -62,7 +79,15 @@ class OperatingSystem:
     def hasFile (cls, fileName):
         """Tells whether <fileName> signifies a file."""
 
-        return os.path.isfile(fileName)
+        return isString(fileName) and os.path.isfile(fileName)
+
+    #--------------------
+
+    @classmethod
+    def hasDirectory (cls, directoryName):
+        """Tells whether <directoryName> signifies a directory."""
+
+        return isString(directoryName) and os.path.isdir(directoryName)
 
     #--------------------
 
@@ -73,7 +98,7 @@ class OperatingSystem:
         Logging.trace(">>")
 
         result = os.path.expanduser("~")
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -83,7 +108,7 @@ class OperatingSystem:
         """Moves file with <sourceFileName> to either file or
            directory target with <targetName>."""
 
-        Logging.trace(">>: %s -> %s", sourceFileName, targetName)
+        Logging.trace(">>: %r -> %r", sourceFileName, targetName)
         shutil.copy(sourceFileName, targetName)
         os.remove(sourceFileName)
         Logging.trace("<<")
@@ -110,15 +135,17 @@ class OperatingSystem:
     def removeFile (cls, fileName, fileIsKept=False):
         """Removes file with <fileName> permanently."""
 
-        Logging.trace(">>: %s", fileName)
+        Logging.trace(">>: %r", fileName)
 
         if fileIsKept:
-            Logging.trace("--: not removed '%s'", fileName)
+            Logging.trace("--: not removed %r", fileName)
         elif not cls.hasFile(fileName):
-            Logging.trace("--: file already nonexisting '%s'", fileName)
+            Logging.trace("--: file already nonexisting %r", fileName)
         else:
-            Logging.trace("--: removing '%s'", fileName)
+            Logging.trace("--: removing %r", fileName)
             os.remove(fileName)
+
+        Logging.trace("<<")
 
     #--------------------
 
@@ -130,7 +157,7 @@ class OperatingSystem:
 
         result = os.path.abspath(inspect.stack()[1][1])
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -141,7 +168,7 @@ class OperatingSystem:
            to user; <newlineIsAppended> tells whether a newline is added at
            the end of the message"""
 
-        Logging.trace("--: %s", message)
+        Logging.trace("--: %r", message)
         st = message + ("\n" if newlineIsAppended else "")
         sys.stderr.write(st)
         sys.stderr.flush()

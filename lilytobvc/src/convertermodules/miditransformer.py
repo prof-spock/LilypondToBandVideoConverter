@@ -1348,7 +1348,7 @@ class MidiTransformer:
         elif cls._programChangeRegExp.search(currentLine):
             midiTime = int(currentLine.split(" ", 1)[0])
 
-            if parseState in [_ParseState.inOtherTrack, _ParseState.inLimbo]:
+            if parseState == _ParseState.inOtherTrack:
                 # leave line as is
                 lineBuffer.writeLine(currentLine)
             elif parseState != _ParseState.inInstrumentTrack:

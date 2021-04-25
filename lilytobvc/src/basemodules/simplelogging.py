@@ -9,8 +9,10 @@ import io
 import sys
 import time
 
-from .python2and3support import isPython2
-from .ttbase import iif
+from .ttbase import adaptToRange, iif
+
+# support for python version 2
+toUnicodeString = unicode if sys.version_info[0] == 2 else str
 
 #====================
 
@@ -22,15 +24,18 @@ class Logging:
     Level_standard = 2
     Level_verbose  = 3
     
-    _referenceLevel    = Level_none
-    _fileName          = ""
-    _fileIsOpen        = None
-    _fileIsKeptOpen    = None
-    _file              = None
-    _isEnabled         = True
-    _timeIsLogged      = True
-    _previousTimestamp = 0
-    _timeOfDayString   = ""
+    _referenceLevel             = Level_none
+    _fileName                   = ""
+    _fileIsOpen                 = None
+    _fileIsKeptOpen             = None
+    _file                       = None
+    _isEnabled                  = True
+    _timeIsLogged               = True
+    _timeFactor                 = 1
+    _timeFractionalPartTemplate = ""
+    _timeFractionalDigitCount   = 0
+    _previousTimestamp          = 0
+    _timeOfDayString            = ""
 
     _buffer = []
     # buffers log data before log file is opened, otherwise a
@@ -95,7 +100,14 @@ class Logging:
         
         if currentTimestamp != cls._previousTimestamp:
             cls._previousTimestamp = currentTimestamp
-            cls._timeOfDayString   = time.strftime("%H%M%S")
+            st = time.strftime("%H%M%S")
+
+            if cls._timeFractionalDigitCount > 0:
+                fractionalPart = currentTimestamp - int(currentTimestamp)
+                fractionalPart *= cls._timeFactor
+                st += cls._timeFractionalPartTemplate % fractionalPart
+                
+            cls._timeOfDayString = st
 
         return cls._timeOfDayString
         
@@ -148,9 +160,7 @@ class Logging:
     def _writeStringDirectly (cls, st):
         """Writes <st> to logging file"""
 
-        if isPython2:
-            st = unicode(st)
-            
+        st = toUnicodeString(st)
         cls._file.write(st)
 
     #--------------------
@@ -161,7 +171,12 @@ class Logging:
     def initialize (cls):
         """Starts logging"""
 
-        cls._writeLine("START LOGGING")
+        cls._referenceLevel = cls.Level_none
+        cls._fileName       = ""
+        cls._fileIsOpen     = False
+        cls._isEnabled      = True
+
+        cls._writeLine("START LOGGING -*- coding:utf-8 -*-")
         atexit.register(cls._closeFileConditionally)
     
     #--------------------
@@ -218,10 +233,18 @@ class Logging:
     #--------------------
 
     @classmethod
-    def setTracingWithTime (cls, timeIsLogged):
-        """Sets logging of time when tracing to active or inactive"""
+    def setTracingWithTime (cls, timeIsLogged, fractionalDigitCount=0):
+        """Sets logging of time when tracing to active or inactive;
+           <fractionalDigitCount> gives the number of fractional
+           digits for the time logged"""
 
-        cls._timeIsLogged = timeIsLogged
+        fractionalDigitCount = adaptToRange(fractionalDigitCount, 0, 3)
+
+        cls._timeIsLogged               = timeIsLogged
+        cls._timeFractionalDigitCount   = fractionalDigitCount
+        cls._timeFactor                 = 10 ** fractionalDigitCount
+        cls._timeFractionalPartTemplate = \
+            ".%0" + "%1d" % fractionalDigitCount + "d"
 
     #--------------------
 

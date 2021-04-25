@@ -13,14 +13,11 @@ import re
 import struct
 import wave
 
-from basemodules.configurationfile import ConfigurationFile
 from basemodules.operatingsystem import OperatingSystem
-from basemodules.python2and3support import isString
 from basemodules.simplelogging import Logging
 from basemodules.stringutil import splitAndStrip, tokenize
-from basemodules.ttbase import adaptToRange, iif, iif2, iif3, \
-                               isInRange, MyRandom
-from basemodules.utf8file import UTF8File
+from basemodules.ttbase import adaptToRange, iif, iif2, iif3
+from basemodules.typesupport import isString
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import humanReadableVoiceName
@@ -39,7 +36,7 @@ _ffmpegLogLevel = "error"
 
 class _WavFile:
     """This class provides services for WAV files like shifting, mixing of
-       several files or normalization and aggregated services like mixdown"""
+       several files or amplification and aggregated services like mixdown"""
 
     _chunkSize = 128  # number of frames to be read from wave file in one step
     maximumSampleValue = 32767
@@ -64,7 +61,7 @@ class _WavFile:
         """Mixes audio samples from <file> into <sampleList> using
            <volumeFactor>"""
 
-        Logging.trace(">>: file = %s, factor = %4.3f", file, volumeFactor)
+        Logging.trace(">>: file = %r, factor = %4.3f", file, volumeFactor)
 
         numerator, log2denominator = cls._makeFraction(volumeFactor)
         fileSampleList  = file.readAllSamples()
@@ -83,9 +80,7 @@ class _WavFile:
         """Opens wav file given by <filePath> for reading or writing
            depending on <mode>"""
 
-        Logging.trace(">>: file = %s, mode = %s", filePath, mode)
-
-        cls = self.__class__
+        Logging.trace(">>: file = %r, mode = %r", filePath, mode)
 
         file = wave.open(filePath, mode)
 
@@ -104,14 +99,14 @@ class _WavFile:
         self._buffer        = bytearray(frameCount * frameSize)
         self._bufferIsEmpty = True
 
-        Logging.trace("<<: %s", self)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self):
         """Returns string representation of <self>"""
 
-        st = (("_WavFile(path = %s, channels = %d, frameSize = %d,"
+        st = (("_WavFile(path = %r, channels = %d, frameSize = %d,"
                + " frameCount = %d, isEmpty = %s)")
               % (self._path, self._channelCount, self._frameSize,
                  self._frameCount, self._bufferIsEmpty))
@@ -123,32 +118,32 @@ class _WavFile:
     def close (self):
         """Closes <self>"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
         self._file.close()
         Logging.trace("<<")
-
-    #--------------------
-
-    def getParameters (self):
-        """Gets the parameters for wav file <self>"""
-
-        Logging.trace(">>: self = %s", self)
-
-        channelCount, sampleSize, frameRate, frameCount, _, _ = \
-            self._file.getparams()
-        result = (channelCount, sampleSize, frameRate, frameCount)
-
-        Logging.trace("<<: %s", result)
-        return result
 
     #--------------------
 
     def frameCount (self):
         """Returns frame count of audio file"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
         result = self._file.getnframes()
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    def getParameters (self):
+        """Gets the parameters for wav file <self>"""
+
+        Logging.trace(">>: %r", self)
+
+        channelCount, sampleSize, frameRate, frameCount, _, _ = \
+            self._file.getparams()
+        result = (channelCount, sampleSize, frameRate, frameCount)
+
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -165,21 +160,21 @@ class _WavFile:
 
         Logging.trace("<<: %d", result)
         return result
-        
+
     #--------------------
 
     @classmethod
     def mixdown (cls, sourceFilePathList, volumeFactorList,
-                 attenuationLevel, targetFilePath):
+                 amplificationLevel, targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> via Python modules only"""
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> via Python modules only"""
 
-        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
-                      + " level = %4.3f, targetFile = %s",
-                      sourceFilePathList, volumeFactorList, attenuationLevel,
-                      targetFilePath)
+        Logging.trace(">>: sourceFiles = %r, volumeFactors = %r,"
+                      + " level = %4.3f, targetFile = %r",
+                      sourceFilePathList, volumeFactorList,
+                      amplificationLevel, targetFilePath)
 
         OperatingSystem.showMessageOnConsole("  MIX", False)
         sourceFileList = [cls(name, "r") for name in sourceFilePathList]
@@ -197,9 +192,9 @@ class _WavFile:
 
         maximumVolume = cls.maximumVolume(resultSampleList)
         maxValue = cls.maximumSampleValue
-        attenuationFactor = pow(2.0, attenuationLevel / 6.0)
+        amplificationFactor = pow(2.0, amplificationLevel / 6.0206)
         scalingFactor = (1.0 if maximumVolume < (maxValue // 10)
-                         else (maxValue * attenuationFactor) / maximumVolume)
+                         else (maxValue * amplificationFactor) / maximumVolume)
         Logging.trace("--: maxVolume = %d, factor = %4.3f",
                       maximumVolume, scalingFactor)
         OperatingSystem.showMessageOnConsole(" S")
@@ -219,10 +214,19 @@ class _WavFile:
 
     #--------------------
 
+    @classmethod
+    def open (cls, filePath, mode):
+        """Opens wav file on path <filePath> with read/write mode specified by
+           <mode>"""
+
+        return cls(filePath, mode)
+
+    #--------------------
+
     def readAllSamples (self):
         """Returns all samples in <wavFile> as an integer list"""
 
-        Logging.trace(">>:%s", self)
+        Logging.trace(">>:%r", self)
 
         self.readAllSamplesRaw()
         sampleCount = self._channelCount * self._frameCount
@@ -237,7 +241,7 @@ class _WavFile:
     def readAllSamplesRaw (self):
         """Returns all samples in <wavFile> as an encoded string"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         if self._bufferIsEmpty:
             self._bufferIsEmpty = False
@@ -255,7 +259,6 @@ class _WavFile:
         Logging.trace(">>: factor = %4.3f", factor)
 
         numerator, log2denominator = cls._makeFraction(factor)
-        sampleCount = len(sampleList)
 
         for sample in sampleList:
             sample = (sample * numerator) >> log2denominator
@@ -267,7 +270,7 @@ class _WavFile:
     def setParameters (self, channelCount, sampleSize, frameRate, frameCount):
         """Sets the parameters for wav file <self>"""
 
-        Logging.trace(">>: self = %s, channelCount = %d, sampleSize = %d,"
+        Logging.trace(">>: self = %r, channelCount = %d, sampleSize = %d,"
                       + " frameRate = %d, frameCount = %d",
                       self, channelCount, sampleSize, frameRate, frameCount)
 
@@ -287,7 +290,7 @@ class _WavFile:
            <shiftedFilePath> with silence prefix of length
            <shiftOffset> using internal python modules only"""
 
-        Logging.trace(">>: infile = '%s', outfile = '%s',"
+        Logging.trace(">>: infile = %r, outfile = %r,"
                       + " shiftOffset = %7.3f",
                       audioFilePath, shiftedFilePath, shiftOffset)
 
@@ -302,7 +305,7 @@ class _WavFile:
 
         # insert padding with silence
         rawSampleList = (silenceFrameCount * channelCount) * [ 0 ]
-        targetFile.writeSamplesRaw(targetFile, rawFrameList)
+        targetFile.writeSamplesRaw(rawSampleList)
 
         # copy samples over
         rawSampleList = sourceFile.readAllSamplesRaw()
@@ -319,7 +322,7 @@ class _WavFile:
     def writeSamples (self, sampleList):
         """Writes all frames in a integer <sampleList> to <self>"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         cls = self.__class__
         maxValue = cls.maximumSampleValue
@@ -336,7 +339,7 @@ class _WavFile:
     def writeSamplesRaw (self, rawSampleList):
         """Writes all frames in a raw <sampleList> to <self>"""
 
-        Logging.trace(">>: %s", self)
+        Logging.trace(">>: %r", self)
 
         packFormat = "<%uh" % len(rawSampleList)
         sampleString = struct.pack(packFormat, *rawSampleList)
@@ -352,11 +355,11 @@ class AudioTrackManager:
 
     _aacCommandLine                = None
     _audioProcessorIsSox           = None
-    _audioProcessorMap             = None
+    _audioProcessorMap             = {}
     _intermediateFilesAreKept      = None
     _ffmpegCommand                 = None
     _midiToWavRenderingCommandList = None
-    _soundStyleNameToEffectsMap    = None
+    _soundStyleNameToEffectsMap    = {}
 
     #--------------------
     # LOCAL FEATURES
@@ -366,8 +369,8 @@ class AudioTrackManager:
         """Compresses audio file with <songTitle> in path with
           <audioFilePath> to AAC file at <targetFilePath>"""
 
-        Logging.trace(">>: audioFile = '%s', title = '%s',"
-                      + " targetFile = '%s'",
+        Logging.trace(">>: audioFile = %r, title = %r,"
+                      + " targetFile = %r",
                       audioFilePath, songTitle, targetFilePath)
 
         cls = self.__class__
@@ -394,7 +397,7 @@ class AudioTrackManager:
         """Converts voice data in midi file with <voiceMidiFilePath>
            to raw audio file with <targetFilePath>"""
 
-        Logging.trace(">>: midiFile = '%s', targetFile = '%s'",
+        Logging.trace(">>: midiFile = %r, targetFile = %r",
                       voiceMidiFilePath, targetFilePath)
 
         cls = self.__class__
@@ -426,9 +429,9 @@ class AudioTrackManager:
            tells whether this is a single, the first, last or other
            part; <debugFileCount> gives the index of the next
            available tee file"""
-                
-        Logging.trace(">>: voice = %s, chainPosition = %s, partPosition = %s,"
-                      + " debugFileCount = %d, effects = %s",
+
+        Logging.trace(">>: voice = %s, chainPosition = %r, partPosition = %r,"
+                      + " debugFileCount = %d, effects = %r",
                       voiceName, chainPosition, partPosition, debugFileCount,
                       effectTokenList)
 
@@ -442,7 +445,7 @@ class AudioTrackManager:
                                     % (self._audioDirectoryPath,
                                        voiceName, st)))
         teeFilePath = (lambda i: tempFilePath(hex(i).upper()[2:]))
-        chainFilePath = (lambda identifier: tempFilePath(identifier))
+        chainFilePath = tempFilePath
 
         # collect sources and targets and delete them from token list
         redirector = re.escape(cls._audioProcessorMap["redirector"])
@@ -476,9 +479,9 @@ class AudioTrackManager:
                              chainFilePath(source))
                 sourceList.append(source)
 
-        Logging.trace("--: sourceList = %s, target = %s",
+        Logging.trace("--: sourceList = %r, target = %r",
                       sourceList, target)
-            
+
         if chainPosition in ["SINGLE", "LAST"]:
             if len(targetList) > 0:
                 Logging.trace("--: bad target in last chain")
@@ -494,34 +497,34 @@ class AudioTrackManager:
         if partPosition in ["FIRST", "OTHER"]:
             debugFileCount += 1
             target = teeFilePath(debugFileCount)
-            
-        Logging.trace("<<: effects = %s, sources = %s, target = %s,"
+
+        Logging.trace("<<: effects = %r, sources = %r, target = %r,"
                       " debugFileCount = %d",
                       effectTokenList, sourceList, target, debugFileCount)
         return (sourceList, target, debugFileCount)
-            
+
     #--------------------
 
     @classmethod
     def _extractMatchingElementsFromList (cls, elementList, elementRegExp):
-        """Scans <elementList> for elements matching <elementsRegExp>, 
+        """Scans <elementList> for elements matching <elementsRegExp>,
            removes them from <elementList> and returns them as ordered
            list"""
 
-        Logging.trace(">>: elementList = %s, regExp = %s",
+        Logging.trace(">>: elementList = %r, regExp = %s",
                       elementList, elementRegExp.pattern)
 
         result = []
-        
+
         for i in reversed(range(len(elementList))):
             element = elementList[i]
 
             if elementRegExp.match(element):
-                normalizedElement = elementRegExp.match(element).group(1)
-                result = [ normalizedElement ] + result
+                amplifiedElement = elementRegExp.match(element).group(1)
+                result = [ amplifiedElement ] + result
                 del elementList[i]
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -533,7 +536,7 @@ class AudioTrackManager:
            to voice with <voiceName> and writes them to
            <voiceMidiFilePath>"""
 
-        Logging.trace(">>: voice = %s, midiFile = '%s', targetFile = '%s'",
+        Logging.trace(">>: voice = %s, midiFile = %r, targetFile = %r",
                       voiceName, midiFilePath, voiceMidiFilePath)
 
         cls = self.__class__
@@ -548,25 +551,25 @@ class AudioTrackManager:
     #--------------------
 
     def _mixdownToWavFile (self, sourceFilePathList, volumeFactorList,
-                           masteringEffectList, attenuationLevel,
+                           masteringEffectList, amplificationLevel,
                            targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> either externally or with slow internal
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> either externally or with slow internal
            algorithm; <masteringEffectList> gives the refinement
            effects for this track (if any) to be applied after
            mixdown"""
 
-        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
-                      + " masteringEffects = '%s', attenuation = %4.3f,"
-                      + " targetFile = %s",
+        Logging.trace(">>: sourceFiles = %r, volumeFactors = %r,"
+                      + " masteringEffects = %r, amplification = %4.3f,"
+                      + " targetFile = %r",
                       sourceFilePathList, volumeFactorList,
-                      masteringEffectList, attenuationLevel,
+                      masteringEffectList, amplificationLevel,
                       targetFilePath)
 
         cls = self.__class__
-        
+
         # convert volume factors from decibels to float values
         rawVolumeFactorList = [10 ** (volumeFactorInDecibels / 20)
                                for volumeFactorInDecibels in volumeFactorList]
@@ -575,17 +578,17 @@ class AudioTrackManager:
             self._mixdownToWavFileExternally(sourceFilePathList,
                                              rawVolumeFactorList,
                                              masteringEffectList,
-                                             attenuationLevel,
+                                             amplificationLevel,
                                              targetFilePath)
         else:
             if masteringEffectList > "":
                 Logging.trace("--: WARNING - no mastering available"
                               + " when using internal mixdown,"
-                              + " effects '%s' discarded",
+                              + " effects %r discarded",
                               masteringEffectList)
 
             _WavFile.mixdown(sourceFilePathList, rawVolumeFactorList,
-                             attenuationLevel, targetFilePath)
+                             amplificationLevel, targetFilePath)
 
         Logging.trace("<<")
 
@@ -593,19 +596,19 @@ class AudioTrackManager:
 
     def _mixdownToWavFileExternally (self, sourceFilePathList,
                                      volumeFactorList, masteringEffectList,
-                                     attenuationLevel, targetFilePath):
+                                     amplificationLevel, targetFilePath):
         """Mixes WAV audio files given in <sourceFilePathList> to target WAV
            file with <targetFilePath> with volumes given by
-           <volumeFactorList> with loudness attenuation given by
-           <attenuationLevel> using external command;
+           <volumeFactorList> with loudness amplification given by
+           <amplificationLevel> using external command;
            <masteringEffectList> gives the refinement effects for this
            track (if any) to be applied after mixdown"""
 
-        Logging.trace(">>: sourceFiles = %s, volumeFactors = %s,"
-                      + " masteringEffects = '%s', level = %4.3f,"
-                      + " targetFile = %s",
+        Logging.trace(">>: sourceFiles = %r, volumeFactors = %r,"
+                      + " masteringEffects = %r, level = %4.3f,"
+                      + " targetFile = %r",
                       sourceFilePathList, volumeFactorList,
-                      masteringEffectList, attenuationLevel,
+                      masteringEffectList, amplificationLevel,
                       targetFilePath)
 
         cls = self.__class__
@@ -615,13 +618,13 @@ class AudioTrackManager:
         replaceVariables = cls._replaceVariablesByValues
 
         # check whether mastering is done after mixdown
-        masteringPassIsRequired = (attenuationLevel != 0
+        masteringPassIsRequired = (amplificationLevel != 0
                                    or masteringEffectList > "")
         intermediateFilePath = self._audioDirectoryPath + "/result-mix.wav"
         intermediateFilePath = iif(masteringPassIsRequired,
                                    intermediateFilePath, targetFilePath)
 
-        Logging.trace("--: masteringPass = %s, intermediateFile = '%s'",
+        Logging.trace("--: masteringPass = %r, intermediateFile = %r",
                       masteringPassIsRequired, intermediateFilePath)
 
         # do the mixdown of the audio sources
@@ -630,7 +633,7 @@ class AudioTrackManager:
         match = commandRegexp.search(mixingCommandLine)
 
         if match is None:
-            Logging.trace("--: bad command line format for mix - '%s'",
+            Logging.trace("--: bad command line format for mix - %r",
                           mixingCommandLine)
         else:
             commandPrefix        = tokenize(match.group(1))
@@ -648,7 +651,7 @@ class AudioTrackManager:
                 part = replaceVariables(commandRepeatingPart, variableMap)
                 command.extend(part)
 
-            Logging.trace("--: repeating part = '%s'", command)
+            Logging.trace("--: repeating part = %r", command)
 
             commandList = commandPrefix + command + commandSuffix
             variableMap = { "outfile" : intermediateFilePath }
@@ -657,11 +660,11 @@ class AudioTrackManager:
                                            stdout=OperatingSystem.nullDevice)
 
         if masteringPassIsRequired:
-            # do mastering and normalization
-            normalizationEffect = audioProcMap["normalizationEffect"]
-            normalizationEffectTokenList = tokenize(normalizationEffect)
-            variableMap  = { "attenuationLevel" : attenuationLevel }
-            nmEffectPartList = replaceVariables(normalizationEffectTokenList,
+            # do mastering and amplification
+            amplificationEffect = audioProcMap["amplificationEffect"]
+            amplificationEffectTokenList = tokenize(amplificationEffect)
+            variableMap  = { "amplificationLevel" : amplificationLevel }
+            nmEffectPartList = replaceVariables(amplificationEffectTokenList,
                                                 variableMap)
             effectList = (tokenize(masteringEffectList)
                           + nmEffectPartList)
@@ -673,6 +676,8 @@ class AudioTrackManager:
                             "effects" : effectList }
             command = replaceVariables(refinementCommandList, variableMap)
             OperatingSystem.executeCommand(command, True)
+            OperatingSystem.removeFile(intermediateFilePath,
+                                       cls._intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -681,25 +686,24 @@ class AudioTrackManager:
     def _mixdownVoicesToWavFile (self, voiceNameList,
                                  voiceNameToAudioLevelMap,
                                  parallelTrackFilePath,
-                                 masteringEffectList, attenuationLevel,
+                                 masteringEffectList, amplificationLevel,
                                  targetFilePath):
         """Constructs and executes a command for audio mixdown to target file
            with <targetFilePath> from given <voiceNameList>, the
            mapping to volumes <voiceNameToAudioLevelMap> with loudness
-           attenuation given by <attenuationLevel>;
+           amplification given by <amplificationLevel>;
            <masteringEffectList> gives the refinement effects for
            this track (if any) to be applied after mixdown; if
            <parallelTrackPath> is not empty, the parallel track is
            added"""
 
-        Logging.trace(">>: voiceNames = %s, audioLevels = %s"
-                      + " parallelTrack = '%s', masteringEffects = '%s'"
-                      + " attenuation = %5.3f, target = '%s'",
+        Logging.trace(">>: voiceNames = %r, audioLevels = %r"
+                      + " parallelTrack = %r, masteringEffects = %r"
+                      + " amplification = %5.3f, target = %r",
                       voiceNameList, voiceNameToAudioLevelMap,
                       parallelTrackFilePath, masteringEffectList,
-                      attenuationLevel, targetFilePath)
+                      amplificationLevel, targetFilePath)
 
-        cls = self.__class__
         sourceFilePathList = []
         volumeFactorList   = []
 
@@ -716,7 +720,7 @@ class AudioTrackManager:
             volumeFactorList.append(volumeFactor)
 
         self._mixdownToWavFile(sourceFilePathList, volumeFactorList,
-                               masteringEffectList, attenuationLevel,
+                               masteringEffectList, amplificationLevel,
                                targetFilePath)
         Logging.trace("<<")
 
@@ -726,7 +730,7 @@ class AudioTrackManager:
     def _powerset (cls, currentList):
         """Calculates the power set of elements in <currentList>"""
 
-        Logging.trace(">>: %s", currentList)
+        Logging.trace(">>: %r", currentList)
 
         elementCount = len(currentList)
         powersetCardinality = 2 ** elementCount
@@ -744,7 +748,7 @@ class AudioTrackManager:
 
             result.append(currentSet)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -754,10 +758,9 @@ class AudioTrackManager:
         """Replaces all occurrences of variables in <stringList> by values
            given by <variableMap>"""
 
-        Logging.trace(">>: list = %s, map = %s", stringList, variableMap)
+        Logging.trace(">>: list = %r, map = %r", stringList, variableMap)
 
         result = []
-        variableList = variableMap.keys()
         variableRegexp = re.compile(r"\$\{([a-zA-Z]+)\}")
 
         for st in stringList:
@@ -775,7 +778,7 @@ class AudioTrackManager:
                 else:
                     result.extend(replacement)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -786,11 +789,11 @@ class AudioTrackManager:
            <shiftedFilePath> with silence prefix of length
            <shiftOffset>"""
 
-        Logging.trace(">>: infile = '%s', outfile = '%s',"
+        Logging.trace(">>: infile = %r, outfile = %r,"
                       + " shiftOffset = %7.3f",
                       audioFilePath, shiftedFilePath, shiftOffset)
 
-        OperatingSystem.showMessageOnConsole("== shifting %s by %7.3fs"
+        OperatingSystem.showMessageOnConsole("== shifting %r by %7.3fs"
                                              % (shiftedFilePath, shiftOffset))
 
         if "paddingCommandLine" not in cls._audioProcessorMap:
@@ -800,7 +803,7 @@ class AudioTrackManager:
             cls._shiftAudioFileExternally(commandLine,
                                           audioFilePath, shiftedFilePath,
                                           shiftOffset)
-            
+
         Logging.trace("<<")
 
     #--------------------
@@ -812,8 +815,8 @@ class AudioTrackManager:
            <shiftedFilePath> with silence prefix of length
            <shiftOffset> using external command with <commandLine>"""
 
-        Logging.trace(">>: commandLine = '%s',"
-                      + " infile = '%s', outfile = '%s',"
+        Logging.trace(">>: commandLine = %r,"
+                      + " infile = %r, outfile = %r,"
                       + " shiftOffset = %7.3f",
                       commandLine, audioFilePath,
                       shiftedFilePath, shiftOffset)
@@ -830,13 +833,14 @@ class AudioTrackManager:
 
     #--------------------
 
-    def _tagAudio (self, audioFilePath, configData, songTitle, albumName):
+    @classmethod
+    def _tagAudio (cls, audioFilePath, configData, songTitle, albumName):
         """Tags M4A audio file with <songTitle> at <audioFilePath>
            with tags specified by <configData>, <songTitle> and
            <albumName>"""
 
-        Logging.trace(">>: audioFile = '%s', configData = %s,"
-                      + " title = '%s', album = '%s'",
+        Logging.trace(">>: audioFile = %r, configData = %r,"
+                      + " title = %r, album = %r",
                       audioFilePath, configData, songTitle, albumName)
 
         artistName = configData.artistName
@@ -867,10 +871,10 @@ class AudioTrackManager:
         """Sets some global processing data like e.g. the command
            paths."""
 
-        Logging.trace(">>: aac = '%s', audioProcessor = '%s',"
-                      + " ffmpeg = '%s', midiToWavCommand = '%s',"
-                      + " soundStyleNameToEffectsMap = %s,"
-                      + " debugging = %s",
+        Logging.trace(">>: aac = %r, audioProcessor = %r,"
+                      + " ffmpeg = %r, midiToWavCommand = %r,"
+                      + " soundStyleNameToEffectsMap = %r,"
+                      + " debugging = %r",
                       aacCommandLine, audioProcessorMap,
                       ffmpegCommand, midiToWavCommandLine,
                       soundStyleNameToEffectsMap,
@@ -888,7 +892,7 @@ class AudioTrackManager:
         command = commandList[0].lower()
         cls._audioProcessorIsSox = (command.endswith("sox")
                                     or command.endswith("sox.exe"))
-        
+
         Logging.trace("<<")
 
     #--------------------
@@ -897,7 +901,7 @@ class AudioTrackManager:
         """Initializes generator with target directory of all audio
            files to be stored in <audioDirectoryPath>"""
 
-        Logging.trace(">>: audioDirectoryPath = '%s'", audioDirectoryPath)
+        Logging.trace(">>: audioDirectoryPath = %r", audioDirectoryPath)
 
         self._audioDirectoryPath = audioDirectoryPath
 
@@ -921,7 +925,7 @@ class AudioTrackManager:
         groupToVoiceSetMap = configData.audioGroupNameToVoiceNameSetMap
         audioTrackList     = configData.audioTrackList
 
-        Logging.trace("--: groupToVoiceSetMap = %s, trackList = %s",
+        Logging.trace("--: groupToVoiceSetMap = %r, trackList = %r",
                       groupToVoiceSetMap, audioTrackList)
 
         # traverse all audio track objects
@@ -951,12 +955,12 @@ class AudioTrackManager:
                         audioTrack.languageCode,
                         audioTrack.voiceNameToAudioLevelMap,
                         audioTrack.masteringEffectList,
-                        audioTrack.attenuationLevel)
-            Logging.trace("--: appending %s for track name %s",
+                        audioTrack.amplificationLevel)
+            Logging.trace("--: appending %r for track name %r",
                           newEntry, audioTrack.name)
             result.append(newEntry)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -965,11 +969,11 @@ class AudioTrackManager:
         """Sets refined file from <filePath> for voice with
            <voiceName> and applies <shiftOffset>"""
 
-        Logging.trace(">>: file = '%s', voice = %s, offset = %7.3f",
+        Logging.trace(">>: file = %r, voice = %r, offset = %7.3f",
                       filePath, voiceName, shiftOffset)
 
         cls = self.__class__
-        message = "== overriding %s from file" % voiceName
+        message = "== overriding %r from file" % voiceName
         OperatingSystem.showMessageOnConsole(message)
 
         targetFilePath = (_processedAudioFileTemplate
@@ -989,7 +993,7 @@ class AudioTrackManager:
            <shiftOffset> is greater that zero, the target file is
            shifted by that amount"""
 
-        Logging.trace(">>: voice = %s, midiFile = '%s', shiftOffset = %7.3f",
+        Logging.trace(">>: voice = %s, midiFile = %r, shiftOffset = %7.3f",
                       voiceName, midiFilePath, shiftOffset)
 
         cls = self.__class__
@@ -1054,34 +1058,37 @@ class AudioTrackManager:
                 cls._soundStyleNameToEffectsMap[soundStyleName]
         else:
             audioProcessingEffects = ""
-            message = ("--: unknown variant %s replaced by copy default"
+            message = ("unknown variant %s replaced by copy default"
                        % soundVariant)
-            Logging.trace(message)
+            Logging.trace("--: " + message)
             OperatingSystem.showMessageOnConsole(message)
+            isCopyVariant = True
 
-        # add reverb if applicable
-        reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
-        reverbEffect = iif2(reverbLevel == 0, "",
-                            not cls._audioProcessorIsSox, "",
-                            " reverb %d" % reverbLevel)
+        if not isCopyVariant:
+            # add reverb if applicable
+            reverbLevel = adaptToRange(int(reverbLevel * 100.0), 0, 100)
+            reverbEffect = iif2(reverbLevel == 0, "",
+                                not cls._audioProcessorIsSox, "",
+                                " reverb %d" % reverbLevel)
 
-        if reverbLevel > 0 and not cls._audioProcessorIsSox:
-            message = "reverberation skipped, please use explicit reverb"
-            OperatingSystem.showMessageOnConsole(message)
-        
-        audioProcessingEffects += reverbEffect
+            if reverbLevel > 0 and not cls._audioProcessorIsSox:
+                message = "reverberation skipped, please use explicit reverb"
+                OperatingSystem.showMessageOnConsole(message)
+
+            audioProcessingEffects += reverbEffect
+
         self._processAudioRefinement(voiceName, audioProcessingEffects)
 
         Logging.trace("<<")
-        
+
     #--------------------
 
     def _processAudioRefinement (self, voiceName, audioProcessingEffects):
         """Handles audio processing given by <audioProcessingEffects>"""
 
-        Logging.trace(">>: voice = %s, effects = %s",
+        Logging.trace(">>: voice = %s, effects = %r",
                       voiceName, audioProcessingEffects)
-        
+
         cls = self.__class__
 
         debugFileCount = 0
@@ -1091,7 +1098,7 @@ class AudioTrackManager:
         commandList = tokenize(cls._audioProcessorMap["refinementCommandLine"])
 
         for chainIndex, chainProcessingEffects in enumerate(chainCommandList):
-            Logging.trace("--: chain[%d] = %s",
+            Logging.trace("--: chain[%d] = %r",
                           chainIndex, chainProcessingEffects)
             chainPosition = iif3(chainCommandCount == 1, "SINGLE",
                                  chainIndex == 0, "FIRST",
@@ -1115,7 +1122,8 @@ class AudioTrackManager:
                                                      debugFileCount,
                                                      partCommandTokenList)
 
-                if partCommandTokenList[0] != "mix":
+                if (len(partCommandTokenList) == 0
+                    or partCommandTokenList[0] != "mix"):
                     currentSource = sourceList[0]
                     variableMap = { "infile"   : currentSource,
                                     "outfile"  : currentTarget,
@@ -1147,25 +1155,26 @@ class AudioTrackManager:
         """Combines the processed audio files for all voices in
            <configData.voiceNameList> into several combination files and
            converts them to aac format; <configData> defines the voice
-           volumes, the relative normalization level, the optional
+           volumes, the relative amplification level, the optional
            voices as well as the tags and suffices for the final
            files"""
 
-        Logging.trace(">>: configData = %s", configData)
+        Logging.trace(">>: configData = %r", configData)
 
         cls = self.__class__
 
-        waveIntermediateFilePath = self._audioDirectoryPath + "/result.wav"
         voiceProcessingList = \
             cls.constructSettingsForAudioTracks(configData)
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, \
-              targetFilePath, _, _, voiceNameToAudioLevelMap, \
-              masteringEffectList, attenuationLevel = v
+              targetFilePath, _, languageCode, voiceNameToAudioLevelMap, \
+              masteringEffectList, amplificationLevel = v
+            waveIntermediateFilePath = ("%s/result_%s.wav"
+                                        % (self._audioDirectoryPath, languageCode))
             OperatingSystem.showMessageOnConsole("== make mix file: %s"
                                                  % songTitle)
-            
+
             if configData.parallelTrackFilePath != "":
                 parallelTrackVolume = configData.parallelTrackVolume
                 voiceNameToAudioLevelMap["parallel"] = parallelTrackVolume
@@ -1174,13 +1183,13 @@ class AudioTrackManager:
                                          voiceNameToAudioLevelMap,
                                          configData.parallelTrackFilePath,
                                          masteringEffectList,
-                                         attenuationLevel,
+                                         amplificationLevel,
                                          waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,
                                 targetFilePath)
-            self._tagAudio(targetFilePath, configData, songTitle, albumName)
+            cls._tagAudio(targetFilePath, configData, songTitle, albumName)
 
-            OperatingSystem.removeFile(waveIntermediateFilePath,
-                                       cls._intermediateFilesAreKept)
+            #OperatingSystem.removeFile(waveIntermediateFilePath,
+            #                           cls._intermediateFilesAreKept)
 
         Logging.trace("<<")

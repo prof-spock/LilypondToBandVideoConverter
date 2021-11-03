@@ -11,6 +11,8 @@ import re
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Natural, ObjectList, Real, String, \
+                                    StringList
 from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
@@ -28,7 +30,8 @@ class _SubtitleShifter:
     #--------------------
 
     @classmethod
-    def _formatTime (cls, timeInSeconds):
+    def _formatTime (cls,
+                     timeInSeconds : Real) -> String:
         """Returns <timeInSeconds> in SRT format with HH:MM:SS,000."""
 
         Logging.trace(">>: %7.3f", timeInSeconds)
@@ -47,7 +50,8 @@ class _SubtitleShifter:
     #--------------------
 
     @classmethod
-    def _scanTime (cls, timeString):
+    def _scanTime (cls,
+                   timeString : String) -> Real:
         """Returns time in seconds in SRT format with HH:MM:SS,000
            as float seconds."""
 
@@ -68,7 +72,9 @@ class _SubtitleShifter:
     #--------------------
 
     @classmethod
-    def applyShift (cls, lineList, duration):
+    def applyShift (cls,
+                    lineList : StringList,
+                    duration : Real) -> StringList:
         """Shifts SRT subtitle data in <lineList> by <duration>"""
 
         Logging.trace(">>: lineList = %r, duration = %7.3f",
@@ -102,17 +108,20 @@ class VideoAudioCombiner:
        files generated from lilypond scores with sound audio tracks
        and measure counting subtitles."""
 
-    _ffmpegCommand = None
-    _mp4boxCommand = None
-    _defaultMp4BaselineLevel = "3.0"
+    _ffmpegCommand : String = None
+    _mp4boxCommand : String = None
+    _defaultMp4BaselineLevel : String = "3.0"
 
     #--------------------
     # LOCAL FEATURES
     #--------------------
 
     @classmethod
-    def _combineWithFfmpeg (cls, sourceVideoFilePath, audioTrackDataList,
-                            subtitleFilePath, targetVideoFilePath):
+    def _combineWithFfmpeg (cls,
+                            sourceVideoFilePath : String,
+                            audioTrackDataList : ObjectList,
+                            subtitleFilePath : String,
+                            targetVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
            <targetVideoFilePath>; if <subtitleFilePath> is not empty,
@@ -158,8 +167,11 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def _combineWithMp4box (cls, sourceVideoFilePath, audioTrackDataList,
-                            subtitleFilePath, targetVideoFilePath):
+    def _combineWithMp4box (cls,
+                            sourceVideoFilePath : String,
+                            audioTrackDataList : ObjectList,
+                            subtitleFilePath : String,
+                            targetVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
            <targetVideoFilePath>; if <subtitleFilePath> is not empty,
@@ -192,7 +204,9 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def initialize (cls, ffmpegCommand, mp4boxCommand):
+    def initialize (cls,
+                    ffmpegCommand : String,
+                    mp4boxCommand : String):
         """Sets the internal command names"""
 
         Logging.trace(">>: ffmpegCommand = %r, mp4boxCommand = %r",
@@ -207,8 +221,12 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def combine (cls, voiceNameList, trackDataList, sourceVideoFilePath,
-                 targetVideoFilePath, subtitleFilePath):
+    def combine (cls,
+                 voiceNameList : StringList,
+                 trackDataList : ObjectList,
+                 sourceVideoFilePath : String,
+                 targetVideoFilePath : String,
+                 subtitleFilePath : String):
         """Combines all final audio files (characterized by
            <trackDataList>) and the video given by
            <sourceVideoFilePath> into video in <targetVideoFilePath>;
@@ -253,10 +271,14 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def insertHardSubtitles (cls, sourceVideoFilePath, subtitleFilePath,
-                             targetVideoFilePath, shiftOffset,
-                             subtitleColor, subtitleFontSize,
-                             ffmpegPresetName):
+    def insertHardSubtitles (cls,
+                             sourceVideoFilePath : String,
+                             subtitleFilePath : String,
+                             targetVideoFilePath : String,
+                             shiftOffset : Real,
+                             subtitleColor : Natural,
+                             subtitleFontSize : Natural,
+                             ffmpegPresetName : String):
         """Inserts hard subtitles specified by an SRT file with
            <subtitleFilePath> into video given by
            <sourceVideoFilePath> resulting in video with
@@ -302,8 +324,10 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def shiftSubtitleFile (cls, subtitleFilePath, targetSubtitleFilePath,
-                           shiftOffset):
+    def shiftSubtitleFile (cls,
+                           subtitleFilePath : String,
+                           targetSubtitleFilePath : String,
+                           shiftOffset : Real):
         """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and stores
            result in file with <targetSubtitleFilePath>"""
 
@@ -328,8 +352,14 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def tagVideoFile (cls, videoFilePath, albumName, artistName,
-                      albumArtFilePath, title, mediaType, year):
+    def tagVideoFile (cls,
+                      videoFilePath : String,
+                      albumName : String,
+                      artistName : String,
+                      albumArtFilePath : String,
+                      title : String,
+                      mediaType : String,
+                      year : String):
         """Adds some quicktime/MP4 tags to video file with
            <videoFilePath>"""
 

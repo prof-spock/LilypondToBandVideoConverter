@@ -10,9 +10,14 @@
 #====================
 
 import argparse
+import re
 
+from basemodules.datatypesupport import SETATTR
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Boolean, Callable, List, Map, \
+                                    Natural, String, StringList, \
+                                    StringMap, StringSet, Tuple
 from basemodules.stringutil import convertStringToList
 from basemodules.ttbase import iif
 from basemodules.validitychecker import ValidityChecker
@@ -25,22 +30,20 @@ from .ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from .miditransformer import MidiTransformer
 from .videoaudiocombiner import VideoAudioCombiner
 
-# -- special pylint settings --
-# pylint: disable=no-member
-
 #====================
 # TYPE DEFINITIONS
 #====================
 
-countInMeasures = 2
-
 subtitleFileNameTemplate = "%s_subtitle.srt"
 silentVideoFileNameTemplate = "%s_noaudio%s.mp4"
 
+# file name used for disabling logging
+lowerCasedNullLoggingFileName = "none"
+
 #--------------------
 #--------------------
 
-def intersection (listA, listB):
+def intersection (listA : List, listB : List) -> List:
     """Returns the intersection of lists <listA> and <listB>."""
 
     result = (element for element in listA if element in listB)
@@ -48,7 +51,7 @@ def intersection (listA, listB):
 
 #--------------------
 
-def makeMap (listA, listB):
+def makeMap (listA : List, listB : List) -> Map:
     """Returns a map from the elements in <listA> to <listB> assuming
        that list lengths are equal"""
 
@@ -68,17 +71,25 @@ class _CommandLineOptions:
     #--------------------
 
     @classmethod
-    def check (cls, argumentList):
+    def checkArguments (cls,
+                        argumentList : StringList):
         """Checks whether command line options given in <argumentList>
            are okay"""
 
         Logging.trace(">>")
 
         configurationFilePath = argumentList.configurationFilePath
+        loggingFilePath = argumentList.loggingFilePath
         givenPhaseSet = set(convertStringToList(argumentList.phases, "/"))
 
         ValidityChecker.isReadableFile(configurationFilePath,
                                        "configurationFilePath")
+
+        if loggingFilePath is not None:
+            if loggingFilePath.lower() != lowerCasedNullLoggingFileName:
+                ValidityChecker.isWritableFile(loggingFilePath,
+                                               "loggingFilePath")
+
         allowedPhaseSet = set(["all", "preprocess", "postprocess",
                                "extract", "score", "midi", "silentvideo",
                                "rawaudio", "refinedaudio", "mix",
@@ -110,6 +121,7 @@ class _CommandLineOptions:
                        help="tells to keep intermediate files")
         p.add_argument("configurationFilePath",
                        help="name of configuration file for song")
+        p.add_argument("-l", "--loggingFilePath")
         p.add_argument("--phases",
                        required=True,
                        help=("slash-separated list of phase names to be"
@@ -163,7 +175,74 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def _calculateTrackToSettingsMap (cls):
+    def _adaptTempFileName (cls,
+                            processingPhase : String,
+                            voiceNameList : StringList):
+        """Constructs a temporary lilypond file name from configuration data
+           and settings <processingPhase> and <voiceNameList>"""
+
+        Logging.trace(">>: phase = %r, voices = %r",
+                      processingPhase, voiceNameList)
+
+        template = cls._configData.tempLilypondFilePath
+
+        if processingPhase == "extract":
+            # assume there is only one voice in voice list
+            voiceName = voiceNameList[0]
+            template = template.replace("${voiceName}", voiceName)
+        else:
+            # strip off the voice name placeholder and any separator
+            # characters
+            regexp = re.compile(r"[\(\[_\- ]*\$\{voiceName\}[\)\]_\- ]*")
+            template = regexp.sub("", template)
+
+        result = template.replace("${phase}", processingPhase)
+        Logging.trace("<<: %r", result)
+        return result
+        
+    #--------------------
+
+    @classmethod
+    def _calculateMidiMapsFromConfiguration (cls) -> Tuple:
+        """Collects data from configuration file and returns mappings from
+           voice name to midi instrument, midi volume and midi pan
+           position"""
+
+        Logging.trace(">>")
+
+        voiceNameToVoiceDataMap = cls._configData.voiceNameToVoiceDataMap
+
+        voiceNameToMidiInstrumentMap = {}
+        voiceNameToMidiVolumeMap     = {}
+        voiceNameToMidiPanMap        = {}
+
+        for _, voiceName in enumerate(cls._configData.voiceNameList):
+            voiceDescriptor = voiceNameToVoiceDataMap[voiceName]
+            Logging.trace("--: %r", voiceDescriptor)
+
+            midiInstrument = voiceDescriptor.midiInstrument
+            midiVolume     = voiceDescriptor.midiVolume
+            panPosition    = voiceDescriptor.panPosition
+
+            midiInstrumentBank, midiInstrument = \
+                cls._stringToMidiInstrument(midiInstrument)
+            panPosition = cls._stringToMidiPanPosition(panPosition)
+
+            voiceNameToMidiInstrumentMap[voiceName] = midiInstrument
+            voiceNameToMidiVolumeMap[voiceName]     = midiVolume
+            voiceNameToMidiPanMap[voiceName]        = panPosition
+
+        result = (voiceNameToMidiInstrumentMap,
+                  voiceNameToMidiVolumeMap,
+                  voiceNameToMidiPanMap)
+
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+        
+    @classmethod
+    def _calculateTrackToSettingsMap (cls) -> StringMap:
         """Collects data from configuration file for all the settings
            of each track and returns map from track name to midi
            channel, volume, pan position and reverb level"""
@@ -178,28 +257,14 @@ class _LilypondProcessor:
             Logging.trace("--: %r", voiceDescriptor)
 
             midiChannel    = voiceDescriptor.midiChannel
+            midiInstrument = voiceDescriptor.midiInstrument
             midiVolume     = voiceDescriptor.midiVolume
             panPosition    = voiceDescriptor.panPosition
             reverbLevel    = voiceDescriptor.reverbLevel
 
-            if panPosition == "C":
-                panPosition = 64
-            else:
-                suffix      = panPosition[-1]
-                offset      = int(float(panPosition[0:-1]) * 63)
-                Logging.trace("--: panPosition = %r, pan = %d, suffix = %r",
-                              panPosition, offset, suffix)
-                panPosition = iif(suffix == "L", 63 - offset, 65 + offset)
-
-            midiInstrument = voiceDescriptor.midiInstrument
-
-            if ':' not in midiInstrument:
-                midiInstrumentBank, midiInstrument = 0, int(midiInstrument)
-            else:
-                midiInstrumentBank, midiInstrument = midiInstrument.split(":")
-                midiInstrumentBank = int(midiInstrumentBank)
-                midiInstrument     = int(midiInstrument)
-
+            panPosition = cls._stringToMidiPanPosition(panPosition)
+            midiInstrumentBank, midiInstrument = \
+                cls._stringToMidiInstrument(midiInstrument)
             reverbLevel = int(127 * reverbLevel)
 
             trackSettingsEntry = \
@@ -215,7 +280,8 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def _findOverriddenVoiceSets (cls, voiceNameSet):
+    def _findOverriddenVoiceSets (cls,
+                                  voiceNameSet : StringSet) -> StringSet:
         """Calculates set of overridden voices and remaining set
            of selected voices"""
 
@@ -236,16 +302,19 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def _makePdf (cls, processingPhase, targetFileNamePrefix,
-                  voiceNameList):
+    def _makePdf (cls,
+                  processingPhase : String,
+                  targetFileNamePrefix : String,
+                  voiceNameList : StringList):
         """Processes lilypond file and generates extract or score PDF
            file."""
 
         Logging.trace(">>: targetFilePrefix = %r, voiceNameList=%r",
                       targetFileNamePrefix, voiceNameList)
 
+        tempLilypondFilePath = cls._adaptTempFileName(processingPhase,
+                                                      voiceNameList)
         configData = cls._configData
-        tempLilypondFilePath = configData.tempLilypondFilePath
         lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(configData.includeFilePath,
                               configData.lilypondVersion,
@@ -269,7 +338,9 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
-    def _processLilypond (cls, lilypondFilePath, targetFileNamePrefix):
+    def _processLilypond (cls,
+                          lilypondFilePath : String,
+                          targetFileNamePrefix : String):
         """Processes <lilypondFilePath> and stores result in file with
            <targetFileNamePrefix>."""
 
@@ -284,6 +355,48 @@ class _LilypondProcessor:
         OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def _stringToMidiInstrument(cls,
+                                st : String) -> Tuple:
+        """Converts <st> to midi instrument bank plus instrument based on
+           separator ':' (if any)"""
+
+        Logging.trace(">>: %r", st)
+
+        if ':' not in st:
+            midiInstrumentBank, midiInstrument = 0, int(st)
+        else:
+            midiInstrumentBank, midiInstrument = st.split(":")
+            midiInstrumentBank = int(midiInstrumentBank)
+            midiInstrument     = int(midiInstrument)
+
+        result = midiInstrumentBank, midiInstrument
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    @classmethod
+    def _stringToMidiPanPosition (cls,
+                                  st : String) -> Natural:
+        """Returns pan position in range [0, 127] for given <st>"""
+
+        Logging.trace(">>: %r", st)
+        
+        if st == "C":
+            result = 64
+        else:
+            suffix      = st[-1]
+            offset      = int(float(st[0:-1]) * 63)
+            Logging.trace("--: panPosition = %r, pan = %d, suffix = %r",
+                          st, offset, suffix)
+            result = iif(suffix == "L", 63 - offset, 65 + offset)
+
+        Logging.trace("<<: %r", result)
+        return result
 
     #--------------------
     # EXPORTED FEATURES
@@ -319,8 +432,12 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         configData = cls._configData
-        tempSubtitleFilePath = "tempSubtitle.srt"
-        tempMp4FilePath = "tempVideoWithSubtitles.mp4"
+        intermediateFileDirectoryPath = \
+            configData.intermediateFileDirectoryPath
+        tempSubtitleFilePath = (intermediateFileDirectoryPath
+                                + "/tempSubtitle.srt")
+        tempMp4FilePath = (intermediateFileDirectoryPath
+                           + "/tempVideoWithSubtitles.mp4")
 
         # --- shift subtitles ---
         subtitleFilePath = "%s/%s" % (configData.targetDirectoryPath,
@@ -385,9 +502,9 @@ class _LilypondProcessor:
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         OperatingSystem.removeFile(tempSubtitleFilePath,
-	                           intermediateFilesAreKept)
+                                   intermediateFilesAreKept)
         OperatingSystem.removeFile(tempMp4FilePath,
-	                           intermediateFilesAreKept)
+                                   intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -401,8 +518,16 @@ class _LilypondProcessor:
 
         configData = cls._configData
         intermediateFilesAreKept = configData.intermediateFilesAreKept
-        tempLilypondFilePath = configData.tempLilypondFilePath
+        tempLilypondFilePath = cls._adaptTempFileName("midi", [])
         lilypondFile = LilypondFile(tempLilypondFilePath)
+
+        voiceNameToMidiInstrumentMap, \
+        voiceNameToMidiVolumeMap, \
+        voiceNameToMidiPanMap = cls._calculateMidiMapsFromConfiguration()
+
+        lilypondFile.setMidiParameters(voiceNameToMidiInstrumentMap,
+                                       voiceNameToMidiVolumeMap,
+                                       voiceNameToMidiPanMap)
         lilypondFile.generate(configData.includeFilePath,
                               configData.lilypondVersion, "midi",
                               configData.midiVoiceNameList,
@@ -430,7 +555,7 @@ class _LilypondProcessor:
         trackToSettingsMap = cls._calculateTrackToSettingsMap()
 
         midiTransformer = MidiTransformer(tempMidiFileName,
-	                                  intermediateFilesAreKept)
+                                          intermediateFilesAreKept)
         midiTransformer.addMissingTrackNames()
         midiTransformer.humanizeTracks(configData.countInMeasureCount,
                         configData.measureToHumanizationStyleNameMap)
@@ -441,9 +566,9 @@ class _LilypondProcessor:
         OperatingSystem.moveFile(targetMidiFileName,
                                  configData.targetDirectoryPath)
         OperatingSystem.removeFile(tempMidiFileName,
-	                           intermediateFilesAreKept)
+                                   intermediateFilesAreKept)
         OperatingSystem.removeFile(tempLilypondFilePath,
-	                           intermediateFilesAreKept)
+                                   intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -550,7 +675,7 @@ class _LilypondProcessor:
                                   + cls._pathSeparator
                                   + (subtitleFileNameTemplate
                                      % configData.fileNamePrefix))
-        tempLilypondFilePath = configData.tempLilypondFilePath
+        tempLilypondFilePath = cls._adaptTempFileName("silentvideo", [])
 
         for _, videoFileKind in configData.videoFileKindMap.items():
             message = ("== generating silent video for %s"
@@ -597,7 +722,7 @@ class _LilypondProcessor:
                                               targetMp4FileName,
                                               targetSubtitleFileName,
                                               configData.measureToTempoMap,
-                                              countInMeasures,
+                                              configData.countInMeasureCount,
                                               videoTarget.frameRate,
                                               videoTarget.scalingFactor,
                                               videoTarget.ffmpegPresetName,
@@ -612,15 +737,17 @@ class _LilypondProcessor:
                 ##                         configData.targetDirectoryPath)
 
         OperatingSystem.removeFile(tempLilypondFilePath,
-	                           intermediateFilesAreKept)
+                                   intermediateFilesAreKept)
 
         Logging.trace("<<")
 
 #--------------------
 #--------------------
 
-def conditionalExecuteHandlerProc (processingPhase, processingPhaseSet,
-                                   isPreprocessing, handlerProc):
+def conditionalExecuteHandlerProc (processingPhase : String,
+                                   processingPhaseSet : StringSet,
+                                   isPreprocessing : Boolean,
+                                   handlerProc : Callable):
     """Checks whether <processingPhase> occurs in <processingPhaseSet>, for
        being part of the group pre- or postprocessing (depending on
        <isPreprocessing>) and executes <handlerProc> when processing
@@ -647,7 +774,16 @@ def initialize ():
 
     intermediateFilesAreKept, processingPhaseSet, \
     selectedVoiceNameSet, argumentList = _CommandLineOptions.read()
-    _CommandLineOptions.check(argumentList)
+    _CommandLineOptions.checkArguments(argumentList)
+
+    # set logging file path from command line (if available)
+    loggingFilePath = argumentList.loggingFilePath
+
+    if loggingFilePath is not None:
+        if loggingFilePath.lower() != lowerCasedNullLoggingFileName:
+            Logging.setFileName(loggingFilePath, False)
+        else:
+            Logging.setEnabled(False)
 
     configData = LTBVC_ConfigurationData()
     _LilypondProcessor._configData = configData
@@ -662,18 +798,21 @@ def initialize ():
         isOkay = False
     else:
         isOkay = True
-        loggingFilePath = configData.get("loggingFilePath")
 
         if loggingFilePath is None:
-            Logging.setFileName("STDERR")
-            ValidityChecker.isValid(False, "loggingFilePath not set")
+            # get path from configuration file
+            loggingFilePath = configData.get("loggingFilePath")
 
-        Logging.setFileName(loggingFilePath)
+            if loggingFilePath is None:
+                Logging.setEnabled(False)
+            else:
+                Logging.setFileName(loggingFilePath, True)
+
         configData.checkAndSetDerivedVariables(selectedVoiceNameSet)
 
         # override config file setting from command line option
         if intermediateFilesAreKept:
-            configData.intermediateFilesAreKept = True
+            SETATTR(configData, "intermediateFilesAreKept", True)
 
         # initialize all the submodules with configuration information
         _LilypondProcessor._lilypondCommand = configData.lilypondCommand
@@ -686,7 +825,8 @@ def initialize ():
                                      configData.ffmpegCommand,
                                      configData.midiToWavRenderingCommandLine,
                                      configData.soundStyleNameToTextMap,
-                                     configData.intermediateFilesAreKept)
+                                     configData.intermediateFilesAreKept,
+                                     configData.intermediateFileDirectoryPath)
         MidiTransformer.initialize(configData.voiceNameToVariationFactorMap,
                                    configData.humanizationStyleNameToTextMap,
                                    configData.humanizedVoiceNameSet)
@@ -702,7 +842,7 @@ def main ():
 
     Logging.initialize()
     Logging.setLevel(Logging.Level_verbose)
-    #Logging.setTracingWithTime(True)
+    Logging.setTracingWithTime(True, 2)
     Logging.trace(">>")
 
     isOkay, processingPhaseSet = initialize()

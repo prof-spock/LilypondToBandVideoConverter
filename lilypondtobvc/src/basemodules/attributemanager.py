@@ -8,6 +8,7 @@
 #====================
 
 from .simplelogging import Logging
+from .simpletypes import Dictionary, Object, String, StringList
 from .stringutil import adaptToKind
 from .validitychecker import ValidityChecker
 from .ttbase import iif, iif3
@@ -21,9 +22,11 @@ class AttributeManager:
     #--------------------
 
     @classmethod
-    def checkForTypesAndCompleteness (cls, objectName, objectKind,
-                                      attributeNameToValueMap,
-                                      attributeNameToKindMap):
+    def checkForTypesAndCompleteness (cls,
+                                      objectName : String,
+                                      objectKind : String,
+                                      attributeNameToValueMap : Dictionary,
+                                      attributeNameToKindMap : Dictionary):
         """Checks for object with <objectName> and kind <objectKind>
            whether elements in <attributeNameToValueMap> occur in
            <attributeNameToKindMap> and have correct types"""
@@ -40,9 +43,9 @@ class AttributeManager:
             kind  = attributeNameToKindMap[attributeName]
             value = attributeNameToValueMap[attributeName]
 
-            if kind in [ "I", "F" ]:
-                isFloat = (kind == "F")
-                ValidityChecker.isNumberString(value, valueName, isFloat)
+            if kind in [ "I", "R" ]:
+                isReal = (kind == "R")
+                ValidityChecker.isNumberString(value, valueName, isReal)
             elif kind == "B":
                 errorMessage = ("bad kind for %s: %s" % (valueName, value))
                 ValidityChecker.isValid(value.upper() in ["TRUE", "FALSE"],
@@ -58,8 +61,11 @@ class AttributeManager:
     #--------------------
 
     @classmethod
-    def convertToString (cls, currentObject, className, attributeNameList,
-                         attributeNameToKindMap=None):
+    def convertToString (cls,
+                         currentObject : Object,
+                         className : String,
+                         attributeNameList : StringList,
+                         attributeNameToKindMap : Dictionary = None):
         """Returns a string representation of <currentObject> belonging to
            class with <className> using explicit metadata given by
            <attributeNameList> and <attributeNameToKindMap>"""
@@ -84,8 +90,10 @@ class AttributeManager:
     #--------------------
 
     @classmethod
-    def setAttributesFromMap (cls, currentObject, attributeNameToValueMap,
-                              attributeNameToKindMap=None):
+    def setAttributesFromMap (cls,
+                              currentObject : Object,
+                              attributeNameToValueMap : Dictionary,
+                              attributeNameToKindMap : Dictionary = None):
         """Sets corresponding attributes in <currentObject> to associated
            values in <attributeNameToValueMap>; if
            <attributeNameToKindMap> is defined, then appropriate type

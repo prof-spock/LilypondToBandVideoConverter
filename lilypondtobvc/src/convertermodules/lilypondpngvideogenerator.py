@@ -13,6 +13,8 @@ import re
 
 import basemodules.simpleassertion
 from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Boolean, Map, Natural, Real, \
+                                    RealList, String
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File
@@ -49,7 +51,9 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def check (cls, condition, message):
+    def check (cls,
+               condition : Boolean,
+               message : String):
         """Checks for <condition> and if not satisfied, raises exception
            with <message>."""
 
@@ -58,7 +62,9 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def ensureFileExistence (cls, fileName, fileKind):
+    def ensureFileExistence (cls,
+                             fileName : String,
+                             fileKind : String):
         """Checks whether file with <fileName> exists, otherwise gives
            error message about file kind mentioning file name."""
 
@@ -73,7 +79,10 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def ensureProgramAvailability (cls, programName, programPath, option):
+    def ensureProgramAvailability (cls,
+                                   programName : String,
+                                   programPath : String,
+                                   option : String):
         """Checks whether program on <programPath> is available and otherwise
            gives error message and exits. <option> is the only
            command-line option for program."""
@@ -96,8 +105,10 @@ class DurationManager:
     #--------------------
 
     @classmethod
-    def measureToDurationMap (cls, measureToTempoMap, countInMeasures,
-                              lastMeasureNumber):
+    def measureToDurationMap (cls,
+                              measureToTempoMap : Map,
+                              countInMeasures : Natural,
+                              lastMeasureNumber : Natural):
         """Calculates mapping from measure number to duration based on
            tempo track in <measureToTempoMap> and the number of
            <countInMeasures>."""
@@ -134,7 +145,9 @@ class DurationManager:
     #--------------------
 
     @classmethod
-    def pageDurationList (cls, pageToMeasureMap, measureToDurationMap):
+    def pageDurationList (cls,
+                          pageToMeasureMap : Map,
+                          measureToDurationMap : Map) -> RealList:
         """Calculates page duration list based on mapping of pages to
            measures <pageToMeasureMap> and the mapping of measures to
            durations <measureToDurationMap>"""
@@ -168,7 +181,9 @@ class DurationManager:
     #--------------------
 
     @classmethod
-    def measureDuration (cls, tempo, measureLength):
+    def measureDuration (cls,
+                         tempo : Real,
+                         measureLength : Real) -> Real:
         """Returns the duration of some measure with <measureLength>
            quarters and <tempo> given in quarters per minute."""
 
@@ -182,7 +197,9 @@ class DurationManager:
     #--------------------
 
     @classmethod
-    def quantizeDurationList (cls, durationList, frameRate):
+    def quantizeDurationList (cls,
+                              durationList : RealList,
+                              frameRate : Real):
         """Adjusts <durationList> such that it conforms to
            <frameRate>."""
 
@@ -211,7 +228,6 @@ class PostscriptFile:
     _fileName = None
 
     # relevant constants for analyzing the postscript file
-    _barLineColourSettingText   = " 0.0030 0.0020 0.0010 setrgbcolor"
     _barNumberColourSettingText = " 0.0010 0.0020 0.0030 setrgbcolor"
     _digitRegexp                = re.compile(r".*/(zero|one|two|three|four"
                                              + r"|five|six|seven|eight|nine)")
@@ -227,7 +243,8 @@ class PostscriptFile:
     #--------------------
 
     @classmethod
-    def setName (cls, name):
+    def setName (cls,
+                 name : String):
         """Sets name of postscript file."""
 
         Logging.trace(">>: %r", name)
@@ -240,7 +257,7 @@ class PostscriptFile:
     #--------------------
 
     @classmethod
-    def pageToMeasureMap (cls):
+    def pageToMeasureMap (cls) -> Map:
         """Scans postscript file for page numbers and measure numbers
            by some naive pattern matching and returns mapping from
            page to lowest measure number in page.  Assumes that pages
@@ -271,16 +288,14 @@ class PostscriptFile:
         for line in lineList:
             lineIsPageStart = cls._pageRegexp.match(line)
 
-            if parseState == ParseState_inLimbo:
-                if lineIsPageStart:
-                    parseState = ParseState_inPage
-                else:
-                    continue
-
             if lineIsPageStart or cls._endOfFileText in line:
                 if pageNumber > 0:
                     Logging.trace("--: firstMeasure = %d, measureCount = %d",
                                   pageMeasureNumber, measureCount)
+
+            # wait for a page start when not within page
+            if parseState == ParseState_inLimbo and not lineIsPageStart:
+                continue
 
             if lineIsPageStart:
                 parseState = ParseState_inPage
@@ -296,8 +311,9 @@ class PostscriptFile:
                     currentNumber = 0
                     currentFactor = 1
             elif parseState == ParseState_beforeMeasureText:
+                # skip over lines that are not a "selectfont"
                 parseState = iif(cls._fontDefinitionText in line,
-                                 parseState + 1, ParseState_inPage)
+                                 ParseState_inMeasureText, parseState)
             elif parseState == ParseState_inMeasureText:
                 if cls._digitRegexp.search(line):
                     matchList = cls._digitRegexp.match(line)
@@ -377,9 +393,9 @@ class MP4Video:
 
         # check the numeric parameters
         ValidityChecker.isNumberString(cls._scaleFactor, "scale factor",
-                                       floatIsAllowed=False, rangeKind=">0")
+                                       realIsAllowed=False, rangeKind=">0")
         ValidityChecker.isNumberString(cls._frameRate, "frame rate",
-                                       floatIsAllowed=True, rangeKind=">0"),
+                                       realIsAllowed=True, rangeKind=">0"),
         cls._scaleFactor = int(cls._scaleFactor)
         cls._frameRate   = float(cls._frameRate)
 
@@ -388,7 +404,8 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def cleanUpConditionally (cls, filesAreKept):
+    def cleanUpConditionally (cls,
+                              filesAreKept : Boolean):
         """Deletes all intermediate files when <filesAreKept> is unset"""
 
         Logging.trace(">>: %r", filesAreKept)
@@ -401,7 +418,7 @@ class MP4Video:
             OperatingSystem.removeFile(fileName, filesAreKept)
 
         OperatingSystem.removeFile(cls._concatSpecificationFileName,
-                                 filesAreKept)
+                                   filesAreKept)
 
         if cls.fileName and cls.fileName == cls._tempFileName:
             OperatingSystem.removeFile(cls.fileName, filesAreKept)
@@ -411,7 +428,8 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def make (cls, pageDurationList):
+    def make (cls,
+              pageDurationList : RealList):
         """Generate an MP4 video from durations in <pageDurationList>
            and generated PNG images."""
 
@@ -430,7 +448,8 @@ class MP4Video:
             intermediateFileName = cls._intermediateFileNameTemplate % page
 
             # write file name to concatenation file
-            normalizedFileName = intermediateFileName.replace("\\", "/")
+            normalizedFileName = \
+                OperatingSystem.basename(intermediateFileName, True)
             st = "file '%s'\n" % normalizedFileName
             concatSpecificationFile.write(st)
 
@@ -471,7 +490,8 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def setName (cls, fileName):
+    def setName (cls,
+                 fileName : String):
         """Sets file name for MP4 generation to <fileName>; if empty, some
            temporary name will be used."""
 
@@ -495,7 +515,8 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def _formatTime (cls, timeInSeconds):
+    def _formatTime (cls,
+                     timeInSeconds : Real) -> String:
         """Returns <timeInSeconds> in SRT format with HH:MM:SS,000."""
 
         hours = int(timeInSeconds / 3600)
@@ -515,7 +536,9 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def make (cls, measureToDurationMap, countInMeasures):
+    def make (cls,
+              measureToDurationMap : Map,
+              countInMeasures : Natural):
         """Generates SRT subtitle file from <measureToDuration> and
            <countInMeasures>."""
 
@@ -550,7 +573,8 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def setName (cls, name):
+    def setName (cls,
+                 name : String):
         """Sets name of subtitle file."""
 
         Logging.trace(">>: %r", name)
@@ -565,7 +589,8 @@ class SubtitleFile:
     #--------------------
 
     @classmethod
-    def cleanUpConditionally (cls, filesAreKept):
+    def cleanUpConditionally (cls,
+                              filesAreKept : Boolean):
         """Cleans up subtitle file if <filesAreKept> is unset,
            otherwise moves it to directory given by <targetPath>"""
 
@@ -601,9 +626,9 @@ class LilypondPngVideoGenerator:
         # check the numeric parameters
         ValidityChecker.isNumberString(self._countInMeasures,
                                        "count-in measures",
-                                       floatIsAllowed=True)
+                                       realIsAllowed=True)
         ValidityChecker.isNumberString(self._frameRate, "frame rate",
-                                       floatIsAllowed=True, rangeKind=">0")
+                                       realIsAllowed=True, rangeKind=">0")
         Assertion.check(len(self._measureToTempoMap) > 0,
                         "at least one tempo must be specified")
 
@@ -645,7 +670,8 @@ class LilypondPngVideoGenerator:
 
     #--------------------
 
-    def _makePath (self, fileName):
+    def _makePath (self,
+                   fileName : String):
         """makes path from <fileName> and _intermediateFilePath"""
 
         return (self._intermediateFileDirectoryPath
@@ -675,7 +701,9 @@ class LilypondPngVideoGenerator:
     #--------------------
 
     @classmethod
-    def initialize (cls, ffmpegCommand, lilypondCommand):
+    def initialize (cls,
+                    ffmpegCommand : String,
+                    lilypondCommand : String):
         """Sets module-specific configuration variables"""
 
         Logging.trace(">>: ffmpeg = %r, lilypond = %r",
@@ -686,11 +714,17 @@ class LilypondPngVideoGenerator:
 
     #--------------------
 
-    def __init__ (self, lilypondFileName, targetMp4FileName,
-                  targetSubtitleFileName, measureToTempoMap, countInMeasures,
-                  frameRate, scalingFactor, ffmpegPresetName,
-                  intermediateFileDirectoryPath,
-                  intermediateFilesAreKept=False):
+    def __init__ (self,
+                  lilypondFileName : String,
+                  targetMp4FileName : String,
+                  targetSubtitleFileName : String,
+                  measureToTempoMap : Map,
+                  countInMeasures : Natural,
+                  frameRate : Real,
+                  scalingFactor : Real,
+                  ffmpegPresetName : String,
+                  intermediateFileDirectoryPath : String,
+                  intermediateFilesAreKept : Boolean = False):
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = %r, targetMp4FileName = %r,"
@@ -735,7 +769,7 @@ class LilypondPngVideoGenerator:
 
     #--------------------
 
-    def __repr__ (self):
+    def __repr__ (self) -> String:
         """Returns strings representation of <self>."""
 
         className = self.__class__.__name__

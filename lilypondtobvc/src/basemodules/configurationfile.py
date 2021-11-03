@@ -10,22 +10,24 @@ import io
 import re
 
 from .operatingsystem import OperatingSystem
+from .simpletypes import Dictionary, List, Natural, Object, ObjectSet, Map, \
+                         String, StringList, StringMap, StringSet, Tuple
 from .typesupport import isString
 from .simplelogging import Logging
 from .ttbase import iif, missingValue
 
 #====================
 
-def reprOfStringToValueMap (self):
-    """String representation for a string to value map <self>"""
+def _reprOfStringToValueMap (stringMap : Map) -> String:
+    """String representation for a string to value map <stringMap>"""
 
     entrySeparator = u"§"
     entryTemplate = "%s: %s"
-    keyList = sorted(list(self.keys()))
+    keyList = sorted(list(stringMap.keys()))
     result = ""
     
     for key in keyList:
-        value = self[key] 
+        value = stringMap[key] 
         result += (iif(result == "", "", entrySeparator)
                    + entryTemplate % (key, value))
     
@@ -40,12 +42,14 @@ class _Token:
     Kind_number        = "number"
     Kind_string        = "string"
     Kind_operator      = "operator"
-    Kind_floatNumber   = "float"
+    Kind_realNumber    = "real"
     Kind_integerNumber = "integer"
 
     #--------------------
 
-    def __init__ (self, start, text, kind, value):
+    def __init__ (self,
+                  start : Natural, text : String,
+                  kind : String, value : Object):
         """Initializes token with start position, token text, token kind and
            value"""
 
@@ -56,7 +60,7 @@ class _Token:
         
     #--------------------
 
-    def __repr__ (self):
+    def __repr__ (self) -> String:
         """String representation for token <self>"""
 
         st = ("_Token(%r, '%s', %s, %r)"
@@ -65,18 +69,22 @@ class _Token:
         
 #====================
 
+_TokenList = List[_Token]
+
+#====================
+
 class ConfigurationFile:
     """Provides services for reading a configuration file with key -
        value assignments.  The parsing process calculates a map from
        name to value where the values may be booleans, integers,
-       floats or strings."""
+       reals or strings."""
 
     _importCommandName = "INCLUDE"
     _trueBooleanValueNames = ["TRUE", "WAHR"]
     _validBooleanValueNames = _trueBooleanValueNames + ["FALSE", "FALSCH"]
     _commentMarker = "--"
     _continuationMarker = "\\"
-    _floatRegExp = re.compile(r"^[+\-]?[0-9]+\.[0-9]*$")
+    _realRegExp = re.compile(r"^[+\-]?[0-9]+\.[0-9]*$")
     _integerRegExp = re.compile(r"^[+\-]?[0-9]+$")
     _keyValueRegExp = re.compile(r"^(\w+)\s*=\s*(.*)$", re.UNICODE)
     _whiteSpaceCharRegExp = re.compile(r"^\s$")
@@ -91,7 +99,7 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def _adaptConfigurationValue (cls, value):
+    def _adaptConfigurationValue (cls, value : String) -> Object:
         """Takes string <value> and constructs either a boolean, a numeric
            value or a sanitized string."""
 
@@ -102,17 +110,62 @@ class ConfigurationFile:
             result = (uppercasedValue in cls._trueBooleanValueNames)
         elif cls._integerRegExp.match(value):
             result = int(value)
-        elif cls._floatRegExp.match(value):
+        elif cls._realRegExp.match(value):
             result = float(value)
         else:
-            result = cls._parseFragmentedString(value)
+            result = value
             
         Logging.trace("<<: %r", result)
         return result
         
     #--------------------
 
-    def _expandVariables (self, st):
+    @classmethod
+    def _combineFragmentedString (cls, st : String) -> String:
+        """Combines - possibly fragmented - external representation of a
+           string given by <st> into a sanitized string."""
+
+        ParseState_inLimbo   = 0
+        ParseState_inOther   = 1
+        ParseState_inString  = 2
+        ParseState_inLiteral = 3
+        ParseState_inEscape  = 4
+
+        parseState = ParseState_inLimbo
+        result = ""
+
+        for ch in st:
+            # process finite state automaton with three states based
+            # on next character in string
+            # Logging.trace("--: (%d) character: %r", parseState, ch)
+
+            if parseState == ParseState_inLimbo:
+                if ch == cls._doubleQuoteCharacter:
+                    parseState = ParseState_inString
+                elif not cls._whiteSpaceCharRegExp.search(ch):
+                    parseState = ParseState_inLiteral
+                    result += ch
+            elif parseState == ParseState_inString:
+                if ch == cls._doubleQuoteCharacter:
+                    parseState = ParseState_inLimbo
+                elif ch == cls._escapeCharacter:
+                    parseState = ParseState_inEscape
+                else:
+                    result += ch
+            elif parseState == ParseState_inLiteral:
+                result += ch
+                if cls._whiteSpaceCharRegExp.search(ch):
+                    parseState = ParseState_inLimbo
+            else:
+                assert (parseState == ParseState_inEscape)
+                result += ch
+                parseState = ParseState_inString
+
+        return result
+
+    #--------------------
+
+    def _expandVariables (self, st : String) -> String:
         """Expands all variables embedded in <st>."""
 
         Logging.trace(">>: %r", st)
@@ -175,7 +228,7 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _findIdentifierValue (self, identifier):
+    def _findIdentifierValue (self, identifier : String) -> String:
         """Returns string representation of associated identifier value
            for <identifier>; if not found in current key to value map, the
            identifier itself is returned"""
@@ -202,7 +255,7 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _lookupFileName (self, originalFileName):
+    def _lookupFileName (self, originalFileName : String) -> String:
         """Returns file name in search paths based on <originalFileName>"""
 
         Logging.trace(">>: %r", originalFileName)
@@ -228,7 +281,7 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def _mergeContinuationLines (cls, lineList):
+    def _mergeContinuationLines (cls, lineList : StringList):
         """Merges continuation lines in <lineList> into single
            cumulated line and replaces continuations by empty lines
            (to preserve line numbers)."""
@@ -264,7 +317,9 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def _mustHave (cls, token, kindSet, valueSet=None):
+    def _mustHave (cls,
+                   token : _Token, kindSet : StringSet,
+                   valueSet : ObjectSet = None):
         """Ensures that <token> is of a kind in <kindSet>; if
            <valueSet> is not None, token value is also checked"""
 
@@ -289,9 +344,9 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _parseConfiguration (self, lineList):
+    def _parseConfiguration (self, lineList : StringList):
         """Parses configuration file data given by <lineList> and updates
-           key to value map."""
+           key to value and key to string value map."""
 
         Logging.trace(">>")
 
@@ -319,61 +374,21 @@ class ConfigurationFile:
                     key = match.group(1)
                     value = match.group(2)
                     value = self._expandVariables(value)
+                    value = cls._combineFragmentedString(value)
+                    self._keyToStringValueMap[key] = value
+                    Logging.trace("--: string value %r -> %r", key, value)
                     value = cls._adaptConfigurationValue(value)
                     self._keyToValueMap[key] = value
-
-                    Logging.trace("--: %s -> %s", key, value)
+                    Logging.trace("--: adapted value %r -> %r", key, value)
 
         Logging.trace("<<: %r", self._keyToValueMap)
 
     #--------------------
 
     @classmethod
-    def _parseFragmentedString (cls, st):
-        """Parses - possibly fragmented - external representation of a
-           string given by <st> and returns sanitized string."""
-
-        ParseState_inLimbo   = 0
-        ParseState_inString  = 1
-        ParseState_inLiteral = 2
-        ParseState_inEscape  = 3
-
-        parseState = ParseState_inLimbo
-        result = ""
-
-        for ch in st:
-            # process finite state automaton with three states based
-            # on next character in string
-            # Logging.trace("--: (%d) character: %r", parseState, ch)
-
-            if parseState == ParseState_inLimbo:
-                if ch == cls._doubleQuoteCharacter:
-                    parseState = ParseState_inString
-                elif not cls._whiteSpaceCharRegExp.search(ch):
-                    parseState = ParseState_inLiteral
-                    result += ch
-            elif parseState == ParseState_inString:
-                if ch == cls._doubleQuoteCharacter:
-                    parseState = ParseState_inLimbo
-                elif ch == cls._escapeCharacter:
-                    parseState = ParseState_inEscape
-                else:
-                    result += ch
-            elif parseState == ParseState_inLiteral:
-                result += ch
-                if cls._whiteSpaceCharRegExp.search(ch):
-                    parseState = ParseState_inLimbo
-            else:
-                assert (parseState == ParseState_inEscape)
-                result += ch
-                parseState = ParseState_inString
-
-        return result
-
-    #--------------------
-
-    @classmethod
-    def _parseTableString (cls, tokenList, position):
+    def _parseTableString (cls,
+                           tokenList : _TokenList,
+                           position : Natural) -> Tuple:
         """Parses <tokenList> containing a table definition mapping
            keys to values where values may be tables itself; returns
            triple of dictionary object, error position within string
@@ -443,7 +458,10 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _readFile (self, fileName, lineList, visitedFileNameSet):
+    def _readFile (self,
+                   fileName : String,
+                   lineList : StringList,
+                   visitedFileNameSet : StringSet):
         """Appends lines of configuration file with <fileName> to <lineList>;
            also handles embedded imports of files; <visitedFileNameSet>
            tells which files have already been visited"""
@@ -513,7 +531,7 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def _tokenizeTableString (cls, st):
+    def _tokenizeTableString (cls, st : String) -> _TokenList:
         """Converts table definition string into list of tokens where
            a token is a pair of kind and value"""
 
@@ -571,13 +589,13 @@ class ConfigurationFile:
                     tokenText  += ch
                     tokenValue += ch
                 elif ch == ".":
-                    tokenKind = _Token.Kind_floatNumber
+                    tokenKind = _Token.Kind_realNumber
                     tokenText  += ch
                     tokenValue += ch
                 else:
                     i -= 1
                     tokenIsDone = True
-                    tokenValue = iif(tokenKind == _Token.Kind_floatNumber,
+                    tokenValue = iif(tokenKind == _Token.Kind_realNumber,
                                      float(tokenValue), int(tokenValue))
                     tokenKind = _Token.Kind_number
 
@@ -603,7 +621,7 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def setSearchPaths (cls, searchPathList):
+    def setSearchPaths (cls, searchPathList : StringList):
         """Sets list of search paths to <searchPathList>."""
 
         Logging.trace(">>: %r", searchPathList)
@@ -612,25 +630,47 @@ class ConfigurationFile:
 
     #--------------------
 
-    def __init__ (self, fileName):
+    def __init__ (self, fileName : String):
         """Parses configuration file given by <fileName> and sets
            internal key to value map."""
 
         Logging.trace(">>: %r", fileName)
 
         self._keyToValueMap = {}
-
+        self._keyToStringValueMap = {}
         visitedFileNameSet = set()
         lineList = []
         isOkay = self._readFile(fileName, lineList, visitedFileNameSet)
         self._parseConfiguration(lineList)
 
         Logging.trace("<<: %s",
-                      reprOfStringToValueMap(self._keyToValueMap))
+                      _reprOfStringToValueMap(self._keyToValueMap))
 
     #--------------------
 
-    def getKeySet (self):
+    def asStringMap (self) -> StringMap:
+        """Returns mapping from all keys in configuration file to their
+           effective values"""
+
+        Logging.trace(">>")
+        result = dict(self._keyToValueMap)
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    def asDictionary (self) -> Dictionary:
+        """Returns mapping from all keys in configuration file to their
+           string values as found in the file"""
+
+        Logging.trace(">>")
+        result = dict(self._keyToStringValueMap)
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    def keySet (self) -> StringSet:
         """Returns set of all keys in configuration file"""
 
         Logging.trace(">>")
@@ -640,13 +680,16 @@ class ConfigurationFile:
 
     #--------------------
 
-    def getValue (self, key, defaultValue=missingValue):
+    def value (self,
+               key : String,
+               defaultValue : Object = missingValue) -> Object:
         """Returns value for <key> in configuration file; if
            <defaultValue> is missing, an error message is logged when
            there is no associated value, otherwise <defaultValue> is
            returned for a missing entry"""
 
-        Logging.trace(">>: key = %s, defaultValue = %r", key, defaultValue)
+        Logging.trace(">>: key = %s, defaultValue = %r",
+                      key, defaultValue)
 
         isMandatory = (defaultValue == missingValue)
         result = None
@@ -664,7 +707,7 @@ class ConfigurationFile:
     #--------------------
 
     @classmethod
-    def parseTableDefinitionString (cls, st):
+    def parseTableDefinitionString (cls, st : String) -> Tuple:
         """Parses <st> as configuration string containing a table
            definition mapping keys to values where values may be
            tables itself; returns triple of dictionary object, error

@@ -10,6 +10,7 @@
 import re
 
 from .simplelogging import Logging
+from .simpletypes import Boolean, Object, Positive, String, Tuple
 from .ttbase import iif
 
 #====================
@@ -23,13 +24,14 @@ class RegExpPattern:
     identifierPattern = r"[a-zA-Z]+"
     integerPattern    = r"\d+"
     floatPattern      = r"\d+(\.\d+)?"
-
+   
     #--------------
     # LOCAL METHODS
     #--------------
 
     @classmethod
-    def _atomicGroupName (cls, groupIndex):
+    def _atomicGroupName (cls,
+                          groupIndex : Positive) -> String:
         """returns group name for atomic group with <groupIndex>"""
 
         return "ATO%dMIC" % groupIndex
@@ -37,7 +39,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _makeAtomicPattern (cls, pattern, firstGroupIndex=1):
+    def _makeAtomicPattern (cls,
+                            pattern : String,
+                            firstGroupIndex : Positive = 1) -> String:
         """constructs an atomic group pattern from <pattern> with groups
            starting at <firstGroupIndex>"""
 
@@ -49,7 +53,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _makeListPattern (cls, elementPattern, firstGroupIndex=1):
+    def _makeListPattern (cls,
+                          elementPattern : String,
+                          firstGroupIndex : Positive = 1) -> String:
         """Constructs a regexp pattern for list of elements with
            <elementPattern> with groups starting at <firstGroupIndex>;
            assumes that list starts immediately"""
@@ -63,7 +69,8 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _makeOptionalPattern (cls, pattern):
+    def _makeOptionalPattern (cls,
+                              pattern : String) -> String:
         """Constructs a regexp pattern for <pattern> making it optional"""
 
         return "(?:%s|)" % pattern
@@ -71,11 +78,18 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _makeMapPattern (cls, keyPattern, valuePattern, firstGroupIndex=1):
+    def _makeMapPattern (cls,
+                         keyPattern : String,
+                         valuePattern : String,
+                         firstGroupIndex : Positive = 1) -> String:
         """Constructs a regexp pattern for map of key-value-pairs with
            <keyPattern> for keys and <valuePattern> for values with
            atomic groups starting at <firstGroupIndex>; assumes that
            map starts immediately"""
+
+        patternA, patternB = cls._shiftGroupsForPair(keyPattern,
+                                                     valuePattern,
+                                                     firstGroupIndex + 1)
 
         elementPattern = r"%s\s*:\s*%s" % (keyPattern, valuePattern)
         listPattern = cls._makeListPattern(elementPattern)
@@ -86,7 +100,8 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _scanForGroups (cls, pattern):
+    def _scanForGroups (cls,
+                        pattern : String) -> Tuple:
         """looks for atomic groups in <pattern> and returns their
            first and last group index; assumes a consecutive
            numbering"""
@@ -106,7 +121,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _shiftGroups (cls, pattern, firstGroupIndex):
+    def _shiftGroups (cls,
+                      pattern : String,
+                      firstGroupIndex : Positive) -> String:
         """looks for atomic groups in <pattern> and shifts them from
            current first position to <firstGroupIndex>"""
 
@@ -128,7 +145,10 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def _shiftGroupsForPair (cls, patternA, patternB, firstGroupIndex):
+    def _shiftGroupsForPair (cls,
+                             patternA : String,
+                             patternB : String,
+                             firstGroupIndex : Positive) -> String:
         """looks for atomic groups in <patternA> and <patternB> and
            shifts them from their current start index to
            <firstGroupIndex> for first, and to following indices for
@@ -144,7 +164,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def makeCompactListPattern (cls, elementPattern, separator="/"):
+    def makeCompactListPattern (cls,
+                                elementPattern : String,
+                                separator : String = "/") -> String:
         """Constructs string pattern for a compact list (without
            spaces) from <elementPattern> and <separator> for elements
            within list"""
@@ -157,7 +179,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def makeListPattern (cls, elementPattern, mayBeEmpty=True):
+    def makeListPattern (cls,
+                         elementPattern : String,
+                         mayBeEmpty : Boolean = True) -> String:
         """Constructs string pattern for list from <elementPattern>
            for elements within list; assumes that first list element
            starts immediately; if <mayBeEmpty> is set, also allows
@@ -175,7 +199,10 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def makeMapPattern (cls, keyPattern, valuePattern, mayBeEmpty=True):
+    def makeMapPattern (cls,
+                        keyPattern : String,
+                        valuePattern : String,
+                        mayBeEmpty : Boolean = True) -> String:
         """Constructs string pattern for map from <keyPattern> for
            keys and <valuePattern> for values; assumes that map starts
            immediately; if <mayBeEmpty> is set, also allows
@@ -194,8 +221,9 @@ class RegExpPattern:
     #--------------------
 
     @classmethod
-    def makeRegExp (cls, pattern):
+    def makeRegExp (cls,
+                    pattern : String) -> Object:
         """Constructs regular expression from <pattern> with leading
            whitespace and trailing end-of-string"""
 
-        return re.compile(r"^\s*%s\s*$" % pattern)
+        return re.compile("^\s*%s\s*$" % pattern)

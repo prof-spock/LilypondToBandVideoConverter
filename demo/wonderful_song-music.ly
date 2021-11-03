@@ -1,7 +1,5 @@
-\version "2.18.2"
 \include "english.ly"
-
-keyAndTime = { \key e \major  \time 4/4 }
+keyAndTime = { \key e \minor  \time 4/4 }
 
 %====================
 % CHORDS
@@ -84,15 +82,15 @@ vocalsLyricsVideo = { \vocalsLyrics }
 % BASS
 %====================
 
-bsTonPhrase  = \relative c, { \repeat unfold 7 { e8  } fs8 }
+bsTonPhrase  = \relative c, { \repeat unfold 7 { e,8  } fs8 }
 
-bsSubDPhrase = \relative c, { \repeat unfold 7 { a'8 } gs8 }
+bsSubDPhrase = \relative c, { \repeat unfold 7 { a8 } gs8 }
 
-bsDomPhrase  = \relative c, { \repeat unfold 7 { b'8 } cs8 }
+bsDomPhrase  = \relative c, { \repeat unfold 7 { b8 } cs8 }
 
 bsDoubleTonPhrase = { \repeat percent 2 { \bsTonPhrase } }
 
-bsOutroPhrase = \relative c, { b8 b b b gs a b a | e1 | }
+bsOutroPhrase = \relative c, { b8 b b b a a b a | e1 | }
 
 bsIntro = { \repeat percent 2 { \bsDomPhrase } }
 
@@ -124,13 +122,9 @@ bassScore = { \bassExtract }
 %====================
 
 gtrTonPhrase  = \relative c { e,8 b' fs' b, b' fs b, fs }
-
-gtrSubDPhrase = \relative c { a8 e' b' e, e' b e, b }
-
-gtrDomPhrase  = \relative c { b8 fs' cs' fs, fs' cs fs, cs }
-
+gtrSubDPhrase = \transpose e a { \gtrTonPhrase }
+gtrDomPhrase  = \transpose e b { \gtrTonPhrase }
 gtrDoubleTonPhrase = { \repeat percent 2 { \gtrTonPhrase } }
-
 gtrOutroPhrase = \relative c { b4 fs' a, e | <e b'>1 | }
 
 gtrIntro = { \repeat percent 2 { \gtrDomPhrase } }
@@ -166,7 +160,8 @@ drmPhrase = \drummode { <bd hhc>8 hhc <sn hhc> hhc }
 
 drmOstinato = { \repeat unfold 2 { \drmPhrase } }
 
-drmFill = \drummode { \drmPhrase tomh8 tommh toml tomfl }
+drmFill = \drummode { \drmPhrase
+		      tomh16 tomh tommh tommh toml toml tomfl tomfl }
 
 drmIntro = { \drmOstinato  \drmFill }
 

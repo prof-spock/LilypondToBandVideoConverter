@@ -8,6 +8,7 @@
 #====================
 
 from .simplelogging import Logging
+from .simpletypes import Dictionary, Object, String, StringList
 from .stringutil import adaptToKind
 from .validitychecker import ValidityChecker
 from .ttbase import iif, iif3
@@ -15,16 +16,22 @@ from .ttbase import iif, iif3
 #====================
 
 class AttributeManager:
+    """provides services for checking and setting attributes from
+       name-to-value maps"""
+
+    #--------------------
 
     @classmethod
-    def checkForTypesAndCompleteness (cls, objectName, objectKind,
-                                      attributeNameToValueMap,
-                                      attributeNameToKindMap):
+    def checkForTypesAndCompleteness (cls,
+                                      objectName : String,
+                                      objectKind : String,
+                                      attributeNameToValueMap : Dictionary,
+                                      attributeNameToKindMap : Dictionary):
         """Checks for object with <objectName> and kind <objectKind>
            whether elements in <attributeNameToValueMap> occur in
            <attributeNameToKindMap> and have correct types"""
 
-        Logging.trace(">>: name = '%s', kind = '%s', attributeMap = %s"
+        Logging.trace(">>: name = %r, kind = %r, attributeMap = %s"
                       + " referenceMap = %s",
                       objectName, objectKind,
                       attributeNameToValueMap, attributeNameToKindMap)
@@ -36,9 +43,9 @@ class AttributeManager:
             kind  = attributeNameToKindMap[attributeName]
             value = attributeNameToValueMap[attributeName]
 
-            if kind in [ "I", "F" ]:
-                isFloat = (kind == "F")
-                ValidityChecker.isNumberString(value, valueName, isFloat)
+            if kind in [ "I", "R" ]:
+                isReal = (kind == "R")
+                ValidityChecker.isNumberString(value, valueName, isReal)
             elif kind == "B":
                 errorMessage = ("bad kind for %s: %s" % (valueName, value))
                 ValidityChecker.isValid(value.upper() in ["TRUE", "FALSE"],
@@ -50,29 +57,32 @@ class AttributeManager:
 
         Logging.trace("<<")
 
-        
+
     #--------------------
 
     @classmethod
-    def convertToString (cls, object, className, attributeNameList,
-                         attributeNameToKindMap=None):
-        """Returns a string representation of <object> belonging to class with
-           <className> using explicit metadata given by
+    def convertToString (cls,
+                         currentObject : Object,
+                         className : String,
+                         attributeNameList : StringList,
+                         attributeNameToKindMap : Dictionary = None):
+        """Returns a string representation of <currentObject> belonging to
+           class with <className> using explicit metadata given by
            <attributeNameList> and <attributeNameToKindMap>"""
 
         templateString = "%s("
         valueList = [ className ]
 
         for i, attributeName in enumerate(attributeNameList):
-            valueList.append(getattr(object, attributeName))
+            valueList.append(getattr(currentObject, attributeName))
             kind = attributeNameToKindMap[attributeName]
             templateString += (iif(i > 0, ", ", "")
                                + attributeName + " = "
                                + iif3(kind == "F", "%5.3f",
                                       kind == "I", "%d",
-                                      kind == "S", "'%s'",
-                                      "%s"))
- 
+                                      kind == "S", "%r",
+                                      "%r"))
+
         templateString += ")"
         st = templateString % tuple(valueList)
         return st
@@ -80,13 +90,16 @@ class AttributeManager:
     #--------------------
 
     @classmethod
-    def setAttributesFromMap (cls, object, attributeNameToValueMap,
-                              attributeNameToKindMap=None):
-        """Sets corresponding attributes in <object> to associated values in
-           <attributeNameToValueMap>; if <attributeNameToKindMap> is
-           defined, then appropriate type mappings are done."""
+    def setAttributesFromMap (cls,
+                              currentObject : Object,
+                              attributeNameToValueMap : Dictionary,
+                              attributeNameToKindMap : Dictionary = None):
+        """Sets corresponding attributes in <currentObject> to associated
+           values in <attributeNameToValueMap>; if
+           <attributeNameToKindMap> is defined, then appropriate type
+           mappings are done."""
 
-        Logging.trace(">>: nameToValueMap = %s, nameToKindMap = %s",
+        Logging.trace(">>: nameToValueMap = %r, nameToKindMap = %r",
                       attributeNameToValueMap, attributeNameToKindMap)
 
         for attributeName in attributeNameToValueMap.keys():
@@ -97,8 +110,6 @@ class AttributeManager:
                 kind = attributeNameToKindMap[attributeName]
                 value = adaptToKind(value, kind)
 
-            setattr(object, attributeName, value)
+            setattr(currentObject, attributeName, value)
 
         Logging.trace("<<")
-
-

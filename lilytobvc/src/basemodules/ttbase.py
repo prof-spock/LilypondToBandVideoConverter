@@ -5,25 +5,31 @@
 
 #====================
 
-import sys
+from .simpletypes import Boolean, IntegerList, Object, Real, String
 
 #====================
 
 missingValue = "@!XYZZY"
+infinity = 1e99
 
 #====================
 
-def iif (condition, trueValue, falseValue):
+def iif (condition : Boolean, trueValue : Object,
+         falseValue : Object) -> Object:
     """Emulates conditional expressions with full value evaluation."""
 
     if condition:
-        return trueValue
+        result = trueValue
     else:
-        return falseValue
+        result = falseValue
+
+    return result
 
 #--------------------
 
-def iif2 (condition1, trueValue1, condition2, trueValue2, falseValue2):
+def iif2 (condition1 : Boolean, trueValue1 : Object,
+          condition2 : Boolean, trueValue2 : Object,
+          falseValue2 : Object) -> Object:
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
@@ -32,8 +38,10 @@ def iif2 (condition1, trueValue1, condition2, trueValue2, falseValue2):
 
 #--------------------
 
-def iif3 (condition1, trueValue1, condition2, trueValue2,
-          condition3, trueValue3, falseValue3):
+def iif3 (condition1 : Boolean, trueValue1 : Object,
+          condition2 : Boolean, trueValue2 : Object,
+          condition3 : Boolean, trueValue3 : Object,
+          falseValue3 : Object) -> Object:
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
@@ -43,8 +51,11 @@ def iif3 (condition1, trueValue1, condition2, trueValue2,
 
 #--------------------
 
-def iif4 (condition1, trueValue1, condition2, trueValue2,
-          condition3, trueValue3, condition4, trueValue4, falseValue4):
+def iif4 (condition1 : Boolean, trueValue1 : Object,
+          condition2 : Boolean, trueValue2 : Object,
+          condition3 : Boolean, trueValue3 : Object,
+          condition4 : Boolean, trueValue4 : Object,
+          falseValue4 : Object) -> Object:
     """Emulates a sequence of conditional expressions with full
        condition and value evaluation."""
 
@@ -55,15 +66,20 @@ def iif4 (condition1, trueValue1, condition2, trueValue2,
 
 #--------------------
 
-def isInRange (x, lowBound, highBound):
+def isInRange (x : Object,
+               lowBound : Object,
+               highBound : Object):
     """Tells whether x lies in the range from <lowBound> to
        <highBound>."""
 
-    return (x >= lowBound and x <= highBound)
+    return (lowBound <= x <= highBound)
 
 #--------------------
 
-def adaptToRange (x, lowBound, highBound, isCyclic=False):
+def adaptToRange (x : Object,
+                  lowBound : Object,
+                  highBound : Object,
+                  isCyclic : Boolean = False):
     """Adapts <x> to range [<lowBound>, <highBound>] either by
        clipping at the bounds or <ifCyclic> by shifting periodically"""
 
@@ -88,10 +104,10 @@ def adaptToRange (x, lowBound, highBound, isCyclic=False):
 
 #--------------------
 
-def intListToHex (list):
-    """Returns hex representation of integer <list>"""
+def intListToHex (currentList : IntegerList) -> String:
+    """Returns hex representation of integer <currentList>"""
 
-    return "".join(map(lambda x: ("%02X" % x), list))
+    return "".join(map(lambda x: ("%02X" % x), currentList))
 
 #====================
 
@@ -105,12 +121,13 @@ class MyRandom:
 
     @classmethod
     def initialize (cls):
+        """Initializes seed to predefined value"""
         cls.value = 0.123456789
 
     #--------------------
 
     @classmethod
-    def random (cls):
+    def random (cls) -> Real:
         """Returns a random number in interval [0, 1["""
 
         cls.value *= 997.0

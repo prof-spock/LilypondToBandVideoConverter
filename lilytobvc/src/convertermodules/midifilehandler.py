@@ -7,12 +7,14 @@
 # IMPORTS
 #====================
 
-from basemodules.operatingsystem import OperatingSystem
 from basemodules.simpleassertion import Assertion
 from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Boolean, Integer, IntegerList, \
+                                    List, Natural, NaturalList, String, \
+                                    StringList, Tuple
 from basemodules.stringutil import stringToIntList
 from basemodules.ttbase import iif, intListToHex
-from basemodules.utf8file import UTF8File 
+from basemodules.utf8file import UTF8File
 
 #====================
 
@@ -76,34 +78,37 @@ class MidiFileHandler:
     #--------------------
     #--------------------
 
-    def _appendToByteList (self, list):
-        """Appends integer list <list> to internal byte list and
+    def _appendToByteList (self,
+                           intList : IntegerList):
+        """Appends integer list <intList> to internal byte list and
            traces operation"""
 
         Logging.trace("--: %d -> %s",
-                      len(self._byteList), intListToHex(list))
-        self._byteList.extend(list)
+                      len(self._byteList), intListToHex(intList))
+        self._byteList.extend(intList)
 
     #--------------------
 
-    def _appendToLineList (self, st):
+    def _appendToLineList (self,
+                           st : String):
         """Appends <st> to <self._lineList>"""
 
-        Logging.trace("--: %d -> %s", self._position, st)
+        Logging.trace("--: %d -> %r", self._position, st)
         self._lineList.append(st)
 
     #--------------------
 
-    def _checkByteListWriteOperation (self, midiFileName):
+    def _checkByteListWriteOperation (self,
+                                      midiFileName : String):
         """Checks consistency of write operation of a byte list to be
            read from file with <midiFileName>"""
 
-        Logging.trace(">>: %s", midiFileName)
+        Logging.trace(">>: %r", midiFileName)
 
         self.readFile(midiFileName)
         byteList = self._byteList
         testFileName = midiFileName + "-tst"
-        self.writeFile(testFileName, lineList)
+        self.writeFile(testFileName, byteList)
         otherByteList = self._byteList
 
         for i in range(min(len(byteList), len(otherByteList))):
@@ -112,7 +117,7 @@ class MidiFileHandler:
                               i, byteList[i], otherByteList[i])
 
         Logging.trace("<<")
-        
+
     #--------------------
 
     def _convertByteListToLineList (self):
@@ -123,10 +128,10 @@ class MidiFileHandler:
 
         self._position = 0
         self._lineList = []
-        
+
         trackCount = self._readMidiHeader()
 
-        for i in range(trackCount):
+        for _ in range(trackCount):
             self._readMidiTrack()
 
         Logging.trace("<<")
@@ -143,14 +148,14 @@ class MidiFileHandler:
         self._byteList = []
         trackCount = self._writeMidiHeader()
 
-        for i in range(trackCount):
+        for _ in range(trackCount):
             self._writeMidiTrack()
 
         Logging.trace("<<")
 
     #--------------------
 
-    def _getLine (self):
+    def _getLine (self) -> String:
         """Returns line in <self._lineList> at <self._position> and
            advances position"""
 
@@ -160,7 +165,8 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _metaEventKind (self, eventByte):
+    def _metaEventKind (self,
+                        eventByte : Natural) -> String:
         """Calculates kind of meta event by given <eventByte>"""
 
         cls = self.__class__
@@ -169,16 +175,17 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _midiEventKind (self, eventByte):
+    def _midiEventKind (self,
+                        eventByte : Natural) -> String:
         """Calculates kind of event by given <eventByte>"""
 
         cls = self.__class__
-        result = cls._byteToEventKindMap.get(eventByte, None)
+        result = cls._byteToEventKindMap.get(eventByte)
         return result
 
     #--------------------
 
-    def _peekLine (self):
+    def _peekLine (self) -> String:
         """Returns line in <self._lineList> at <self._position>, but
            leaves position as is"""
 
@@ -186,7 +193,9 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _readIntBytes (self, count, isSigned=False):
+    def _readIntBytes (self,
+                       count : Natural,
+                       isSigned : Boolean = False) -> Natural:
         """Reads <count> bytes from <self._byteList> at
            <self._position> and returns them as an integer"""
 
@@ -210,7 +219,7 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _readMetaEvent (self):
+    def _readMetaEvent (self) -> Tuple:
         """Reads meta event in midi stream <self._byteList> at
            <self._position> and returns representation without time
            indication"""
@@ -225,7 +234,7 @@ class MidiFileHandler:
         Assertion.check(metaEventKind is not None,
                         "bad MIDI format: expected meta event byte %d"
                         % metaEventByte)
-        
+
         eventLength = cls._metaEventKindToLengthMap[metaEventKind]
         st = ""
 
@@ -272,14 +281,15 @@ class MidiFileHandler:
 
         eventKind = "Meta " + metaEventKind
 
-        Logging.trace("<<: kind = '%s', st = '%s'", eventKind, st)
+        Logging.trace("<<: kind = %r, st = %r", eventKind, st)
         return eventKind, st
-        
+
     #--------------------
 
-    def _readMidiEvent (self):
-        """Reads event in midi stream <self._byteList> at
-           <self._position> and updates <self._lineList> accordingly"""
+    def _readMidiEvent (self) -> Boolean:
+        """Reads event in midi stream <self._byteList> at <self._position> and
+           updates <self._lineList> accordingly; returns whether track
+           has ended"""
 
         Logging.trace(">>: %d", self._position)
 
@@ -336,10 +346,10 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _readMidiHeader (self):
+    def _readMidiHeader (self) -> Natural:
         """Converts header in midi stream <self._byteList> at
            <self._position> and appends text representation to
-           <self._lineList>"""
+           <self._lineList>; returns number of tracks"""
 
         Logging.trace(">>: %d", self._position)
 
@@ -358,7 +368,7 @@ class MidiFileHandler:
         st = ("%s %d %d %d"
               % ("MFile", fileFormat, trackCount, timeDivision))
         self._appendToLineList(st)
-        
+
         Logging.trace("<<: %d", self._position)
         return trackCount
 
@@ -385,14 +395,15 @@ class MidiFileHandler:
 
         while not isTrackEnd:
             isTrackEnd = self._readMidiEvent()
-        
+
         self._appendToLineList(cls._trackEndMarker)
-        
+
         Logging.trace("<<")
 
     #--------------------
 
-    def _readStringBytes (self, count):
+    def _readStringBytes (self,
+                          count : Natural) -> String:
         """Reads <count> bytes from <self._byteList> at
            <self._position> and returns them as a string"""
 
@@ -405,12 +416,12 @@ class MidiFileHandler:
         for ch in partList:
             result = result + chr(ch)
 
-        Logging.trace("--: %s", result)
+        Logging.trace("--: %r", result)
         return result
-    
+
     #--------------------
 
-    def _readVariableBytes (self):
+    def _readVariableBytes (self) -> Natural:
         """Reads bytes from <self._byteList> at <self._position> and
            returns them as an integer until top bit is not set"""
 
@@ -424,12 +435,14 @@ class MidiFileHandler:
             part = part & 127
             result = result * 128 + part
 
-        Logging.trace("--: %d", result)
+        # Logging.trace("--: %d", result)
         return result
-    
+
     #--------------------
 
-    def _tokenize (self, st):
+    @classmethod
+    def _tokenize (cls,
+                   st : String) -> StringList:
         """Splits <st> at blanks, but keeps strings together and
            returns part list"""
 
@@ -438,7 +451,7 @@ class MidiFileHandler:
         part = ""
 
         for ch in st:
-            if ch != " " and ch != "\"":
+            if ch not in [" ", "\""]:
                 part += ch
             elif ch == "\"":
                 part += ch
@@ -457,53 +470,58 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _writeIntBytes (self, value, count, isSigned=False):
+    def _writeIntBytes (self,
+                        value : Integer,
+                        count : Natural,
+                        isSigned : Boolean = False):
         """Writes integer <value> as <count> bytes and appends to
            <self._byteList>"""
 
         if isSigned and value < 0:
-            maxValue = 256 ** count
+            maxValue = 1 << (count * 8)   # 256 ** count
             value = int(maxValue - value)
 
         partList = []
 
-        for i in range(count):
-            partList = [ value % 256 ] + partList
-            value //= 256
+        for _ in range(count):
+            value, currentByte = divmod(value, 256)
+            partList.insert(0, currentByte)
 
         self._appendToByteList(partList)
 
     #--------------------
 
-    def _writeListBytes (self, list):
-        """Writes elements from <list> as integer values and appends
-           them to <self._byteList>"""
+    def _writeListBytes (self,
+                         byteList : List):
+        """Writes elements from <byteList> as integer values and appends them
+           to <self._byteList>"""
 
-        for value in list:
+        for value in byteList:
             self._writeIntBytes(int(value), 1)
 
     #--------------------
 
-    def _writeMetaEvent (self, argumentList):
-        """Converts meta event with argument given by <argumentList>
-           to midi stream and appends to <self._byteList>"""
-
-        currentLine = self._peekLine()
-        Logging.trace(">>: %d - %s", self._position, currentLine)
+    def _writeMetaEvent (self,
+                         argumentList : NaturalList) -> Boolean:
+        """Converts meta event with argument given by <argumentList> to midi
+           stream and appends to <self._byteList> and returns whether
+           this has been the track end meta event"""
 
         cls = self.__class__
+        currentLine = self._peekLine()
+        Logging.trace(">>: %d - %s", self._position, currentLine)
 
         metaEventKind = argumentList[0]
         metaEventByte = cls._metaEventKindToByteMap.get(metaEventKind, None)
         Assertion.check(metaEventByte is not None,
-                        "bad text line: expected meta event kind '%s'"
+                        "bad text line: expected meta event kind %r"
                         % metaEventKind)
         self._writeIntBytes(metaEventByte, 1)
         argumentList = argumentList[1:]
 
         eventLength = cls._metaEventKindToLengthMap[metaEventKind]
 
-        Logging.trace("--: kind=%s, length=%s", metaEventKind, eventLength)
+        Logging.trace("--: kind=%r, length=%r", metaEventKind, eventLength)
 
         if eventLength == "V":
             # some text event or a sequencer specific meta event
@@ -512,7 +530,7 @@ class MidiFileHandler:
                 self._writeListBytes(argumentList)
             else:
                 st = argumentList[0][1:-1]
-                Logging.trace("--: st='%s'", st)
+                Logging.trace("--: st=%r", st)
                 self._writeVariableBytes(len(st))
                 self._writeStringBytes(st)
         else:
@@ -524,8 +542,8 @@ class MidiFileHandler:
                 self._writeIntBytes(int(argumentList[0]), eventLength)
             elif metaEventKind == "SMPTEOffset":
                 argumentList = map(lambda x: int(x[3:]), argumentList)
-                for i in range(len(argumentList)):
-                    self._writeIntBytes(argumentList[i], 1)
+                for _, byteValue in enumerate(argumentList):
+                    self._writeIntBytes(byteValue, 1)
             elif metaEventKind == "TimeSig":
                 numerator, denominator = argumentList[0].split("/")
                 numerator = int(numerator)
@@ -546,14 +564,15 @@ class MidiFileHandler:
                 self._writeIntBytes(iif(isMinor, 1, 0), 1)
 
         isTrackEnd = (metaEventKind == "TrkEnd")
-        Logging.trace("<<: isTrackEnd = %s", isTrackEnd)
+        Logging.trace("<<: isTrackEnd = %r", isTrackEnd)
         return isTrackEnd
 
     #--------------------
 
-    def _writeMidiHeader (self):
-        """Converts head line in <self._lineList> at <self._position>
-           to midi stream and appends to <self._byteList>"""
+    def _writeMidiHeader (self) -> Natural:
+        """Converts head line in <self._lineList> at <self._position> to midi
+           stream and appends to <self._byteList>; returns number of
+           tracks specified"""
 
         currentLine = self._peekLine()
         Logging.trace(">>: %d - %s", self._position, currentLine)
@@ -579,25 +598,25 @@ class MidiFileHandler:
 
     #--------------------
 
-    def _writeMidiEvent (self):
-        """Converts current midi event in <self._lineList> at
-           <self._position> to midi stream and appends to
-           <self._byteList>"""
+    def _writeMidiEvent (self) -> Boolean:
+        """Converts current midi event in <self._lineList> at <self._position>
+           to midi stream and appends to <self._byteList> and returns
+           whether this has been the track end event"""
 
-        Logging.trace(">>: %d - %s", self._position, self._peekLine())
+        currentLine = self._peekLine()
+        Logging.trace(">>: %d - %s", self._position, currentLine)
 
         cls = self.__class__
-        currentLine = self._peekLine()
-        partList = self._tokenize(currentLine)
+        partList = cls._tokenize(currentLine)
 
         absoluteTime = int(partList[0])
         eventKind    = partList[1]
-        Logging.trace("--: t=%d, ev='%s'", absoluteTime, eventKind)
+        Logging.trace("--: t=%d, ev=%r", absoluteTime, eventKind)
 
         Assertion.check(absoluteTime >= self._currentTime,
                         "absolute time in file must be ascending")
         Assertion.check(eventKind in cls._eventKindToByteMap,
-                        "event kind unknown: '%s'" % eventKind)
+                        "event kind unknown: %r" % eventKind)
 
         self._writeVariableBytes(absoluteTime - self._currentTime)
         self._currentTime = absoluteTime
@@ -629,7 +648,7 @@ class MidiFileHandler:
             self._writeListBytes(argumentList)
 
         self._position += 1
-        Logging.trace("<<: isTrackEnd = %s", isTrackEnd)
+        Logging.trace("<<: isTrackEnd = %r", isTrackEnd)
         return isTrackEnd
 
     #--------------------
@@ -669,35 +688,36 @@ class MidiFileHandler:
         self._byteList = self._byteList[:chunkLengthPosition]
         self._writeIntBytes(len(trackData), 4)
         self._byteList += trackData
-        
+
         Logging.trace("<<")
 
     #--------------------
 
-    def _writeStringBytes (self, st):
-        """Writes integer <value> as <count> bytes and appends to
-           <self._byteList>"""
+    def _writeStringBytes (self,
+                           st : String):
+        """Writes <st> as bytes and appends to <self._byteList>"""
 
         self._appendToByteList(stringToIntList(st))
 
     #--------------------
 
-    def _writeVariableBytes (self, value):
+    def _writeVariableBytes (self,
+                             value : Natural):
         """Writes integer <value> as bytes and appends to
            <self._byteList> using a variable number of bytes"""
 
         Logging.trace(">>: %08X", value)
 
+        isFirst = True
         isDone = False
         partList = []
 
         while not isDone:
-            partialValue = value % 128 + 128
-            value = value // 128
+            value, partialValue = divmod(value, 128)
+            partialValue += 0 if isFirst else 128
+            partList.insert(0, partialValue)
+            isFirst = False
             isDone = (value == 0)
-            partList = [ partialValue ] + partList
-
-        partList[len(partList) - 1] -= 128
 
         self._appendToByteList(partList)
         Logging.trace("<<")
@@ -713,14 +733,15 @@ class MidiFileHandler:
         self._byteList    = None
         self._lineList    = None
         self._currentTime = None
-        
+
     #--------------------
 
-    def readFile (self, fileName):
+    def readFile (self,
+                  fileName : String) -> StringList:
         """Reads a midi file and returns a text representation as a
            line list."""
 
-        Logging.trace(">>: %s", fileName)
+        Logging.trace(">>: %r", fileName)
 
         midiFile = UTF8File(fileName, "rb")
         self._byteList = bytearray(midiFile.read())
@@ -733,16 +754,18 @@ class MidiFileHandler:
 
     #--------------------
 
-    def writeFile (self, fileName, lineList):
+    def writeFile (self,
+                   fileName : String,
+                   lineList : StringList):
         """Writes a midi file from text representation <lineList>"""
 
-        Logging.trace(">>: %s", fileName)
+        Logging.trace(">>: %r", fileName)
 
         self._lineList = lineList
 
         for currentLine in lineList:
             Logging.trace("--: %s", currentLine)
-            
+
         self._convertLineListToByteList()
 
         midiFile = UTF8File(fileName, "wb")

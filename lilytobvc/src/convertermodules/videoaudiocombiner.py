@@ -8,13 +8,13 @@
 #====================
 
 import re
-import sys
 
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.simplelogging import Logging
-from basemodules.stringutil import convertStringToList
+from basemodules.simpletypes import Natural, ObjectList, Real, String, \
+                                    StringList
 from basemodules.ttbase import iif
-from basemodules.utf8file import UTF8File 
+from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
 
 from .mp4tagmanager import MP4TagManager
@@ -30,7 +30,8 @@ class _SubtitleShifter:
     #--------------------
 
     @classmethod
-    def _formatTime (cls, timeInSeconds):
+    def _formatTime (cls,
+                     timeInSeconds : Real) -> String:
         """Returns <timeInSeconds> in SRT format with HH:MM:SS,000."""
 
         Logging.trace(">>: %7.3f", timeInSeconds)
@@ -43,17 +44,18 @@ class _SubtitleShifter:
         result = ("%02d:%02d:%02d,%03d"
                   % (hours, minutes, seconds, milliseconds))
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
 
     @classmethod
-    def _scanTime (cls, timeString):
+    def _scanTime (cls,
+                   timeString : String) -> Real:
         """Returns time in seconds in SRT format with HH:MM:SS,000
            as float seconds."""
 
-        Logging.trace(">>: %s", timeString)
+        Logging.trace(">>: %r", timeString)
 
         hours        = int(timeString[0:2])
         minutes      = int(timeString[3:5])
@@ -70,10 +72,12 @@ class _SubtitleShifter:
     #--------------------
 
     @classmethod
-    def applyShift (cls, lineList, duration):
+    def applyShift (cls,
+                    lineList : StringList,
+                    duration : Real) -> StringList:
         """Shifts SRT subtitle data in <lineList> by <duration>"""
 
-        Logging.trace(">>: lineList = %s, duration = %7.3f",
+        Logging.trace(">>: lineList = %r, duration = %7.3f",
                       lineList, duration)
 
         timeLineRegexp = re.compile(r"([0-9:,]+)\s*-->\s*([0-9:,]+)")
@@ -94,7 +98,7 @@ class _SubtitleShifter:
 
             result.append(line)
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
 #====================
@@ -104,17 +108,20 @@ class VideoAudioCombiner:
        files generated from lilypond scores with sound audio tracks
        and measure counting subtitles."""
 
-    _ffmpegCommand = None
-    _mp4boxCommand = None
-    _defaultMp4BaselineLevel = "3.0"
+    _ffmpegCommand : String = None
+    _mp4boxCommand : String = None
+    _defaultMp4BaselineLevel : String = "3.0"
 
     #--------------------
     # LOCAL FEATURES
     #--------------------
 
     @classmethod
-    def _combineWithFfmpeg (cls, sourceVideoFilePath, audioTrackDataList,
-                            subtitleFilePath, targetVideoFilePath):
+    def _combineWithFfmpeg (cls,
+                            sourceVideoFilePath : String,
+                            audioTrackDataList : ObjectList,
+                            subtitleFilePath : String,
+                            targetVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
            <targetVideoFilePath>; if <subtitleFilePath> is not empty,
@@ -123,11 +130,11 @@ class VideoAudioCombiner:
         # TODO: this ffmpeg rendering does not produce quicktime
         # compliant videos
 
-        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
-                      + " audioTracks = %s, subtitleFile = '%s'",
+        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+                      + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
-        
+
         trackFilePathList    = []
         mapDefinitionList    = []
         metadataSettingsList = []
@@ -154,24 +161,27 @@ class VideoAudioCombiner:
                    + ["-vcodec", "copy", "-acodec", "copy",
                       "-scodec", "mov_text", "-y", targetVideoFilePath ])
 
-        Logging.trace("<<: %s", command)
+        Logging.trace("<<: %r", command)
         return command
 
     #--------------------
 
     @classmethod
-    def _combineWithMp4box (cls, sourceVideoFilePath, audioTrackDataList,
-                            subtitleFilePath, targetVideoFilePath):
+    def _combineWithMp4box (cls,
+                            sourceVideoFilePath : String,
+                            audioTrackDataList : ObjectList,
+                            subtitleFilePath : String,
+                            targetVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
            <targetVideoFilePath>; if <subtitleFilePath> is not empty,
            a subtile is added"""
 
-        Logging.trace(">>: sourceVideo = '%s', targetVideo = '%s',"
-                      + " audioTracks = %s, subtitleFile = '%s'",
+        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+                      + " audioTracks = %r, subtitleFile = %r",
                       sourceVideoFilePath, audioTrackDataList,
                       subtitleFilePath, targetVideoFilePath)
-        
+
         command = [ cls._mp4boxCommand,
                     "-isma", "-ipod", "-strict-error",
                     sourceVideoFilePath ]
@@ -186,7 +196,7 @@ class VideoAudioCombiner:
 
         command.extend([ "-out", targetVideoFilePath ])
 
-        Logging.trace("<<: %s", command)
+        Logging.trace("<<: %r", command)
         return command
 
     #--------------------
@@ -194,10 +204,12 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def initialize (cls, ffmpegCommand, mp4boxCommand):
+    def initialize (cls,
+                    ffmpegCommand : String,
+                    mp4boxCommand : String):
         """Sets the internal command names"""
 
-        Logging.trace(">>: ffmpegCommand = '%s', mp4boxCommand = '%s'",
+        Logging.trace(">>: ffmpegCommand = %r, mp4boxCommand = %r",
                       ffmpegCommand, mp4boxCommand)
 
         cls._ffmpegCommand = ffmpegCommand
@@ -207,10 +219,14 @@ class VideoAudioCombiner:
 
     #--------------------
     #--------------------
-    
+
     @classmethod
-    def combine (cls, voiceNameList, trackDataList, sourceVideoFilePath,
-                 targetVideoFilePath, subtitleFilePath):
+    def combine (cls,
+                 voiceNameList : StringList,
+                 trackDataList : ObjectList,
+                 sourceVideoFilePath : String,
+                 targetVideoFilePath : String,
+                 subtitleFilePath : String):
         """Combines all final audio files (characterized by
            <trackDataList>) and the video given by
            <sourceVideoFilePath> into video in <targetVideoFilePath>;
@@ -218,9 +234,9 @@ class VideoAudioCombiner:
            is added as an additional track; <voiceNameList> gives the
            list of all voices"""
 
-        Logging.trace(">>: voiceNameList = %s, trackDataList = %s,"
-                      + " sourceVideo = '%s', targetVideo = '%s',"
-                      + " subtitleFilePath = %s",
+        Logging.trace(">>: voiceNameList = %r, trackDataList = %r,"
+                      + " sourceVideo = %r, targetVideo = %r,"
+                      + " subtitleFilePath = %r",
                       voiceNameList, trackDataList, sourceVideoFilePath,
                       targetVideoFilePath, subtitleFilePath)
 
@@ -232,7 +248,7 @@ class VideoAudioCombiner:
 
         audioTrackDataList = []
 
-        for i, audioTrackData in enumerate(trackDataList):
+        for _, audioTrackData in enumerate(trackDataList):
             _, _, _, audioFilePath, description,\
               languageCode, _, _, _ = audioTrackData
             element = (audioFilePath, languageCode, description)
@@ -255,10 +271,14 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def insertHardSubtitles (cls, sourceVideoFilePath, subtitleFilePath,
-                             targetVideoFilePath, shiftOffset,
-                             subtitleColor, subtitleFontSize,
-                             ffmpegPresetName):
+    def insertHardSubtitles (cls,
+                             sourceVideoFilePath : String,
+                             subtitleFilePath : String,
+                             targetVideoFilePath : String,
+                             shiftOffset : Real,
+                             subtitleColor : Natural,
+                             subtitleFontSize : Natural,
+                             ffmpegPresetName : String):
         """Inserts hard subtitles specified by an SRT file with
            <subtitleFilePath> into video given by
            <sourceVideoFilePath> resulting in video with
@@ -268,9 +288,9 @@ class VideoAudioCombiner:
            <subtitleColor> the RGB color of the subtitle,
            <subtitleFontSize> the size in pixels"""
 
-        Logging.trace(">>: sourceVideo = '%s', subtitleFile = '%s',"
-                      + " targetVideo = '%s', subtitleFontSize = %d,"
-                      + " subtitleColor = %d, ffmpegPreset = %s",
+        Logging.trace(">>: sourceVideo = %r, subtitleFile = %r,"
+                      + " targetVideo = %r, subtitleFontSize = %d,"
+                      + " subtitleColor = %d, ffmpegPreset = %r",
                       sourceVideoFilePath, subtitleFilePath,
                       targetVideoFilePath, subtitleFontSize,
                       subtitleColor, ffmpegPresetName)
@@ -278,7 +298,7 @@ class VideoAudioCombiner:
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
 
-        st = "== hardcoding subtitles for %s" % sourceVideoFilePath
+        st = "== hardcoding subtitles for %r" % sourceVideoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
         subtitleOption = (("subtitles=%s:force_style='PrimaryColour=%d,"
@@ -304,13 +324,15 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def shiftSubtitleFile (cls, subtitleFilePath, targetSubtitleFilePath,
-                           shiftOffset):
+    def shiftSubtitleFile (cls,
+                           subtitleFilePath : String,
+                           targetSubtitleFilePath : String,
+                           shiftOffset : Real):
         """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and stores
            result in file with <targetSubtitleFilePath>"""
 
-        Logging.trace(">>: subtitleFilePath = '%s', shiftOffset = %7.3f,"
-                      + " targetSubtitleFilePath ='%s'",
+        Logging.trace(">>: subtitleFilePath = %r, shiftOffset = %7.3f,"
+                      + " targetSubtitleFilePath =%r",
                       subtitleFilePath, shiftOffset, targetSubtitleFilePath)
 
         ValidityChecker.isReadableFile(subtitleFilePath, "subtitle file")
@@ -330,16 +352,22 @@ class VideoAudioCombiner:
     #--------------------
 
     @classmethod
-    def tagVideoFile (cls, videoFilePath, albumName, artistName,
-                      albumArtFilePath, title, mediaType, year):
+    def tagVideoFile (cls,
+                      videoFilePath : String,
+                      albumName : String,
+                      artistName : String,
+                      albumArtFilePath : String,
+                      title : String,
+                      mediaType : String,
+                      year : String):
         """Adds some quicktime/MP4 tags to video file with
            <videoFilePath>"""
 
-        Logging.trace(">>: '%s'", videoFilePath)
+        Logging.trace(">>: %r", videoFilePath)
 
         ValidityChecker.isReadableFile(videoFilePath, "source video file")
 
-        st = "== tagging %s" % videoFilePath
+        st = "== tagging %r" % videoFilePath
         OperatingSystem.showMessageOnConsole(st)
 
         tagToValueMap = {}
@@ -353,5 +381,5 @@ class VideoAudioCombiner:
         tagToValueMap["year"]            = year
 
         MP4TagManager.tagFile(videoFilePath, tagToValueMap)
-        
+
         Logging.trace("<<")

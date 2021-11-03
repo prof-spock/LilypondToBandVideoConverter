@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 # StringUtil - provides several utility string functions like conversions
 #              from strings to maps or lists or tokenization
 #
@@ -6,17 +7,20 @@
 #====================
 
 from .simplelogging import Logging
-from .ttbase import iif
+from .simpletypes import IntegerList, Map, Natural, Object, \
+                         ObjectList, String, StringList, StringMap, Tuple
+from .ttbase import iif, intListToHex
 
 #====================
 
-def adaptToKind (st, kind):
+def adaptToKind (st : String,
+                 kind : String) -> Object:
     """Returns converted value for given string <st> with type given by
        <kind>."""
 
     if kind == "I":
         result = int(st)
-    elif kind == "F":
+    elif kind == "R":
         result = float(st)
     elif kind == "B":
         result = (st.upper() == "TRUE")
@@ -27,15 +31,39 @@ def adaptToKind (st, kind):
 
 #--------------------
 
-def stringToIntList (st):
-    """Returns integer list for string <st>"""
+def newlineReplacedString (st : String) -> String:
+    """Returns form of <st> where newlines are replaced by hash characters
+       (to have multiline strings in a single line)"""
 
-    list = [ ord(st[i]) for i in range(len(st)) ]
-    return list
-    
+    replacementCharacter = "#"
+    result = st.replace("\n", replacementCharacter)
+    return result
+
 #--------------------
 
-def stringToHex (st):
+def shortenedString (st : String,
+                     maximumLength : Natural = 20) -> String:
+    """Returns <st> shortened to <maximumLength>"""
+
+    if len(st) > maximumLength:
+        result = st[:maximumLength - 1] + u"…"
+        #result = st[:maximumLength - 3] + "..."
+    else:
+        result = st
+
+    return result
+
+#--------------------
+
+def stringToIntList (st : String) -> IntegerList:
+    """Returns integer list for string <st>"""
+
+    intList = [ ord(st[i]) for i in range(len(st)) ]
+    return intList
+
+#--------------------
+
+def stringToHex (st : String) -> String:
     """Returns hex representation of <st>"""
 
     return intListToHex(stringToIntList(st))
@@ -49,7 +77,9 @@ _structureLeadinCharacterSet = set(["{", "[", "("])
 
 #--------------------
 
-def _convertStringToList (st, startPosition, separator):
+def _convertStringToList (st : String,
+                          startPosition : Natural,
+                          separator : String) -> StringList:
     """Splits <st> starting from <startPosition> at <separator> into
        list of parts; sublists or submaps are correctly handled and
        embedded into the list; returns end position and resulting list"""
@@ -97,7 +127,7 @@ def _convertStringToList (st, startPosition, separator):
                 currentElement = ch
                 parseState = ParseState_inElement
         elif parseState == ParseState_inElement:
-            if ch != " " and ch != separator and ch != listEndCharacter:
+            if ch not in [" ", separator, listEndCharacter]:
                 currentElement += ch
             else:
                 result.append(currentElement)
@@ -124,7 +154,9 @@ def _convertStringToList (st, startPosition, separator):
 
 #--------------------
 
-def _convertStringToMap (st, startPosition, separator):
+def _convertStringToMap (st : String,
+                         startPosition : Natural,
+                         separator : String) -> StringMap:
     """Splits <st> starting from <startPosition> at <separator> into map
        of key-value-pairs; sublists or submaps as values are correctly
        handled and embedded into the map; returns end position and
@@ -182,8 +214,7 @@ def _convertStringToMap (st, startPosition, separator):
                 currentElement = ch
                 parseState += 1
         elif parseState in [ParseState_inKey, ParseState_inValue]:
-            if (ch != " " and ch != separator and ch != ":"
-                and ch != mapEndCharacter):
+            if ch not in [" ", separator, ":", mapEndCharacter]:
                 currentElement += ch
             else:
                 parseState += 2
@@ -214,22 +245,25 @@ def _convertStringToMap (st, startPosition, separator):
         position += 1
 
     return (position, result)
-            
+
 #--------------------
 
-def convertStringToList (st, separator=",", kind="S"):
+def convertStringToList (st : String,
+                         separator : String = ",",
+                         kind : String = "S") -> ObjectList:
     """Splits <st> with parts separated by <separator> into list with
        all parts having leading and trailing whitespace removed; if
-       <kind> is 'I' or 'F' the elements are transformed into ints or
+       <kind> is 'I' or 'R' the elements are transformed into ints or
        floats"""
 
-    position, result = _convertStringToList("[" + st + "]", 0, separator)
+    _, result = _convertStringToList("[" + st + "]", 0, separator)
     result = list(map(lambda x: adaptToKind(x, kind), result))
     return result
 
 #--------------------
 
-def convertStringToMap (st, separator=","):
+def convertStringToMap (st : String,
+                        separator : String = ",") -> Map:
     """Splits <st> with parts separated by <separator> into map where
        key and value is separated by colons with all parts
        having leading and trailing whitespace removed"""
@@ -240,12 +274,13 @@ def convertStringToMap (st, separator=","):
     if not st.startswith("{"):
         st = "{" + st + "}"
 
-    position, result = _convertStringToMap(st, 0, separator)
+    _, result = _convertStringToMap(st, 0, separator)
     return result
 
 #--------------------
 
-def splitAndStrip (st, separator):
+def splitAndStrip (st : String,
+                   separator : String) -> StringList:
     """Returns split of <st> by <separator> with each part stripped from
        leading and trailing whitespace"""
 
@@ -253,13 +288,44 @@ def splitAndStrip (st, separator):
 
 #--------------------
 
-def tokenize (st):
+def splitAt (st : String,
+             separator : String) -> Tuple:
+    """Returns split of <st> by <separator> at first position; if
+       there is none, the third result is a False value"""
+
+    separatorPosition = st.find(separator)
+    separatorLength   = len(separator)
+    isFound = (separatorPosition >= 0)
+
+    if isFound:
+        partA = st[:separatorPosition]
+        partB = st[separatorPosition+separatorLength:]
+    else:
+        partA, partB = (st, "")
+
+    result = (partA, partB, isFound)
+    return result
+
+#--------------------
+
+def stripStringQuotes (st : String) -> String:
+    """Returns <st> with string quotes removed"""
+
+    for ch in ("'", "\""):
+        if st.startswith(ch) and st.endswith(ch):
+            st = st[1:-1]
+    
+    return st
+
+#--------------------
+
+def tokenize (st : String) -> StringList:
     """Returns a list of tokens also taking care of strings"""
 
-    Logging.trace(">>: %s", st)
+    Logging.trace(">>: %r", st)
 
     whiteSpaceCharacterList = " "
-    quoteCharacterList = "'"""
+    quoteCharacterList = "\"'"
     escapeCharacter = '\\'
 
     ParseState_inLimbo  = 0
@@ -316,6 +382,6 @@ def tokenize (st):
     if parseState != ParseState_inLimbo:
         result.append(token)
 
-    Logging.trace("--: accumulatedTrace = %s", fsaTrace)
-    Logging.trace("<<: %s", result)
+    Logging.trace("--: accumulatedTrace = %r", fsaTrace)
+    Logging.trace("<<: %r", result)
     return result

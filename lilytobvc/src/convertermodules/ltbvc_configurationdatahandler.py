@@ -7,353 +7,829 @@
 # IMPORTS
 #====================
 
+import dataclasses
+from dataclasses import dataclass
 import datetime
-import re
 
 from basemodules.attributemanager import AttributeManager
 from basemodules.configurationfile import ConfigurationFile
+from basemodules.datatypesupport import AbstractDataType, \
+                                        DataTypeSupport, specialField, \
+                                        SETATTR
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.regexppattern import RegExpPattern
 from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Boolean, Callable, ClassVar, \
+                                    Dictionary, Map, \
+                                    Natural, Object, ObjectList, Real, \
+                                    String, StringList, StringMap, \
+                                    StringSet, Tuple
 from basemodules.stringutil import adaptToKind, convertStringToList, \
                                    convertStringToMap
 from basemodules.ttbase import iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
-from .ltbvc_businesstypes import generateObjectListFromString, \
-                                 generateObjectMapFromString, \
-                                 AudioTrack, TempoTrack, \
-                                 VideoFileKind, VideoTarget, VoiceDescriptor
+from .ltbvc_businesstypes import AudioTrack, VideoFileKind, \
+                                 VideoTarget, VoiceDescriptor
+
+# renamings
+generateObjectListFromString= DataTypeSupport.generateObjectListFromString
+generateObjectMapFromString = DataTypeSupport.generateObjectMapFromString
 
 #====================
 
-def _checkVariableList (variableNameList, configurationFile):
-    """Checks all variables in <variableNameList> to be read from
-       <configurationFile>"""
+#--------------------------------------
+# helper variables for default settings
+#--------------------------------------
 
-    for variableName in variableNameList:
-        _LocalValidator.checkVariable(variableName,
-                                      configurationFile.getValue)
+# the path of the directory where media files should be stored
+_defaultMediaTargetDirectoryPath = "./mediafiles"
+
+# set of voices with chord symbols
+_melodicVoiceNameSet : StringSet = set(("bass", "keyboard", "guitar"))
+
+# mapping from voice names to the lilypond clefs
+_voiceNameToClefMapString : String = \
+    ("{ bass : bass_8, drums : '', guitar : G_8,"
+     + " keyboardBottom : bass, percussion : '' }")
+
+# mapping from voice name to involved staffs for this voice
+_voiceNameToStaffListMapString : String = \
+    "{ drums : DrumStaff, percussion : DrumStaff }"
+
+#====================
+
+def _filterByKeyList (nameToValueMap : StringMap,
+                      keyList : StringList) -> StringMap:
+    """Returns <nameToValueMap> projected to keys from <keyList>"""
+
+    Logging.trace(">>: keyList = %r, map = %r",
+                  keyList, nameToValueMap)
+
+    result = { key : value
+               for key, value in nameToValueMap.items()
+               if key in keyList }
+
+    Logging.trace("<<: %r", result)
+    return result
 
 #--------------------
 
-def _getStylesWithNamePrefix (prefix, configurationFile):
+def _getStylesWithNamePrefix (prefix : String,
+                              parameterNameToValueMap : StringMap) \
+                              -> StringList:
     """Returns list of names of styles having <prefix> in
-       <configurationFile>"""
+       keys of <parameterNameToValueMap>"""
 
     Logging.trace(">>")
 
-    allVariables = configurationFile.getKeySet()
-    result = [x for x in allVariables if x.startswith(prefix)]
+    result = [ x for x in parameterNameToValueMap.keys()
+               if x.startswith(prefix) ]
 
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
 
-def _readStylesWithPrefix (prefix, configurationFile):
-    """Reads all styles with name <prefix> from <configurationFile>
-       and returns them as map"""
+def _readStylesWithPrefix (prefix : String,
+                           parameterNameToValueMap : StringMap) \
+                           -> StringMap:
+    """Reads all styles with name <prefix> from <keySet> and associates
+       them with their value from <parameterNameToValueMap> and returns
+       them as map"""
 
     Logging.trace(">>")
 
-    styleNameList = _getStylesWithNamePrefix(prefix, configurationFile)
-    result = {}
+    styleNameList = _getStylesWithNamePrefix(prefix, parameterNameToValueMap)
+    result = { styleName : parameterNameToValueMap[styleName]
+               for styleName in styleNameList }
 
-    for styleName in styleNameList:
-        style = configurationFile.getValue(styleName)
-        result[styleName] = style
-
-    Logging.trace("<<: %s", result)
+    Logging.trace("<<: %r", result)
     return result
 
 #--------------------
 
-def _readAttributesFromConfigFile (object, attributeNameList,
-                                   configurationFile):
-    """Traverses <attributeNameList> and sets attribute in <object> to
-       value read from <configurationFile>."""
+def _readAttributesFromMapping (currentObject : Object,
+                                attributeNameList : StringList,
+                                attributeNameToValueMap : StringMap):
+    """Traverses <attributeNameList> and sets attribute in <currentObject>
+       to value read via <attributeNameToValueMap>"""
 
     for attributeName in attributeNameList:
         value = _LocalValidator.get(attributeName,
-                                    configurationFile.getValue)
-        setattr(object, attributeName, value)
+                                    attributeNameToValueMap)
+        setattr(currentObject, attributeName, value)
+
+#====================
+
+class _DefaultValueHandler:
+    """Encapsulates default string values of configuration file
+       variables."""
+
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
+
+    #.........................
+    # complex parameter values
+    #.........................
+    
+    # default value for refinement audio processor
+    _audioProcessorDefaultString : String = \
+        ("{"
+         + "amplificationEffect: 'gain ${amplificationLevel}',"
+         + "mixingCommandLine: 'sox -m [-v ${factor} ${infile} ] ${outfile}',"
+         + "paddingCommandLine: 'sox ${infile} ${outfile} pad ${duration}',"
+         + "refinementCommandLine: 'sox ${infile} ${outfile} ${effects}'"
+         + "}")
+
+    # default value for mapping from output kinds to the lilypond
+    # clefs used for the different voice names
+    _phaseAndVoiceNameToClefMapDefaultString = \
+        ("{"
+         + ", ".join([targetKind + " : " +
+                      _voiceNameToClefMapString
+                      for targetKind in ["extract", "midi", "score", "video"]])
+         + "}")
+
+    # default value for mapping from output kinds to staff mappings
+    # used
+    _phaseAndVoiceNameToStaffListMapDefaultString : String = \
+        ("{ "
+         + ", ".join([targetKind + " : " + _voiceNameToStaffListMapString
+                      for targetKind in ["extract", "midi", "score", "video"]])
+         + " }")
+
+    # default value for mapping from voice names to chords shown in
+    # extract, score or video
+    _voiceNameToChordsMapDefaultString : String = \
+        ("{ "
+         + "vocals : s/v, "
+         + ", ".join([voiceName + " : e"
+                      for voiceName in _melodicVoiceNameSet])
+         + " }")
+
+    # default value for the mapping from file kind to video target for
+    # a single target with the all voices
+    _videoFileKindMapDefaultString = \
+        ("{ " \
+         "tabletVocGtr: { target:         tablet,"
+         +              " fileNameSuffix: '-tblt',"
+         +             (" directoryPath:  '%s' ,"
+                        % _defaultMediaTargetDirectoryPath)
+         +              " voiceNameList:  '' }"
+         + " }")
+
+    # default value for the mapping of the video target: a single
+    # target with a 640x480 resolution
+    _videoTargetMapDefaultString : String = \
+        ("{ "
+         + "tablet: { resolution: 64,"
+         +          " height: 480,"
+         +          " width: 640," \
+         +          " topBottomMargin: 5," \
+         +          " leftRightMargin: 10," \
+         +          " scalingFactor: 4," \
+         +          " frameRate: 10.0," \
+         +          " mediaType: 'Music Video'," \
+         +          " systemSize: 25," \
+         +          " subtitleColor: 2281766911," \
+         +          " subtitleFontSize: 20," \
+         +          " subtitlesAreHardcoded: true }"
+         + " }")
+
+    #......................................................
+    # overall mapping from parameter name to default values
+    #......................................................
+
+    _parameterNameToDataMap : StringMap = {
+        # commands
+        "aacCommandLine"                    : "",
+        "audioProcessor"                    : _audioProcessorDefaultString,
+        "ffmpegCommand"                     : "ffmpeg",
+        "lilypondCommand"                   : "lilypond",
+        "lilypondVersion"                   : "2.18.22",
+        "midiToWavRenderingCommandLine"     : "",
+        "mp4boxCommand"                     : "",
+
+        # global settings
+        "intermediateFilesAreKept"          : False,
+
+        # file paths
+        "intermediateFileDirectoryPath"     : ".",
+        "loggingFilePath"                   : "./ltbvc.log",
+        "targetDirectoryPath"               : "./generated",
+        "tempLilypondFilePath"              : "./temp.ly",
+
+        # song group properties
+        "artistName"                        : "UNKNOWN ARTIST",
+        "albumName"                         : "UNKNOWN ALBUM",
+
+        # general song properties
+        "composerText"                      : "",
+        "countInMeasureCount"               : 0,
+        "fileNamePrefix"                    : None,
+        "includeFilePath"                   : "",
+        "title"                             : None,
+        "trackNumber"                       : 0,
+        "voiceNameList"                     : "[]",
+        "year"                              : datetime.date.today().year,
+        "measureToTempoMap"                 : "{}",
+        "phaseAndVoiceNameToClefMap"        : \
+            _phaseAndVoiceNameToClefMapDefaultString,
+        "phaseAndVoiceNameToStaffListMap"   : \
+            _phaseAndVoiceNameToStaffListMapDefaultString,
+
+        # extract and score generation
+        "extractVoiceNameSet"               : "",
+        "scoreVoiceNameList"                : "",
+        "voiceNameToChordsMap"              : \
+            _voiceNameToChordsMapDefaultString,
+        "voiceNameToLyricsMap"              : "",
+        "voiceNameToScoreNameMap"           : "",
+
+        # midi generation
+        "humanizedVoiceNameSet"             : "",
+        "measureToHumanizationStyleNameMap" : "{}",
+        "midiChannelList"                   : "",
+        "midiInstrumentList"                : "",
+        "midiVoiceNameList"                 : "",
+        "midiVolumeList"                    : "",
+        "panPositionList"                   : "",
+        "voiceNameToVariationFactorMap"     : "{}",
+
+        # audio file generation
+        "audioGroupToVoicesMap"             : "{}",
+        "audioTargetDirectoryPath"          : \
+            _defaultMediaTargetDirectoryPath,
+        "audioTrackList"                    : "{}",
+        "audioVoiceNameSet"                 : "",
+        "parallelTrack"                     : ",0,0",
+        "reverbLevelList"                   : "",
+        "soundVariantList"                  : "",
+        "tempAudioDirectoryPath"            : ".",
+        "voiceNameToOverrideFileNameMap"    : "{}",
+
+        # video file generation
+        "videoTargetMap"                    : _videoTargetMapDefaultString,
+        "videoFileKindMap"                  : _videoFileKindMapDefaultString
+    }
+    
+    #--------------------
+    # EXPORTED FEATURES
+    #--------------------
+
+    @classmethod
+    def parameterNameList (cls) -> StringList:
+        """Returns the list of parameter names with defaults"""
+
+        return cls._parameterNameToDataMap.keys()
+
+    #--------------------
+
+    @classmethod
+    def value (cls,
+               parameterName : String) -> String:
+        """Returns the default value string for parameter given by
+           <parameterName> (if any)"""
+
+        return cls._parameterNameToDataMap.get(parameterName)
+
+#====================
+
+class _LocalValidator:
+    """Encapsulates routines for validation of the configuration
+       file variables."""
+
+    _validationMap = {}
+
+    #--------------------
+    # LOCAL ROUTINES
+    #--------------------
+
+    @classmethod
+    def _setMap (cls,
+                 name : String,
+                 kind : String,
+                 regExp : Object = None):
+        """Sets a single entry in internal validation map for configuration
+           variable with <name>, having type <kind>; if <kind> is
+           'REGEXP', the additional parameter <regExp> gives the
+           validation regexp"""
+
+        st = ("--" if regExp is None else regExp.pattern)
+        Logging.trace(">>: name = %r, kind = %r, regExp = %r",
+                      name, kind, st)
+
+        cls._validationMap[name] = { "kind"   : kind,
+                                     "regExp" : regExp }
+
+        Logging.trace("<<")
+
+    #--------------------
+    # EXPORTED ROUTINES
+    #--------------------
+
+    @classmethod
+    def initialize (cls):
+        """Sets up internal map for all configuration variables"""
+
+        Logging.trace(">>")
+
+        # abbreviations for pattern functions
+        makeCompactListPat = RegExpPattern.makeCompactListPattern
+        makeListPat        = RegExpPattern.makeListPattern
+        makeMapPat         = RegExpPattern.makeMapPattern
+        makeRegExp         = RegExpPattern.makeRegExp
+
+        # common element patterns
+        noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
+
+        identifierPattern = RegExpPattern.identifierPattern
+        integerPattern    = RegExpPattern.integerPattern
+        floatPattern      = RegExpPattern.floatPattern
+
+        # special element patterns
+        audioProcessorKeyPattern = \
+                      (r"(?:(?:mixing|padding|refinement)CommandLine"
+                       + r"|amplificationEffect|chainSeparator|redirector)")
+        beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
+        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
+        humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
+        humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
+                                    % (floatPattern, floatPattern))
+        parallelTrackPattern = (r"\s*|[^,\s]+(?:,\s*%s\s*(?:,\s*%s\s*))"
+                                % (floatPattern, floatPattern))
+        prephasePattern = r"(?:extract|midi|score|video)"
+        staffListPattern = makeCompactListPat("(?:DrumStaff|PianoStaff"
+                                              + "|Staff|TabStaff)")
+        tempoValuePattern = (r"%s(?:\|%s/%s)?"
+                             % (floatPattern, integerPattern, integerPattern))
+        versionPattern = r"\d+(\.\d+)*"
+
+        # simple map patterns
+        idToTextMapPattern = makeMapPat(identifierPattern, noCommaPattern)
+
+        # regular expressions for lists of standard elements
+        emptyFloatListRegExp = makeRegExp(makeListPat(floatPattern, True))
+        identifierListRegExp = makeRegExp(makeListPat(identifierPattern,
+                                                      False))
+        emptyIdentifierListRegExp = makeRegExp(makeListPat(identifierPattern,
+                                                           True))
+        instrumentListRegExp = makeRegExp(makeListPat(r"\d+(:\d+)?", False))
+        integerListRegExp = makeRegExp(makeListPat(integerPattern, False))
+
+        # commands
+        cls._setMap("aacCommandLine", "STRING")
+        cls._setMap("audioProcessor", "REGEXP",
+                    makeRegExp(makeMapPat(audioProcessorKeyPattern,
+                                          noCommaPattern, False)))
+        cls._setMap("ffmpegCommand", "EXECUTABLE")
+        cls._setMap("lilypondCommand", "EXECUTABLE")
+        cls._setMap("lilypondVersion", "REGEXP",
+                    makeRegExp(versionPattern))
+        cls._setMap("midiToWavRenderingCommandLine", "STRING")
+        cls._setMap("mp4boxCommand", "EXECUTABLE")
+
+        # global settings
+        cls._setMap("intermediateFilesAreKept", "BOOLEAN")
+
+        # file paths
+        cls._setMap("intermediateFileDirectoryPath", "WDIRECTORY")
+        cls._setMap("loggingFilePath", "WFILE")
+        cls._setMap("targetDirectoryPath", "WDIRECTORY")
+        cls._setMap("tempLilypondFilePath", "WFILE")
+
+        # song group properties
+        cls._setMap("artistName", "STRING")
+        cls._setMap("albumName", "STRING")
+
+        # general song properties
+        cls._setMap("composerText", "STRING")
+        cls._setMap("countInMeasureCount", "NATURAL")
+        cls._setMap("fileNamePrefix", "STRING")
+        cls._setMap("includeFilePath", "STRING")
+        cls._setMap("title", "STRING")
+        cls._setMap("trackNumber", "NATURAL")
+        cls._setMap("voiceNameList", "REGEXP", identifierListRegExp)
+        cls._setMap("year", "NATURAL")
+
+        cls._setMap("measureToTempoMap", "REGEXP",
+                    makeRegExp(makeMapPat(floatPattern, tempoValuePattern,
+                                          False)))
+        cls._setMap("phaseAndVoiceNameToClefMap", "REGEXP",
+                    makeRegExp(makeMapPat(prephasePattern,
+                                          makeMapPat(identifierPattern,
+                                                     clefPattern))))
+        cls._setMap("phaseAndVoiceNameToStaffListMap", "REGEXP",
+                    makeRegExp(makeMapPat(prephasePattern,
+                                          makeMapPat(identifierPattern,
+                                                     staffListPattern))))
+
+        # extract and score generation
+        cls._setMap("extractVoiceNameSet", "REGEXP",
+                    emptyIdentifierListRegExp)
+        cls._setMap("scoreVoiceNameList", "REGEXP",
+                    emptyIdentifierListRegExp)
+        cls._setMap("voiceNameToChordsMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          makeCompactListPat(r"[esv]"))))
+        cls._setMap("voiceNameToLyricsMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          makeCompactListPat(r"[esv]\d*"))))
+        cls._setMap("voiceNameToScoreNameMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          identifierPattern)))
+
+        # midi generation
+        cls._setMap("humanizedVoiceNameSet", "REGEXP",
+                    emptyIdentifierListRegExp)
+        cls._setMap("humanizationStyle*", "REGEXP",
+                    makeRegExp(makeMapPat(humanizationKeyPattern,
+                                          humanizationValuePattern,
+                                          False)))
+        cls._setMap("measureToHumanizationStyleNameMap", "REGEXP",
+                    makeRegExp(makeMapPat(integerPattern,
+                                          identifierPattern)))
+        cls._setMap("midiChannelList", "REGEXP", integerListRegExp)
+        cls._setMap("midiInstrumentList", "REGEXP",
+                    instrumentListRegExp)
+        cls._setMap("midiVoiceNameList", "REGEXP",
+                    emptyIdentifierListRegExp)
+        cls._setMap("midiVolumeList", "REGEXP", integerListRegExp)
+        cls._setMap("panPositionList", "REGEXP",
+                    makeRegExp(makeListPat(r"C|\d+(\.\d+)[RL]", False)))
+        cls._setMap("voiceNameToVariationFactorMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          floatPattern + "/" + floatPattern)))
+
+        # audio file generation
+        cls._setMap("audioGroupToVoicesMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          makeCompactListPat(identifierPattern),
+                                          False)))
+        cls._setMap("audioTargetDirectoryPath", "WDIRECTORY")
+        cls._setMap("audioTrackList", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          AudioTrack.regexpPattern(),
+                                          False)))
+        cls._setMap("audioVoiceNameSet", "REGEXP",
+                    emptyIdentifierListRegExp)
+        cls._setMap("parallelTrack", "REGEXP",
+                    makeRegExp(parallelTrackPattern))
+        cls._setMap("reverbLevelList", "REGEXP", emptyFloatListRegExp)
+        cls._setMap("soundStyle*", "STRING")
+        cls._setMap("soundVariantList", "REGEXP", identifierListRegExp)
+        cls._setMap("tempAudioDirectoryPath", "WDIRECTORY")
+        cls._setMap("voiceNameToOverrideFileNameMap", "REGEXP",
+                    makeRegExp(idToTextMapPattern))
+
+        # video file generation
+        cls._setMap("videoTargetMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          VideoTarget.regexpPattern())))
+        cls._setMap("videoFileKindMap", "REGEXP",
+                    makeRegExp(makeMapPat(identifierPattern,
+                                          VideoFileKind.regexpPattern())))
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def checkVariable (cls,
+                       parameterName : String,
+                       parameterNameToValueMap : StringMap,
+                       checkedName : String = None):
+        """Checks whether value for <parameterName> gained from
+           <parameterNameToValueMap> is okay by looking up in internal
+           map; if <checkedName> is set, the syntax of that name is
+           used instead"""
+
+        Logging.trace(">>: parameterName = %r, checkedName = %r",
+                      parameterName, checkedName)
+        effectiveName = iif(checkedName is None, parameterName, checkedName)
+
+        if effectiveName not in cls._validationMap:
+            # no check found => fine
+            Logging.trace("--: no check necessary")
+        else:
+            entry = cls._validationMap[effectiveName]
+            kind         = entry["kind"]
+            defaultValue = _DefaultValueHandler.value(effectiveName)
+            value = parameterNameToValueMap.get(parameterName, defaultValue)
+            Logging.trace("--: parameterName = %s, value = %r",
+                          parameterName, value)
+
+            if value is None:
+                errorMessage = "%r is not set" % parameterName
+                ValidityChecker.isValid(False, errorMessage)
+            elif kind == "STRING":
+                ValidityChecker.isString(value, parameterName)
+            elif kind == "NATURAL":
+                ValidityChecker.isNatural(value, parameterName)
+            elif kind == "BOOLEAN":
+                ValidityChecker.isBoolean(value, parameterName)
+            elif kind == "FLOAT":
+                ValidityChecker.isFloat(value, parameterName)
+            elif kind == "REGEXP":
+                regExp = entry["regExp"]
+                Logging.trace("--: regexp = %r", regExp.pattern)
+                errorMessage = "%s has a bad syntax" % parameterName
+                ValidityChecker.isValid(regExp.match(value) is not None,
+                                        errorMessage)
+            elif value == "":
+                pass
+            elif kind in [ "RDIRECTORY", "WDIRECTORY" ]:
+                ValidityChecker.isDirectory(value, parameterName)
+            elif kind == "RFILE":
+                ValidityChecker.isReadableFile(value, parameterName)
+            elif kind == "EXECUTABLE":
+                ValidityChecker.isExecutableCommand(value, parameterName)
+            elif kind == "WFILE":
+                ValidityChecker.isWritableFile(value, parameterName)
+            else:
+                Logging.trace("--: no check, unknown kind %r", kind)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def checkVariableList (cls,
+                           parameterNameList : StringList,
+                           parameterNameToValueMap : StringMap):
+        """Checks all values of variables in <parameterNameList> via
+           <parameterNameToValueMap>"""
+
+        Logging.trace(">>: list = %r", parameterNameList)
+        
+        for parameterName in parameterNameList:
+            cls.checkVariable(parameterName, parameterNameToValueMap)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def get (cls,
+             name : String,
+             parameterNameToValueMap : StringMap) -> Object:
+        """Gets value for <name> gained by <parameterNameToValueMap>
+           providing default value from internal map (if any); assumes
+           that correctness check has been done before"""
+
+        Logging.trace(">>: %r", name)
+
+        defaultValue = _DefaultValueHandler.value(name)
+        result = parameterNameToValueMap.get(name, defaultValue)
+
+        Logging.trace("<<: %r", result)
+        return result
 
 #====================
 # TYPE DEFINITIONS
 #====================
 
-class _ConfigDataGlobal:
+@dataclass(frozen=True)
+class _ConfigDataGlobal (AbstractDataType):
     """Represents all configuration data that is global e.g. the
        command paths for generation. Note that this categorization is
        just for systematics, any configuration variable can be set per
        song."""
 
-    _soundStyleNamePrefix = "soundStyle"
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
 
-    # list of attribute names with external representation in config file
-    _attributeNameList = \
+    _audioProcessorMapAliasName : ClassVar = "audioProcessor"
+
+    _attributeNameList : ClassVar = \
         [ "aacCommandLine", "ffmpegCommand", "intermediateFileDirectoryPath",
           "lilypondCommand", "lilypondVersion", "loggingFilePath",
           "midiToWavRenderingCommandLine", "mp4boxCommand",
           "targetDirectoryPath", "tempAudioDirectoryPath",
           "tempLilypondFilePath", "videoTargetMap", "videoFileKindMap" ]
 
-    # attributes derived from other information and stored in object
-    _additionalAttributeNameList = \
-        [ "audioProcessorMap", "intermediateFilesAreKept",
-          "soundStyleNameToTextMap" ]
+    _derivedAttributeNameList : ClassVar = [ "audioProcessorMap" ]
 
-    _attributeNameToKindMap = {
-        "aacCommandLine"                : "S",
-        "audioProcessorMap"             : "{}",
-        "ffmpegCommand"                 : "S",
-        "intermediateFileDirectoryPath" : "S",
-        "intermediateFilesAreKept"      : "B",
-        "lilypondCommand"               : "S",
-        "lilypondVersion"               : "S",
-        "loggingFilePath"               : "S",
-        "midiToWavRenderingCommandLine" : "S",
-        "mp4boxCommand"                 : "S",
-        "soundStyleNameToTextMap"       : "{}",
-        "targetDirectoryPath"           : "S",
-        "tempAudioDirectoryPath"        : "S",
-        "tempLilypondFilePath"          : "S",
-        "videoFileKindMap"              : "{}",
-        "videoTargetMap"                : "{}"
-    }
+    _externalAttributeNameList : ClassVar = [ _audioProcessorMapAliasName ]
+
+    _soundStyleNamePrefix : ClassVar = "soundStyle"
+
+    _defaultAudioProcessorMap : ClassVar = \
+        { "chainSeparator": ";", "mixingCommandLine" : "",
+          "amplificationEffect" : "", "refinementCommandLine" : "",
+          "paddingCommandLine": "", "redirector": "->" }
+
+    #--------------------
+
+    @classmethod
+    def _makeAudioProcessorMap (cls,
+                                st : String) -> StringMap:
+        """Converts string <st> into audio processor map using defaults
+           from <_defaultAudioProcessorMap>"""
+
+        Logging.trace(">>: %s", st)
+
+        result = {}
+        externalMap = convertStringToMap(st)
+
+        for key, value in cls._defaultAudioProcessorMap.items():
+            result[key] = externalMap.get(key, value)
+
+        Logging.trace("<<: %r", result)
+        return result
 
     #--------------------
     # EXPORTED FEATURES
     #--------------------
 
-    @classmethod
-    def initialize (cls, configData):
-        """Initializes global attributes of <configData>"""
+    aacCommandLine                : String    = ""
+    audioProcessorMap             : StringMap = \
+        specialField(None,
+                     lambda st: _ConfigDataGlobal._makeAudioProcessorMap(st),
+                     _audioProcessorMapAliasName)
+    ffmpegCommand                 : String    = "ffmpeg"
+    intermediateFileDirectoryPath : String    = "."
+    lilypondCommand               : String    = "lilypond"
+    lilypondVersion               : String    = "2.18"
+    loggingFilePath               : String    = \
+                                        ("/tmp/logs"
+                                         + "/makeLilypondAll.log")
+    midiToWavRenderingCommandLine : String    = "fluidsynth"
+    mp4boxCommand                 : String    = ""
+    soundStyleNameToTextMap       : StringMap = ""
+    targetDirectoryPath           : String    = "."
+    tempAudioDirectoryPath        : String    = "/tmp"
+    tempLilypondFilePath          : String    = "./temp.ly"
+    videoTargetMap                : StringMap = \
+        specialField(None,
+                     (lambda st :
+                      generateObjectMapFromString(st,
+                                                  VideoTarget())))
+    videoFileKindMap              : StringMap = \
+        specialField(None,
+                     (lambda st :
+                      generateObjectMapFromString(st,
+                                                  VideoFileKind())))
 
-        configData.aacCommandLine                = "aac"
-        configData.audioProcessorMap             = ""
-        configData.ffmpegCommand                 = "ffmpeg"
-        configData.intermediateFileDirectoryPath = "."
-        configData.intermediateFilesAreKept      = False
-        configData.lilypondCommand               = "lilypond"
-        configData.lilypondVersion               = "2.18"
-        configData.loggingFilePath               = ("/tmp/logs"
-                                                   + "/makeLilypondAll.log")
-        configData.midiToWavRenderingCommandLine = "fluidsynth"
-        configData.mp4boxCommand                 = "mp4box"
-        configData.soundStyleNameToTextMap       = ""
-        configData.targetDirectoryPath           = "generated"
-        configData.tempAudioDirectoryPath        = "/tmp"
-        configData.tempLilypondFilePath          = "."
-        configData.videoTargetMap                = ""
-        configData.videoFileKindMap              = ""
-
+    #--------------------
     #--------------------
 
     @classmethod
-    def toString (cls, configData):
-        """Returns the string representation of the global attributes
-           of <configData>"""
-
-        st = AttributeManager.convertToString(configData,
-                                              cls.__name__,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    @classmethod
-    def checkValidity (cls, configurationFile):
+    def checkValidity (cls,
+                       parameterNameToValueMap : StringMap):
         """Checks the validity of data to be read from
-           <configurationFile> for the global attributes"""
+           <parameterNameToValueMap> for the global attributes in the
+           ltbvc configuration"""
 
         Logging.trace(">>")
 
-        getValueProc = \
-            lambda name : _LocalValidator.get(name,
-                                              configurationFile.getValue)
-
-        attributeNameList = (cls._attributeNameList
-                             + [ "audioProcessor", "keepIntermediateFiles" ])
-        _checkVariableList(attributeNameList, configurationFile)
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        _LocalValidator.checkVariableList(relevantAttributeNameList,
+                                          parameterNameToValueMap)
 
         # validate sound style definitions
         styleNamePrefix = cls._soundStyleNamePrefix
-        soundStyleNameList = _getStylesWithNamePrefix(styleNamePrefix,
-                                                      configurationFile)
+        soundStyleNameList = \
+            _getStylesWithNamePrefix(styleNamePrefix,
+                                     parameterNameToValueMap)
 
         for styleName in soundStyleNameList:
             _LocalValidator.checkVariable(styleName,
-                                          configurationFile.getValue,
+                                          parameterNameToValueMap,
                                           styleNamePrefix + "*")
 
         # validate audio processor map
-        audioProcessorMapAsString = getValueProc("audioProcessor")
+        parameterName = cls._audioProcessorMapAliasName
+        audioProcessorMapAsString = \
+            parameterNameToValueMap.get(cls._audioProcessorMapAliasName)
         audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
         apmGet = audioProcessorMap.get
 
         chainSeparator        = apmGet("chainSeparator", ";")
         mixingCommandLine     = apmGet("mixingCommandLine", "")
-        normalizationEffect   = apmGet("normalizationEffect", "")
+        amplificationEffect   = apmGet("amplificationEffect", "")
         paddingCommandLine    = apmGet("paddingCommandLine", "")
         redirector            = apmGet("redirector", "->")
         refinementCommandLine = apmGet("refinementCommandLine", "")
 
-        Logging.trace("--: chainSep = '%s', mixCmd = '%s',"
-                      + " normEffect = '%s', padCmd = '%s',"
-                      + " redirector = '%s', refCmd = '%s'",
+        Logging.trace("--: chainSep = %r, mixCmd = %r,"
+                      + " amplifEffect = %r, padCmd = %r,"
+                      + " redirector = %r, refCmd = %r",
                       chainSeparator, mixingCommandLine,
-                      normalizationEffect, paddingCommandLine,
+                      amplificationEffect, paddingCommandLine,
                       redirector, refinementCommandLine)
 
         ValidityChecker.isValid(chainSeparator > "",
             "'audioProcessor.chainSeparator' must be non-empty")
-        ValidityChecker.isValid(normalizationEffect > "",
-            "'audioProcessor.normalizationEffect' must be non-empty")
+        ValidityChecker.isValid(amplificationEffect > "",
+            "'audioProcessor.amplificationEffect' must be non-empty")
         ValidityChecker.isValid(redirector > "",
             "'audioProcessor.redirector' must be non-empty")
         ValidityChecker.isValid(refinementCommandLine > "",
             "'audioProcessor.refinementCommandLine' must be defined")
-        
+
         # additional checks
-        aacCommandLine = getValueProc("aacCommandLine")
-        commandNameMap = { "aacCommandLine" : aacCommandLine }
+        parameterName = "aacCommandLine"
+        aacCommandLine = parameterNameToValueMap.get(parameterName)
+        commandNameMap = { parameterName : aacCommandLine }
 
         for key, commandLine in audioProcessorMap.items():
-            if key not in ["chainSeparator", "normalizationEffect",
+            if key not in ["chainSeparator", "amplificationEffect",
                            "redirector"]:
                 commandNameMap["audioProcessor." + key] = commandLine
 
-        for variableName, commandLine in commandNameMap.items():
-            command = commandLine.split()[0]
-            ValidityChecker.isReadableFile(command, variableName)
+        for parameterName, commandLine in commandNameMap.items():
+            command, _, _ = commandLine.partition(" ")
+
+            if command > "":
+                ValidityChecker.isExecutableCommand(command, parameterName)
 
         Logging.trace("<<")
 
     #--------------------
 
     @classmethod
-    def deserializeObjects (cls, configData):
-        """Adapts strings in <configData> into final list or map form."""
-
-        Logging.trace(">>")
-        cstl = convertStringToList
-        
-        configData.videoFileKindMap = \
-            generateObjectMapFromString(configData.videoFileKindMap,
-                                        VideoFileKind())
-        configData.videoTargetMap = \
-            generateObjectMapFromString(configData.videoTargetMap,
-                                        VideoTarget())
-
-        audioProcessorMapAsString = configData.audioProcessorMap
-        audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
-
-        defaultMap = { "chainSeparator": ";", "mixingCommandLine" : "",
-                       "paddingCommandLine": "", "redirector": "->" }
-                
-        for key, defaultValue in defaultMap.items():
-            if key not in audioProcessorMap:
-                audioProcessorMap[key] = defaultValue
-
-        configData.audioProcessorMap = audioProcessorMap
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def read (cls, configData, configurationFile):
-        """Reads global configuration data from <configurationFile> into
-           <configData> without any string interpretation for object
-           serializations."""
+    def deserialize (cls,
+                     currentObject : Object,
+                     parameterNameToValueMap : StringMap):
+        """Deserializes global configuration data from strings in
+           <parameterNameToValueMap> updating <currentObject>"""
 
         Logging.trace(">>")
 
-        getValueProc = \
-            lambda name : _LocalValidator.get(name,
-                                              configurationFile.getValue)
-
-        _readAttributesFromConfigFile(configData, cls._attributeNameList,
-                                      configurationFile)
-
-        configData.audioProcessorMap = getValueProc("audioProcessor")
-        configData.intermediateFilesAreKept = \
-            getValueProc("keepIntermediateFiles")
-        configData.soundStyleNameToTextMap = \
-            _readStylesWithPrefix(cls._soundStyleNamePrefix,
-                                  configurationFile)
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        localNameToValueMap = \
+            _filterByKeyList(parameterNameToValueMap,
+                             relevantAttributeNameList)
+        DataTypeSupport.checkAndSetFromMap(currentObject,
+                                           localNameToValueMap)
+        SETATTR(currentObject, "soundStyleNameToTextMap",
+                _readStylesWithPrefix(cls._soundStyleNamePrefix,
+                                      parameterNameToValueMap))
 
         Logging.trace("<<")
 
 #====================
 
-class _ConfigDataMidiHumanization:
+@dataclass(frozen=True)
+class _ConfigDataMidiHumanization (AbstractDataType):
     """Represents all configuration data that covers the MIDI
        humanization; single variable is a mapping from humanization
        style name to humanization style text"""
 
-    _humanizationStyleNamePrefix = "humanizationStyle"
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
 
-    # list of attribute names with external representation in config file
-    _attributeNameList = \
-        [ "humanizedVoiceNameSet", "voiceNameToVariationFactorMap" ]
+    _attributeNameList : ClassVar = \
+        [ "humanizationStyleNameToTextMap", "humanizedVoiceNameSet",
+          "voiceNameToVariationFactorMap" ]
 
-    # attributes derived from other information and stored in object
-    _additionalAttributeNameList = \
-        [ "humanizationStyleNameToTextMap" ]
+    _humanizationStyleNamePrefix : ClassVar = "humanizationStyle"
 
-    _attributeNameToKindMap = {
-        "humanizationStyleNameToTextMap" : "{}",
-        "humanizedVoiceNameSet"          : "{}",
-        "voiceNameToVariationFactorMap"  : "{}"
-    }
-    
     #--------------------
     # EXPORTED FEATURES
     #--------------------
 
-    @classmethod
-    def initialize (cls, configData):
-        """Initializes midi humanization attributes of <configData>"""
-
-        configData.humanizationStyleNameToTextMap = ""
-        configData.humanizedVoiceNameSet          = ""
-        configData.voiceNameToVariationFactorMap  = ""
-
-    #--------------------
-
-    @classmethod
-    def toString (cls, configData):
-        """Returns the string representation of the midi humanization
-           attributes of <configData>"""
-
-        st = AttributeManager.convertToString(configData,
-                                              cls.__name__,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
+    # -- attributes
+    humanizationStyleNameToTextMap : StringMap = None
+    humanizedVoiceNameSet          : StringMap = \
+        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+    voiceNameToVariationFactorMap  : StringMap = \
+        specialField(None,
+                     (lambda st :
+                      { voiceName : list(map(float, factors.split("/")))
+                        for voiceName, factors
+                            in convertStringToMap(st).items()}))
 
     #--------------------
 
     @classmethod
-    def checkValidity (cls, configurationFile):
+    def checkValidity (cls,
+                       parameterNameToValueMap : StringMap):
         """Checks the validity of data to be read from
-           <configurationFile> for the midi humanization attributes"""
+           <parameterNameToValueMap> for the midi humanization
+           attributes"""
 
         Logging.trace(">>")
 
-        _checkVariableList(cls._attributeNameList, configurationFile)
+        relevantAttributeNameList = cls._attributeNameList
+        _LocalValidator.checkVariableList(relevantAttributeNameList,
+                                          parameterNameToValueMap)
 
         styleNamePrefix = cls._humanizationStyleNamePrefix
         humanizationStyleNameList = \
-            _getStylesWithNamePrefix(styleNamePrefix, configurationFile)
+            _getStylesWithNamePrefix(styleNamePrefix,
+                                     parameterNameToValueMap)
 
         for styleName in humanizationStyleNameList:
             _LocalValidator.checkVariable(styleName,
-                                          configurationFile.getValue,
+                                          parameterNameToValueMap,
                                           styleNamePrefix + "*")
 
         Logging.trace("<<")
@@ -361,234 +837,215 @@ class _ConfigDataMidiHumanization:
     #--------------------
 
     @classmethod
-    def deserializeObjects (cls, configData):
-        """Adapts strings in <configData> into final list or map form."""
-
-        Logging.trace(">>")
-        
-        vntvfMap = {}
-        tempMap = convertStringToMap(configData.voiceNameToVariationFactorMap)
-
-        for voiceName, factors in tempMap.items():
-            scalingFactors = list(map(lambda x: float(x), factors.split("/")))
-            vntvfMap[voiceName] = scalingFactors
-
-        configData.voiceNameToVariationFactorMap = vntvfMap
-        
-        configData.humanizedVoiceNameSet = \
-            set(convertStringToList(configData.humanizedVoiceNameSet))
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def read (cls, configData, configurationFile):
-        """Reads midi humanization configuration data from
-           <configurationFile> into <configData>."""
+    def deserialize (cls,
+                     currentObject : Object,
+                     parameterNameToValueMap : StringMap):
+        """Deserializes midi humanization configuration data from strings
+           in <parameterNameToValueMap> updating <currentObject>"""
 
         Logging.trace(">>")
 
-        _readAttributesFromConfigFile(configData, cls._attributeNameList,
-                                      configurationFile)
-        configData.humanizationStyleNameToTextMap = \
-            _readStylesWithPrefix(cls._humanizationStyleNamePrefix,
-                                  configurationFile)
+        relevantAttributeNameList = cls._attributeNameList
+        localNameToValueMap = \
+            _filterByKeyList(parameterNameToValueMap,
+                             relevantAttributeNameList)
+        DataTypeSupport.checkAndSetFromMap(currentObject,
+                                           localNameToValueMap)
+        SETATTR(currentObject, "humanizationStyleNameToTextMap",
+                _readStylesWithPrefix(cls._humanizationStyleNamePrefix,
+                                      parameterNameToValueMap))
 
         Logging.trace("<<")
 
 #====================
 
-class _ConfigDataNotation:
+@dataclass(frozen=True)
+class _ConfigDataNotation (AbstractDataType):
     """Represents all configuration data that refers to the notation:
        this is the map from phase and voice name to the staff kind and
        the map from phase and voice name to the clef."""
-
-    # list of attribute names with external representation in config file
-    _attributeNameList = \
-        [ "phaseAndVoiceNameToClefMap", "phaseAndVoiceNameToStaffListMap",
-          "voiceNameToScoreNameMap" ]
-
-    _attributeNameToKindMap = {
-        "phaseAndVoiceNameToClefMap"      : "{}",
-        "phaseAndVoiceNameToStaffListMap" : "{}",
-        "voiceNameToScoreNameMap"         : "{}"
-    }
-    
-    #--------------------
-    # EXPORTED FEATURES
-    #--------------------
-
-    @classmethod
-    def initialize (cls, configData):
-        """Initializes notation attributes of <configData>"""
-
-        configData.phaseAndVoiceNameToClefMap      = ""
-        configData.phaseAndVoiceNameToStaffListMap = ""
-        configData.voiceNameToScoreNameMap         = ""
-
-    #--------------------
-
-    @classmethod
-    def toString (cls, configData):
-        """Returns the string representation of the notation
-           attributes of <configData>"""
-
-        st = AttributeManager.convertToString(configData,
-                                              cls.__name__,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    @classmethod
-    def checkValidity (cls, configurationFile):
-        """Checks the validity of data to be read from
-           <configurationFile> for the notation attributes"""
-
-        Logging.trace(">>")
-
-        _checkVariableList(cls._attributeNameList, configurationFile)
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def deserializeObjects (cls, configData):
-        """Adapts strings in <configData> into final list or map form."""
-
-        Logging.trace(">>")
-        
-        pAVnToStaffListMap = \
-            convertStringToMap(configData.phaseAndVoiceNameToStaffListMap)
-
-        for phase, voiceNameToStaffListMap in pAVnToStaffListMap.items():
-            updatedMap = {}
-
-            for voiceName, staffListString in voiceNameToStaffListMap.items():
-                staffList = convertStringToList(staffListString, "/")
-                updatedMap[voiceName] = staffList
-
-            pAVnToStaffListMap[phase] = updatedMap
-                
-        configData.phaseAndVoiceNameToClefMap = \
-            convertStringToMap(configData.phaseAndVoiceNameToClefMap)
-        configData.phaseAndVoiceNameToStaffListMap = pAVnToStaffListMap
-        configData.voiceNameToScoreNameMap = \
-            convertStringToMap(configData.voiceNameToScoreNameMap)
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def read (cls, configData, configurationFile):
-        """Reads notation configuration data from <configurationFile>
-           into <configData>."""
-
-        Logging.trace(">>")
-
-        _readAttributesFromConfigFile(configData, cls._attributeNameList,
-                                      configurationFile)
-
-        Logging.trace("<<")
-
-#====================
-
-class _ConfigDataSong:
-    """Represents all configuration data for a song like e.g. the voice names
-       or the song title. Note that this categorization is just for
-       systematics, any configuration variable can be set per song."""
-
-    _attributeNameList = \
-      [ "audioVoiceNameSet", "countInMeasureCount",
-        "extractVoiceNameSet", "fileNamePrefix", "includeFilePath",
-        "intermediateFilesAreKept", "measureToHumanizationStyleNameMap",
-        "measureToTempoMap", "midiVoiceNameList",
-        "scoreVoiceNameList", "title",
-        "trackNumber", "voiceNameToChordsMap", "voiceNameToLyricsMap",
-        "voiceNameToOverrideFileNameMap" ]
-
-    # attributes derived from other information and stored in object
-    _additionalAttributeNameList = \
-      [ "parallelTrackFilePath", "parallelTrackVolume", "shiftOffset",
-        "songComposerText", "songYear", "voiceNameList",
-        "voiceNameToVoiceDataMap" ]
-    
-    _attributeNameToKindMap = {
-        "audioVoiceNameSet"                 : "{}",
-        "countInMeasureCount"               : "I",
-        "extractVoiceNameSet"               : "{}",
-        "fileNamePrefix"                    : "S",
-        "includeFilePath"                   : "S",
-        "intermediateFilesAreKept"          : "B",
-        "measureToHumanizationStyleNameMap" : "{}",
-        "measureToTempoMap"                 : "{}",
-        "midiVoiceNameList"                 : "[]",
-        "parallelTrackFilePath"             : "S",
-        "parallelTrackVolume"               : "F",
-        "scoreVoiceNameList"                : "[]",
-        "shiftOffset"                       : "F",
-        "songComposerText"                  : "S",
-        "songYear"                          : "I",
-        "title"                             : "S",
-        "trackNumber"                       : "I",
-        "voiceNameList"                     : "[]",
-        "voiceNameToChordsMap"              : "{}",
-        "voiceNameToLyricsMap"              : "{}",
-        "voiceNameToOverrideFileNameMap"    : "{}",
-        "voiceNameToVoiceDataMap"           : "{}"
-    }
-    
-    _voiceAttributeNameList = [
-        "midiChannelList", "midiInstrumentList",
-        "midiVolumeList", "panPositionList", "reverbLevelList",
-        "soundVariantList", "voiceNameList"]
 
     #--------------------
     # LOCAL FEATURES
     #--------------------
 
-    @classmethod
-    def _adaptMap (cls, map, keyKind='S', valueKind='S'):
-        """Changes in place the keys and values of <map>; <keyKind> tells the
-           target kind of the keys, <valueKind> those of the values"""
+    _attributeNameList : ClassVar = \
+        [ "phaseAndVoiceNameToClefMap", "phaseAndVoiceNameToStaffListMap",
+          "voiceNameToScoreNameMap" ]
 
-        Logging.trace(">>: map = %s, keyKind = %s, valueKind = %s",
-                      map, keyKind, valueKind)
+    #--------------------
+    # EXPORTED FEATURES
+    #--------------------
 
-        otherMap = dict(map)
-        map.clear()
-
-        for key, value in otherMap.items():
-            newKey   = adaptToKind(key,   keyKind)
-            newValue = adaptToKind(value, valueKind)
-            map[newKey] = newValue
-
-        Logging.trace("<<: %s", map)
+    phaseAndVoiceNameToClefMap      : StringMap = \
+        specialField(None, lambda st : convertStringToMap(st))
+    phaseAndVoiceNameToStaffListMap : StringMap = \
+        specialField(None,
+                     lambda st:
+                     { phase : { voiceName :
+                                 convertStringToList(staffListString, "/")
+                                 for voiceName, staffListString
+                                 in voiceNameToStaffListMap.items() }
+                       for phase, voiceNameToStaffListMap
+                       in convertStringToMap(st).items() })
+    voiceNameToScoreNameMap         : StringMap = \
+        specialField(None, lambda st : convertStringToMap(st))
 
     #--------------------
 
     @classmethod
-    def _checkStringLists (cls, voiceNames, midiChannels, midiInstruments,
-                           midiVolumes, panPositions, reverbLevels,
-                           soundVariants):
+    def checkValidity (cls,
+                       parameterNameToValueMap : StringMap):
+        """Checks the validity of data to be read from
+           <parameterNameToValueMap> for the notation attributes"""
+
+        Logging.trace(">>")
+        relevantAttributeNameList = cls._attributeNameList
+        _LocalValidator.checkVariableList(relevantAttributeNameList,
+                                          parameterNameToValueMap)
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def deserialize (cls,
+                     currentObject : Object,
+                     parameterNameToValueMap : StringMap):
+        """Deserializes notation configuration data from strings
+           in <parameterNameToValueMap> updating <currentObject>"""
+
+        Logging.trace(">>")
+        relevantAttributeNameList = cls._attributeNameList
+        localNameToValueMap = \
+            _filterByKeyList(parameterNameToValueMap,
+                             relevantAttributeNameList)
+        DataTypeSupport.checkAndSetFromMap(currentObject,
+                                           localNameToValueMap)
+        Logging.trace("<<")
+
+#====================
+
+@dataclass(frozen=True)
+class _ConfigDataSong (AbstractDataType):
+    """Represents all configuration data for a song like e.g. the voice names
+       or the song title. Note that this categorization is just for
+       systematics, any configuration variable can be set per song."""
+
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
+
+    _attributeNameList : ClassVar = [
+        "audioVoiceNameSet", "countInMeasureCount",
+        "extractVoiceNameSet", "fileNamePrefix", "includeFilePath",
+        "intermediateFilesAreKept", "measureToHumanizationStyleNameMap",
+        "measureToTempoMap", "midiVoiceNameList", "scoreVoiceNameList",
+        "title", "trackNumber", "voiceNameList","voiceNameToChordsMap",
+        "voiceNameToLyricsMap", "voiceNameToOverrideFileNameMap",
+        "voiceNameToVoiceDataMap"
+    ]
+
+    _derivedAttributeNameList : ClassVar = [
+        "parallelTrackFilePath", "parallelTrackVolume", "shiftOffset",
+        "songComposerText", "songYear"
+    ]
+    
+    _externalAttributeNameList : ClassVar = [
+        "parallelTrack", "composerText", "year"
+    ]
+
+
+    _defaultTempoSetting = (120, 4)  # 120 bpm, 4/4
+
+    #--------------------
+
+    @classmethod
+    def _adjustVoiceAttributeList (cls,
+                                   voiceAttributeNameToDataMap : Dictionary,
+                                   attributeListName : String,
+                                   value : String = None):
+        """Sets data in attribute list named <attributeListName> within map
+           <voiceAttributeNameToDataMap> to <value>; if value is not set,
+           this is the midi channel list and it is set to appropriate
+           heuristic values"""
+
+        Logging.trace(">>: attributeList = %s, value = %r",
+                      attributeListName, value)
+
+        voiceNames = voiceAttributeNameToDataMap["voiceNameList"]
+        voiceCount = cls._elementCountInString(voiceNames)
+
+        if attributeListName not in voiceAttributeNameToDataMap:
+            adjustmentIsNecessary = True
+        else:
+            attributeDataAsString = \
+                voiceAttributeNameToDataMap[attributeListName]
+
+            # if there are some elements, leave them as is and
+            # possibly complain later about a wrong count
+            adjustmentIsNecessary = (attributeDataAsString.strip() == "")
+
+        if adjustmentIsNecessary:
+            if value is not None:
+                correctValue = (value + ", ")  * (voiceCount - 1) + value
+            else:
+                voiceNameList = convertStringToList(voiceNames)
+                correctValue = ""
+
+                if attributeListName == "midiChannelList":
+                    midiChannelList = [  1,  2,  3,  4,  5,  6, 7, 8, 9,
+                                        11, 12, 13, 14, 15, 16]
+                    j = 0
+
+                    for voiceName in voiceNameList:
+                        isDrumVoice = (voiceName in ("drums", "percussion"))
+                        correctValue += (iif(j > 0, ", ", "")
+                                         + iif(isDrumVoice, "10",
+                                               str(midiChannelList[j])))
+                        j += iif(j == 14 or isDrumVoice, 0, 1)
+                else:
+                    voiceToInstrumentMap = {
+                        "bass" : "34", "brass" : "56", "guitar" : "26",
+                        "organ" : "18", "reed" : "64", "strings" : "48",
+                        "synthesizer" : "80", "vocals" : "54" }
+
+                    for voiceName in voiceNameList:
+                        correctValue += (iif(i > 0, ", ", "")
+                                         + voiceToInstrumentMap.get(voiceName,
+                                                                    "0"))
+
+            # set associated data to correct value
+            voiceAttributeNameToDataMap[attributeListName] = correctValue
+            Logging.trace("--: correct value = %r", correctValue)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def _checkStringLists (cls,
+                           voiceNames : String,
+                           midiChannels : String,
+                           midiInstruments : String,
+                           midiVolumes : String,
+                           panPositions : String,
+                           reverbLevels : String,
+                           soundVariants : String):
         """Checks whether data for voice list and voice data read from
            configuration file is okay."""
 
-        Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
-                      + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', reverbLevels = '%s',"
-                      + " soundVariants = '%s'",
+        Logging.trace(">>: voiceNames = %r, midiChannels = %r,"
+                      + " midiInstruments = %r, midiVolumes = %r,"
+                      + " panPositions = %r, reverbLevels = %r,"
+                      + " soundVariants = %r",
                       voiceNames, midiChannels, midiInstruments,
                       midiVolumes, panPositions, reverbLevels,
                       soundVariants)
 
         checkForRequiredLength = (lambda st, valueName, elementCount:
-            ValidityChecker.isValid(cls._elementCountInString(st) == elementCount,
-                                    ("'%s' must contain %d elements"
+            ValidityChecker.isValid(cls._elementCountInString(st)
+                                    in (1, elementCount),
+                                    ("%r must contain %d elements"
                                      + " to match 'voiceNameList'")
                                     % (valueName, elementCount)))
 
@@ -599,44 +1056,58 @@ class _ConfigDataSong:
         checkForRequiredLength(midiVolumes, "midiVolumeList", voiceCount)
         checkForRequiredLength(panPositions, "panPositionList", voiceCount)
         checkForRequiredLength(soundVariants, "soundVariantList", voiceCount)
+        checkForRequiredLength(reverbLevels, "reverbLevelList", voiceCount)
 
-        if reverbLevels.strip() != "":
-            checkForRequiredLength(reverbLevels, "reverbLevelList", voiceCount)
-            
         Logging.trace("<<")
 
     #--------------------
 
     @classmethod
-    def _convertToVoiceMap (cls, configData,
-                            voiceNames, midiChannels, midiInstruments,
-                            midiVolumes, panPositions, reverbLevels,
-                            soundVariants):
-        """Converts strings read from configuration file to voice name
-           list and map to voice descriptors"""
+    def _convertStringToRealMap (cls,
+                                 st : String) -> Map:
+        """Reads map from <st> and changes its keys of to real"""
 
-        Logging.trace(">>: voiceNames = '%s', midiChannels = '%s',"
-                      + " midiInstruments = '%s', midiVolumes = '%s',"
-                      + " panPositions = '%s', reverbLevels = '%s',"
-                      + " soundVariants = '%s'",
+        Logging.trace(">>: st = %r", st)
+        currentMap = convertStringToMap(st)
+        result = { adaptToKind(key, "R") : value
+                   for (key, value) in currentMap.items() }
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    def _convertToVoiceMap (self,
+                            voiceNames : String,
+                            midiChannels : String,
+                            midiInstruments : String,
+                            midiVolumes : String,
+                            panPositions : String,
+                            reverbLevels : String,
+                            soundVariants : String) -> Tuple:
+        """Converts strings read from configuration file to voice name
+           list and a map from voice names to voice descriptors"""
+
+        Logging.trace(">>: voiceNames = %r, midiChannels = %r,"
+                      + " midiInstruments = %r, midiVolumes = %r,"
+                      + " panPositions = %r, reverbLevels = %r,"
+                      + " soundVariants = %r",
                       voiceNames, midiChannels, midiInstruments,
                       midiVolumes, panPositions, reverbLevels,
                       soundVariants)
 
-        configData.voiceNameList = convertStringToList(voiceNames)
+        voiceNameList = convertStringToList(voiceNames)
 
         midiChannelList    = convertStringToList(midiChannels, kind="I")
         midiInstrumentList = convertStringToList(midiInstruments)
         midiVolumeList     = convertStringToList(midiVolumes, kind="I")
         panPositionList    = convertStringToList(panPositions)
-        reverbLevelList    = convertStringToList(reverbLevels, kind="F")
+        reverbLevelList    = convertStringToList(reverbLevels, kind="R")
         soundVariantList   = convertStringToList(soundVariants)
 
-        configData.voiceNameToVoiceDataMap = {}
+        voiceNameToVoiceDataMap = {}
 
-        for i in range(len(configData.voiceNameList)):
+        for i, voiceName in enumerate(voiceNameList):
             voiceDescriptor = VoiceDescriptor()
-            voiceName = configData.voiceNameList[i]
             voiceDescriptor.voiceName      = voiceName
             voiceDescriptor.midiChannel    = midiChannelList[i]
             voiceDescriptor.midiInstrument = midiInstrumentList[i]
@@ -644,36 +1115,40 @@ class _ConfigDataSong:
             voiceDescriptor.panPosition    = panPositionList[i]
             voiceDescriptor.reverbLevel    = reverbLevelList[i]
             voiceDescriptor.soundVariant   = soundVariantList[i]
-            configData.voiceNameToVoiceDataMap[voiceName] = voiceDescriptor
+            voiceNameToVoiceDataMap[voiceName] = voiceDescriptor
 
-        Logging.trace("<<: %s", configData.voiceNameToVoiceDataMap)
+        result = (voiceNameList, voiceNameToVoiceDataMap)
+        Logging.trace("<<: %r", result)
+        return result
 
     #--------------------
 
     @classmethod
-    def _convertTargetMapping (cls, mapAsString, isLyricsMap):
+    def _convertTargetMapping (cls,
+                               mapAsString : String,
+                               isLyricsMap : Boolean) -> StringMap:
         """Prepares a map from voice name to lyrics or chord data
            (depending on <isLyricsMap>) based on data in
            <mapAsString>; voice names for lyrics map to a mapping from
            target to lyrics line count, voice names for chords map to
            sets of targets"""
 
-        Logging.trace(">>: map = '%s', isLyrics = %s",
+        Logging.trace(">>: map = %r, isLyrics = %r",
                       mapAsString, isLyricsMap)
 
         targetAbbrevToNameMap = { "e": "extract", "m": "midi",
                                   "s": "score",   "v": "video" }
-        map = convertStringToMap(mapAsString)
+        currentMap = convertStringToMap(mapAsString)
 
-        if map is None:
+        if currentMap is None:
             result = None
         else:
             result = {}
-            
-            for voiceName, value in map.items():
+
+            for voiceName, value in currentMap.items():
                 entry = iif(isLyricsMap, {}, set())
                 targetList = value.split("/")
-                Logging.trace("--: targetList(%s) = %s",
+                Logging.trace("--: targetList(%r) = %r",
                               voiceName, targetList)
 
                 for targetSpec in targetList:
@@ -681,7 +1156,7 @@ class _ConfigDataSong:
 
                     if len(targetSpec) > 0:
                         target, rest = targetSpec[0], targetSpec[1:]
-                        Logging.trace("--: target = %s", target)
+                        Logging.trace("--: target = %r", target)
 
                         if target in "emsv":
                             target = targetAbbrevToNameMap[target]
@@ -696,13 +1171,14 @@ class _ConfigDataSong:
 
                 result[voiceName] = entry
 
-        Logging.trace("<<: %s", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
 
     @classmethod
-    def _elementCountInString (cls, st):
+    def _elementCountInString (cls,
+                               st : String) -> Natural:
         """Returns count of comma-separated elements in <st>"""
 
         return len(st.strip().split(","))
@@ -710,11 +1186,12 @@ class _ConfigDataSong:
     #--------------------
 
     @classmethod
-    def _splitParallelTrackInfo (cls, configData, parallelTrackInfo):
+    def _splitParallelTrackInfo (cls,
+                                 parallelTrackInfo : String) -> Tuple:
         """Splits string <parallelTrackInfo> given for parallel track
            into file path, track volume and shift offset"""
 
-        Logging.trace(">>: %s", parallelTrackInfo)
+        Logging.trace(">>: %r", parallelTrackInfo)
 
         defaultFilePath = ""
         defaultVolume   = 1.0
@@ -731,73 +1208,116 @@ class _ConfigDataSong:
         if len(partList) == 2:
             partList.append(str(defaultOffset))
 
-        configData.parallelTrackFilePath = partList[0].strip()
-        configData.parallelTrackVolume   = float(partList[1])
-        configData.shiftOffset           = float(partList[2])
+        parallelTrackFilePath = partList[0].strip()
+        parallelTrackVolume   = float(partList[1])
+        shiftOffset           = float(partList[2])
+        result = (parallelTrackFilePath, parallelTrackVolume, shiftOffset)
 
-        Logging.trace("<<: %s", partList)
+        Logging.trace("<<: %r", result)
+        return result
+
+    #--------------------
+
+    @classmethod
+    def _stringToTempoMap (cls,
+                           st : String) -> Map:
+        """Returns a tempo map constructed from <st> which maps the measure
+           into a pair of tempo and measure length in quarters"""
+
+        Logging.trace(">>: %s", st)
+
+        tempoMap = { adaptToKind(key, "R") : value
+                     for key, value in convertStringToMap(st).items() }
+
+        for key, value in tempoMap.items():
+            if "|" not in value:
+                tempo, fractionString = value, "4/4"
+            else:
+                tempo, fractionString = value.split("|")
+
+            tempo = float(tempo)
+            numerator, denominator = fractionString.split("/")
+            signatureFraction = float(numerator) / float(denominator)
+            measureLengthInQuarters = round(4.0 * signatureFraction, 5)
+            tempoMap[key] = (tempo, measureLengthInQuarters)
+
+        Logging.trace("<<: %r", tempoMap)
+        return tempoMap
 
     #--------------------
     # EXPORTED FEATURES
     #--------------------
 
-    @classmethod
-    def initialize (cls, configData):
-        """Initializes song related attributes of <configData>"""
-
-        configData.audioVoiceNameSet                 = set()
-        configData.countInMeasureCount               = 0
-        configData.extractVoiceNameSet               = set()
-        configData.fileNamePrefix                    = "XXXX"
-        configData.includeFilePath                   = "%includeFilePath%"
-        configData.intermediateFilesAreKept          = False
-        configData.measureToHumanizationStyleNameMap = None
-        configData.measureToTempoMap                 = None
-        configData.midiVoiceNameList                 = ""
-        configData.parallelTrackFilePath             = ""
-        configData.parallelTrackVolume               = 1.0
-        configData.scoreVoiceNameList                = ""
-        configData.shiftOffset                       = 0.0
-        configData.songComposerText                  = None
-        configData.songYear                          = None
-        configData.title                             = "%title%"
-        configData.trackNumber                       = 0
-        configData.voiceNameList                     = ""
-        configData.voiceNameToChordsMap              = {}
-        configData.voiceNameToLyricsMap              = {}
-        configData.voiceNameToOverrideFileNameMap    = {}
-        configData.voiceNameToVoiceDataMap           = {}
+    audioVoiceNameSet                 : StringSet = \
+        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+    countInMeasureCount               : Natural = 0
+    extractVoiceNameSet               : StringSet = \
+        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+    fileNamePrefix                    : String = "XXXX"
+    includeFilePath                   : String = ""
+    intermediateFilesAreKept          : Boolean = False
+    measureToHumanizationStyleNameMap : StringMap = \
+        specialField(None,
+                     lambda st: _ConfigDataSong._convertStringToRealMap(st))
+    measureToTempoMap                 : Map = \
+        specialField(None, lambda st: _ConfigDataSong._stringToTempoMap(st))
+    midiVoiceNameList                 : StringList = \
+        specialField((), convertStringToList)
+    parallelTrackFilePath             : String = \
+        specialField("",
+                     lambda st: _ConfigDataSong._splitParallelTrackInfo(st)[0],
+                     "parallelTrack",
+                     lambda st: st.split(",")[0].strip())
+    parallelTrackVolume               : Real = \
+        specialField(0.0,
+                     lambda st: _ConfigDataSong._splitParallelTrackInfo(st)[1],
+                     "parallelTrack",
+                     lambda st: st.split(",")[1].strip())
+    scoreVoiceNameList                : StringList = \
+        specialField((), convertStringToList)
+    shiftOffset                       : Real =  \
+        specialField(0.0,
+                     lambda st: _ConfigDataSong._splitParallelTrackInfo(st)[2],
+                     "parallelTrack",
+                     lambda st: st.split(",")[2].strip())
+    songComposerText                  : String = specialField("", None,
+                                                              "composerText")
+    songYear                          : Natural = specialField(0, None,
+                                                               "year")
+    title                             : String = "%title%"
+    trackNumber                       : Natural = 0
+    voiceNameList                     : StringList = \
+        specialField((), convertStringToList)
+    voiceNameToChordsMap              : StringMap = \
+        specialField(None,
+                     lambda st: _ConfigDataSong._convertTargetMapping(st,
+                                                                      False))
+    voiceNameToLyricsMap              : StringMap = \
+        specialField(None,
+                     lambda st: _ConfigDataSong._convertTargetMapping(st,
+                                                                      True))
+    voiceNameToOverrideFileNameMap    : StringMap = \
+        specialField(None, convertStringToMap)
+    voiceNameToVoiceDataMap           : StringMap = None
 
     #--------------------
 
     @classmethod
-    def toString (cls, configData):
-        """Returns the string representation of the song related
-           attributes of <configData>"""
-
-        attributeNameList = (cls._attributeNameList
-                             + cls._additionalAttributeNameList)
-        st = AttributeManager.convertToString(configData,
-                                              cls.__name__,
-                                              attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    @classmethod
-    def checkValidity (cls, configurationFile):
+    def checkValidity (cls,
+                       parameterNameToValueMap : StringMap):
         """Checks the validity of data to be read from
-           <configurationFile> for the song attributes"""
+           <parameterNameToValueMap> for the song attributes"""
 
         Logging.trace(">>")
 
-        _checkVariableList(cls._attributeNameList, configurationFile)
-        _checkVariableList(cls._voiceAttributeNameList, configurationFile)
-        
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        _LocalValidator.checkVariableList(relevantAttributeNameList,
+                                          parameterNameToValueMap)
+
         getValueProc = \
             lambda name : _LocalValidator.get(name,
-                                              configurationFile.getValue)
+                                              parameterNameToValueMap)
 
         # additional rules
         fileNamePrefix = getValueProc("fileNamePrefix")
@@ -827,505 +1347,177 @@ class _ConfigDataSong:
     #--------------------
 
     @classmethod
-    def deserializeObjects (cls, configData):
-        """Adapts strings in <configData> into final list or map form."""
-
-        Logging.trace(">>")
-        cstl = convertStringToList
-        
-        configData.audioVoiceNameSet = \
-          set(cstl(configData.audioVoiceNameSet))
-        configData.extractVoiceNameSet = \
-          set(cstl(configData.extractVoiceNameSet))
-        configData.measureToHumanizationStyleNameMap = \
-            convertStringToMap(configData.measureToHumanizationStyleNameMap)
-        cls._adaptMap(configData.measureToHumanizationStyleNameMap, 'F')
-        configData.midiVoiceNameList  = cstl(configData.midiVoiceNameList)
-        configData.scoreVoiceNameList = cstl(configData.scoreVoiceNameList)
-        configData.voiceNameToChordsMap = \
-            cls._convertTargetMapping(configData.voiceNameToChordsMap, False)
-        configData.voiceNameToLyricsMap = \
-            cls._convertTargetMapping(configData.voiceNameToLyricsMap, True)
-        configData.voiceNameToOverrideFileNameMap = \
-            convertStringToMap(configData.voiceNameToOverrideFileNameMap)
-
-        # the string representation for the parallel track is stored
-        # in <parallelTrackInfo>
-        cls._splitParallelTrackInfo(configData,
-                                    configData.parallelTrackInfo)
-        
-        # the tempo map maps the measure into a pair of tempo and
-        # measure length in quarters
-        tempoMap = convertStringToMap(configData.measureToTempoMap)
-        cls._adaptMap(tempoMap, 'F')
-
-        for key, value in tempoMap.items():
-            if "|" not in value:
-                tempo, fractionString = value, "4/4"
-            else:
-                tempo, fractionString = value.split("|")
-
-            tempo = float(tempo)
-            numerator, denominator = fractionString.split("/")
-            signatureFraction = float(numerator) / float(denominator)
-            measureLengthInQuarters = round(4.0 * signatureFraction, 5)
-            tempoMap[key] = (tempo, measureLengthInQuarters)
-
-        configData.measureToTempoMap = tempoMap
-        c = configData.voiceNameToVoiceDataMap
-
-        # if the reverb levels are not defined, they will be set to
-        # zeros with the same count as the voice names
-        if c["reverbLevelList"].strip() == "":
-            voiceCount = cls._elementCountInString(c["voiceNameList"])
-            c["reverbLevelList"] = "0, " * (voiceCount - 1) + "0"
-        
-        # the voice data map is synthesized from several lists
-        cls._convertToVoiceMap(configData,
-                               c["voiceNameList"], c["midiChannelList"],
-                               c["midiInstrumentList"], c["midiVolumeList"],
-                               c["panPositionList"], c["reverbLevelList"],
-                               c["soundVariantList"])
-
-        # adapt the different lists (when empty)
-        if len(configData.extractVoiceNameSet) == 0:
-            configData.extractVoiceNameSet.update(configData.voiceNameList)
-
-        if len(configData.midiVoiceNameList) == 0:
-            configData.midiVoiceNameList = list(configData.voiceNameList)
-
-        if len(configData.scoreVoiceNameList) == 0:
-            configData.scoreVoiceNameList = list(configData.voiceNameList)
-
-        if len(configData.audioVoiceNameSet) == 0:
-            configData.audioVoiceNameSet.update(configData.midiVoiceNameList)
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def read (cls, configData, configurationFile):
-        """Reads song configuration data from <configurationFile> into
-           <configData>."""
+    def deserialize (cls,
+                     currentObject : Object,
+                     parameterNameToValueMap : StringMap):
+        """Deserializes notation configuration data from strings in
+           <parameterNameToValueMap> updating <currentObject>"""
 
         Logging.trace(">>")
 
-        _readAttributesFromConfigFile(configData, cls._attributeNameList,
-                                      configurationFile)
-        
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        localNameToValueMap = \
+            _filterByKeyList(parameterNameToValueMap,
+                             relevantAttributeNameList)
+        DataTypeSupport.checkAndSetFromMap(currentObject,
+                                           localNameToValueMap)
+
         getValueProc = \
             lambda name : _LocalValidator.get(name,
-                                              configurationFile.getValue)
+                                              parameterNameToValueMap)
 
-        if configData.includeFilePath == "":
-            configData.includeFilePath = (configData.fileNamePrefix
-                                          + "-music.ly")
+        if currentObject.includeFilePath == "":
+            SETATTR(currentObject, "includeFilePath",
+                    currentObject.fileNamePrefix + "-music.ly")
 
-        configData.parallelTrackInfo = getValueProc("parallelTrack")
-        configData.songComposerText = getValueProc("composerText")
-        configData.songYear = getValueProc("year")
+        if currentObject.measureToTempoMap is None:
+            SETATTR(currentObject, "measureToTempoMap", {})
 
-        configData.voiceNameToVoiceDataMap = {}
+        if 1 not in currentObject.measureToTempoMap:
+            currentObject.measureToTempoMap[1] = cls._defaultTempoSetting
+            
+        # the string representation for the parallel track is stored
+        # in <parallelTrackInfo>
+        parallelTrackInfo = getValueProc("parallelTrack")
+        parallelTrackFilePath, parallelTrackVolume, shiftOffset = \
+            cls._splitParallelTrackInfo(parallelTrackInfo)
+        SETATTR(currentObject, "parallelTrackFilePath", parallelTrackFilePath)
+        SETATTR(currentObject, "parallelTrackVolume",   parallelTrackVolume)
+        SETATTR(currentObject, "shiftOffset",           shiftOffset)
 
-        for voiceAttributeName in cls._voiceAttributeNameList:
-            configData.voiceNameToVoiceDataMap[voiceAttributeName] = \
-                getValueProc(voiceAttributeName)
+        c = dict(parameterNameToValueMap)
 
-        # set to float values for correct output
-        configData.parallelTrackVolume = 0.0
-        configData.shiftOffset         = 0.0
+        # if the different sublists are not defined, they will be set to
+        # defaults with the same count as the voice names
+        voiceCount = cls._elementCountInString(c["voiceNameList"])
+        cls._adjustVoiceAttributeList(c, "midiChannelList")
+        cls._adjustVoiceAttributeList(c, "midiInstrumentList", "0")
+        cls._adjustVoiceAttributeList(c, "midiVolumeList", "80")
+        cls._adjustVoiceAttributeList(c, "panPositionList", "C")
+        cls._adjustVoiceAttributeList(c, "reverbLevelList", "0")
+        cls._adjustVoiceAttributeList(c, "soundVariantList", "COPY")
 
-        Logging.trace("<<: configData = %s", configData)
+        # the voice data map is synthesized from several lists
+        voiceNameList, vnToDataMap = \
+            currentObject._convertToVoiceMap(c["voiceNameList"],
+                                             c["midiChannelList"],
+                                             c["midiInstrumentList"],
+                                             c["midiVolumeList"],
+                                             c["panPositionList"],
+                                             c["reverbLevelList"],
+                                             c["soundVariantList"])
+
+        SETATTR(currentObject, "voiceNameList", voiceNameList)
+        SETATTR(currentObject, "voiceNameToVoiceDataMap", vnToDataMap)
+
+        # adapt the different lists (when empty)
+        def updateListProc (attributeName, otherList):
+            value = getattr(currentObject, attributeName)
+            if value is not None and len(value) == 0:
+                SETATTR(currentObject, attributeName, otherList)
+
+        updateListProc("extractVoiceNameSet", set(voiceNameList))
+        updateListProc("midiVoiceNameList", list(voiceNameList))
+        updateListProc("scoreVoiceNameList", list(voiceNameList))
+        updateListProc("audioVoiceNameSet",
+                       set(currentObject.midiVoiceNameList))
+
+        Logging.trace("<<: %r", currentObject)
 
 #====================
 
-class _ConfigDataSongGroup:
+@dataclass(frozen=True)
+class _ConfigDataSongGroup (AbstractDataType):
     """Represents all configuration data that is considered to be
        related to group of songs like e.g. the name of an album or the
        artist for generation. Note that this categorization is
        just for systematics, any configuration variable can be set per
        song."""
 
-    # list of attribute names with external representation in config file
-    _attributeNameList = \
-      [ "albumArtFilePath", "albumName", "artistName",
-        "audioTargetDirectoryPath",
-        "audioTrackList", "targetFileNamePrefix" ]
+    #--------------------
+    # LOCAL FEATURES
+    #--------------------
 
-    _attributeNameToKindMap = {
-        "albumArtFilePath"         : "S",
-        "albumName"                : "S",
-        "artistName"               : "S",
-        "audioTargetDirectoryPath" : "S",
-        "audioTrackList"           : "S",
-        "targetFileNamePrefix"     : "S"   
-    }
+    _attributeNameList : ClassVar = [
+        "albumArtFilePath", "albumName", "artistName",
+        "audioTargetDirectoryPath", "audioTrackList",
+        "targetFileNamePrefix"
+    ]
+
+    _derivedAttributeNameList : ClassVar = [
+        "audioGroupNameToVoiceNameSetMap"
+    ]
+
+    _externalAttributeNameList : ClassVar = [
+        "audioGroupToVoicesMap"
+    ]
     
     #--------------------
     # EXPORTED FEATURES
     #--------------------
 
-    @classmethod
-    def initialize (cls, configData):
-        """Initializes song group related attributes of
-           <configData>"""
+    albumArtFilePath                : String = ""
+    albumName                       : String = ""
+    artistName                      : String = ""
+    audioGroupNameToVoiceNameSetMap : StringMap = \
+        specialField(None,
+                     (lambda st:
+                      { audioGroupName :
+                            set(convertStringToList(voiceNames, "/"))
+                        for audioGroupName, voiceNames
+                        in convertStringToMap(st).items() }),
+                     "audioGroupToVoicesMap")
+    audioTargetDirectoryPath        : String = "."
+    audioTrackList                  : ObjectList = \
+        specialField((),
+                     lambda st: generateObjectListFromString(st,
+                                                             AudioTrack()))
+    targetFileNamePrefix            : String = ""
 
-        configData.albumArtFilePath                = ""
-        configData.albumName                       = ""
-        configData.artistName                      = ""
-        configData.audioGroupNameToVoiceNameSetMap = ""
-        configData.audioTargetDirectoryPath        = ""
-        configData.audioTrackList                  = ""
-        configData.targetFileNamePrefix            = ""
-
+    #--------------------
     #--------------------
 
     @classmethod
-    def toString (cls, configData):
-        """Returns the string representation of the song
-           group related attributes of <configData>"""
-
-        st = AttributeManager.convertToString(configData,
-                                              cls.__name__,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    @classmethod
-    def checkValidity (cls, configurationFile):
+    def checkValidity (cls,
+                       parameterNameToValueMap : StringMap):
         """Checks the validity of data to be read from
-           <configurationFile> for the song group attributes"""
+           <parameterNameToValueMap> for the song group attributes"""
 
         Logging.trace(">>")
-
-        attributeNameList = (cls._attributeNameList
-                             + [ "audioGroupToVoicesMap" ])
-        _checkVariableList(attributeNameList, configurationFile)
-
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        _LocalValidator.checkVariableList(relevantAttributeNameList,
+                                          parameterNameToValueMap)
         Logging.trace("<<")
 
     #--------------------
 
     @classmethod
-    def deserializeObjects (cls, configData):
-        """Adapts strings in <configData> into final list or map form."""
+    def deserialize (cls,
+                     currentObject : Object,
+                     parameterNameToValueMap : StringMap):
+        """Deserializes song group configuration data from strings in
+           <parameterNameToValueMap> updating <currentObject>"""
 
         Logging.trace(">>")
-
-        audioGroupToVoicesMap = \
-            convertStringToMap(configData.audioGroupNameToVoiceNameSetMap)
-
-        for audioGroupName in audioGroupToVoicesMap.keys():
-            st = audioGroupToVoicesMap[audioGroupName]
-            voiceNameSet = set(convertStringToList(st, "/"))
-            audioGroupToVoicesMap[audioGroupName] = voiceNameSet
-
-        configData.audioGroupNameToVoiceNameSetMap = audioGroupToVoicesMap
-
-        configData.audioTrackList = \
-            generateObjectListFromString(configData.audioTrackList,
-                                         AudioTrack())
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def read (cls, configData, configurationFile):
-        """Reads song group configuration data from <configurationFile>
-           into <configData>."""
-
-        Logging.trace(">>")
-
-        _readAttributesFromConfigFile(configData, cls._attributeNameList,
-                                      configurationFile)
-
-        getValueProc = \
-            lambda name : _LocalValidator.get(name,
-                                              configurationFile.getValue)
-        configData.audioGroupNameToVoiceNameSetMap = \
-            getValueProc("audioGroupToVoicesMap")
-
+        relevantAttributeNameList = (cls._attributeNameList
+                                     + cls._externalAttributeNameList)
+        localNameToValueMap = \
+            _filterByKeyList(parameterNameToValueMap,
+                             relevantAttributeNameList)
+        DataTypeSupport.checkAndSetFromMap(currentObject,
+                                           localNameToValueMap)
         Logging.trace("<<")
 
 #====================
 
-class _LocalValidator:
-    """Encapsulates routines for validation of the configuration
-       file variables."""
-
-    _map = {}
-
-    #--------------------
-    # LOCAL ROUTINES
-    #--------------------
-
-    @classmethod
-    def _setMap (cls, name, defaultValue, kind, regExp=None):
-        """Sets a single entry in internal validation map for configuration
-           variable with <name>, having default <defaultValue> and with type
-           <kind>; if <kind> is 'REGEXP', the additional parameter <regExp>
-           gives the validation regexp"""
-
-        st = ("--" if regExp is None else regExp.pattern)
-        Logging.trace(">>: name = %s, default = '%s', kind = %s,"
-                      + " regExp = '%s'",
-                      name, defaultValue, kind, st)
-
-        cls._map[name] = { "defaultValue" : defaultValue,
-                           "kind"         : kind,
-                           "regExp"       : regExp }
-
-        Logging.trace("<<")
-
-    #--------------------
-    # EXPORTED ROUTINES
-    #--------------------
-
-    @classmethod
-    def initialize (cls):
-        """Sets up internal map for all configuration variables"""
-
-        # abbreviations for pattern functions
-        makeCompactListPat = RegExpPattern.makeCompactListPattern
-        makeListPat        = RegExpPattern.makeListPattern
-        makeMapPat         = RegExpPattern.makeMapPattern
-        makeRegExp         = RegExpPattern.makeRegExp
-
-        # common element patterns
-        noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
-
-        fileNamePattern   = r"[/\w\-_\.]+"
-        identifierPattern = RegExpPattern.identifierPattern
-        integerPattern    = RegExpPattern.integerPattern
-        floatPattern      = RegExpPattern.floatPattern
-
-        # special element patterns
-        audioProcessorKeyPattern = \
-                      (r"(?:(?:mixing|padding|refinement)CommandLine"
-                       + r"|normalizationEffect|chainSeparator|redirector)")
-        beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
-        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
-        fileNameListPattern = makeListPat(fileNamePattern, False)
-        humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
-        humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
-                                    % (floatPattern, floatPattern))
-        parallelTrackPattern = (r"[^,\s]+(?:,\s*%s\s*(?:,\s*%s\s*))"
-                                % (floatPattern, floatPattern))
-        prephasePattern = r"(?:extract|midi|score|video)"
-        staffListPattern = makeCompactListPat("(?:DrumStaff|PianoStaff"
-                                              + "|Staff|TabStaff)")
-        tempoValuePattern = (r"%s(?:\|%s/%s)?"
-                             % (floatPattern, integerPattern, integerPattern))
-        versionPattern = r"\d+(\.\d+)*"
-
-        # simple map patterns
-        idToTextMapPattern = makeMapPat(identifierPattern, noCommaPattern)
-
-        # regular expressions for lists of standard elements
-        emptyFloatListRegExp = makeRegExp(makeListPat(floatPattern, True))
-        floatListRegExp = makeRegExp(makeListPat(floatPattern, False))
-        identifierListRegExp = makeRegExp(makeListPat(identifierPattern,
-                                                      False))
-        emptyIdentifierListRegExp = makeRegExp(makeListPat(identifierPattern,
-                                                           True))
-        instrumentListRegExp = makeRegExp(makeListPat(r"\d+(:\d+)?", False))
-        integerListRegExp = makeRegExp(makeListPat(integerPattern, False))
-
-        # commands
-        cls._setMap("aacCommandLine", "", "STRING")
-        cls._setMap("audioProcessor", None, "REGEXP",
-                    makeRegExp(makeMapPat(audioProcessorKeyPattern,
-                                          noCommaPattern, False)))
-        cls._setMap("ffmpegCommand", None, "EXECUTABLE")
-        cls._setMap("lilypondCommand", None, "EXECUTABLE")
-        cls._setMap("lilypondVersion", None, "REGEXP",
-                    makeRegExp(versionPattern))
-        cls._setMap("midiToWavRenderingCommandLine", None, "STRING")
-        cls._setMap("mp4boxCommand", "", "EXECUTABLE")
-
-        # global settings
-        cls._setMap("keepIntermediateFiles", False, "BOOLEAN")
-
-        # file paths
-        cls._setMap("intermediateFileDirectoryPath", ".", "WDIRECTORY")
-        cls._setMap("loggingFilePath", None, "WFILE")
-        cls._setMap("targetDirectoryPath", ".", "WDIRECTORY")
-        cls._setMap("tempLilypondFilePath", "./temp.ly", "WFILE")
-
-        # song group properties
-        cls._setMap("artistName", "[ARTIST]", "STRING")
-        cls._setMap("albumName", "[ALBUM]", "STRING")
-
-        # general song properties
-        cls._setMap("composerText", "", "STRING")
-        cls._setMap("countInMeasureCount", 0, "NATURAL")
-        cls._setMap("fileNamePrefix", None, "STRING")
-        cls._setMap("includeFilePath", "", "STRING")
-        cls._setMap("title", None, "STRING")
-        cls._setMap("trackNumber", 0, "NATURAL")
-        cls._setMap("voiceNameList", None, "REGEXP", identifierListRegExp)
-        cls._setMap("year", datetime.date.today().year, "NATURAL")
-
-        cls._setMap("measureToTempoMap", None, "REGEXP",
-                    makeRegExp(makeMapPat(floatPattern, tempoValuePattern,
-                                          False)))
-        cls._setMap("phaseAndVoiceNameToClefMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(prephasePattern,
-                                          makeMapPat(identifierPattern,
-                                                     clefPattern))))
-        cls._setMap("phaseAndVoiceNameToStaffListMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(prephasePattern,
-                                          makeMapPat(identifierPattern,
-                                                     staffListPattern))))
-
-        # extract and score generation
-        cls._setMap("extractVoiceNameSet", "", "REGEXP",
-                    emptyIdentifierListRegExp)
-        cls._setMap("scoreVoiceNameList", "", "REGEXP",
-                    emptyIdentifierListRegExp)
-        cls._setMap("voiceNameToChordsMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          makeCompactListPat(r"[esv]"))))
-        cls._setMap("voiceNameToLyricsMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          makeCompactListPat(r"[esv]\d*"))))
-        cls._setMap("voiceNameToScoreNameMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          identifierPattern)))
-
-        # midi generation
-        cls._setMap("humanizedVoiceNameSet", "", "REGEXP",
-                    emptyIdentifierListRegExp)
-        cls._setMap("humanizationStyle*", None, "REGEXP",
-                    makeRegExp(makeMapPat(humanizationKeyPattern,
-                                          humanizationValuePattern,
-                                          False)))
-        cls._setMap("measureToHumanizationStyleNameMap", "{}", "REGEXP",
-                    makeRegExp(makeMapPat(integerPattern,
-                                          identifierPattern)))
-        cls._setMap("midiChannelList", None, "REGEXP", integerListRegExp)
-        cls._setMap("midiInstrumentList", None, "REGEXP",
-                    instrumentListRegExp)
-        cls._setMap("midiPanList", None, "REGEXP",
-                    makeRegExp(makeListPat(r"C|\d+(\.\d+)[RL]", False)))
-        cls._setMap("midiVoiceNameList", "", "REGEXP",
-                    emptyIdentifierListRegExp)
-        cls._setMap("midiVolumeList", None, "REGEXP", integerListRegExp)
-        cls._setMap("voiceNameToVariationFactorMap", "", "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          floatPattern + "/" + floatPattern)))
-
-        # audio file generation
-        cls._setMap("audioGroupToVoicesMap", None, "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          makeCompactListPat(identifierPattern),
-                                          False)))
-        cls._setMap("audioTargetDirectoryPath", ".", "WDIRECTORY")
-        cls._setMap("audioTrackList", None, "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          AudioTrack.regexpPattern(),
-                                          False)))
-        cls._setMap("audioVoiceNameSet", "", "REGEXP",
-                    emptyIdentifierListRegExp)
-        cls._setMap("parallelTrack", "", "REGEXP",
-                    makeRegExp(parallelTrackPattern))
-        cls._setMap("reverbLevelList", "", "REGEXP", emptyFloatListRegExp)
-        cls._setMap("soundStyle*", None, "STRING")
-        cls._setMap("soundVariantList", None, "REGEXP",
-                    identifierListRegExp)
-        cls._setMap("tempAudioDirectoryPath", ".", "WDIRECTORY")
-        cls._setMap("voiceNameToOverrideFileNameMap", "{}", "REGEXP",
-                    makeRegExp(idToTextMapPattern))
-
-        # video file generation
-        cls._setMap("videoTargetMap", None, "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          VideoTarget.regexpPattern(),
-                                          False)))
-        cls._setMap("videoFileKindMap", None, "REGEXP",
-                    makeRegExp(makeMapPat(identifierPattern,
-                                          VideoFileKind.regexpPattern(),
-                                          False)))
-
-    #--------------------
-
-    @classmethod
-    def checkVariable (cls, parameterName, getValueProc, checkedName=None):
-        """Checks whether value for <parameterName> gained by
-           <getValueProc> is okay by looking up in internal map; if
-           <checkedName> is set, the syntax of that name is used
-           instead"""
-
-        Logging.trace(">>: parameterName = %s, checkedName = %s",
-                      parameterName, checkedName)
-        effectiveName = iif(checkedName is None, parameterName, checkedName)
-
-        if effectiveName not in cls._map:
-            # no check found => fine
-            Logging.trace("--: no check")
-        else:
-            entry = cls._map[effectiveName]
-            kind         = entry["kind"]
-            defaultValue = entry["defaultValue"]
-            value = getValueProc(parameterName, defaultValue)
-
-            if value is None:
-                errorMessage = "'%s' is not set" % parameterName
-                ValidityChecker.isValid(False, errorMessage)
-            elif kind == "STRING":
-                ValidityChecker.isString(value, parameterName)
-            elif kind == "NATURAL":
-                ValidityChecker.isNatural(value, parameterName)
-            elif kind == "BOOLEAN":
-                ValidityChecker.isBoolean(value, parameterName)
-            elif kind == "FLOAT":
-                ValidityChecker.isFloat(value, parameterName)
-            elif kind == "REGEXP":
-                regExp = entry["regExp"]
-                Logging.trace("--: regexp = '%s'", regExp.pattern)
-                errorMessage = "'%s' has a bad syntax" % parameterName
-                ValidityChecker.isValid(regExp.match(value) is not None,
-                                        errorMessage)
-            elif value == "":
-                pass
-            elif kind in [ "RDIRECTORY", "WDIRECTORY" ]:
-                ValidityChecker.isDirectory(value, parameterName)
-            elif kind in [ "RFILE", "EXECUTABLE" ]:
-                ValidityChecker.isReadableFile(value, parameterName)
-            elif kind == "WFILE":
-                ValidityChecker.isWritableFile(value, parameterName)
-            else:
-                Logging.trace("--: no check, unknown kind '%s'", kind)
-
-        Logging.trace("<<")
-
-    #--------------------
-
-    @classmethod
-    def get (cls, name, getValueProc):
-        """Gets value for <name> gained by <getValueProc> providing
-           default value from internal map (if any); assumes that
-           correctness check has been done before"""
-
-        Logging.trace(">>: %s", name)
-
-        if name not in cls._map:
-            result = getValueProc(name)
-        else:
-            entry = cls._map[name]
-            defaultValue = entry["defaultValue"]
-            result = getValueProc(name, defaultValue)
-
-        Logging.trace("<<: %s", result)
-        return result
-
-#====================
-
-class LTBVC_ConfigurationData:
+@dataclass(frozen=True)
+class LTBVC_ConfigurationData (_ConfigDataGlobal,
+                               _ConfigDataNotation,
+                               _ConfigDataMidiHumanization,
+                               _ConfigDataSong,
+                               _ConfigDataSongGroup):
     """This class encapsulates the settings read from a configuration
        file like e.g. the global commands for ffmpeg, sox, etc. as
        well as file name templates and specifically the song
@@ -1335,39 +1527,130 @@ class LTBVC_ConfigurationData:
     # LOCAL FEATURES
     #--------------------
 
-    _homeDirectoryPath   = OperatingSystem.homeDirectoryPath()
-    _scriptFilePath      = OperatingSystem.scriptFilePath()
-    _scriptDirectoryPath = OperatingSystem.dirname(_scriptFilePath)
+    _configurationFile : ConfigurationFile = \
+        dataclasses.field(default=None, repr = False)
 
     #--------------------
 
-    def _checkValidity (self):
-        """Checks whether all data read from configuration file is
-           okay."""
+    _homeDirectoryPath   : ClassVar[String] = \
+        OperatingSystem.homeDirectoryPath()
+    _scriptFilePath      : ClassVar[String] = \
+        OperatingSystem.scriptFilePath()
+    _scriptDirectoryPath : ClassVar[String] = \
+        OperatingSystem.dirname(_scriptFilePath)
+
+    #--------------------
+
+    def _addMissingSettingsFromDefaults \
+        (self,
+         parameterNameToValueMap : StringMap) -> StringMap:
+        """Adds defaults values for parameters not in
+           <parameterNameToValueMap> and returns resulting map"""
+
+        Logging.trace(">>: %r", parameterNameToValueMap)
+
+        defaultKeyList = _DefaultValueHandler.parameterNameList()
+        unsetKeyList = defaultKeyList - parameterNameToValueMap.keys()
+        result = parameterNameToValueMap.copy()
+
+        for key in unsetKeyList:
+            result[key] = _DefaultValueHandler.value(key)
+        
+        Logging.trace("<<: %r", result)
+        return result
+    
+    #--------------------
+
+    def _checkValidity (self,
+                        parameterNameToValueMap : StringMap):
+        """Checks whether all data in <parameterNameToValueMap> is okay"""
 
         Logging.trace(">>")
 
-        configurationFile = self._configurationFile
-        _ConfigDataGlobal.checkValidity(configurationFile)
-        _ConfigDataNotation.checkValidity(configurationFile)
-        _ConfigDataMidiHumanization.checkValidity(configurationFile)
-        _ConfigDataSong.checkValidity(configurationFile)
-        _ConfigDataSongGroup.checkValidity(configurationFile)
+        _ConfigDataGlobal.checkValidity(parameterNameToValueMap)
+        _ConfigDataNotation.checkValidity(parameterNameToValueMap)
+        _ConfigDataMidiHumanization.checkValidity(parameterNameToValueMap)
+        _ConfigDataSong.checkValidity(parameterNameToValueMap)
+        _ConfigDataSongGroup.checkValidity(parameterNameToValueMap)
 
         Logging.trace("<<")
 
     #--------------------
 
-    def _deserializeObjects (self):
-        """Deserializes all embedded objects represented as strings."""
+    def _constructAdvancedDefaults (self):
+        """Constructs additional defaults  updating <self>"""
 
         Logging.trace(">>")
 
-        _ConfigDataGlobal.deserializeObjects(self)
-        _ConfigDataNotation.deserializeObjects(self)
-        _ConfigDataMidiHumanization.deserializeObjects(self)
-        _ConfigDataSong.deserializeObjects(self)
-        _ConfigDataSongGroup.deserializeObjects(self)
+        # workaround for missing frozenmap
+        criticalAttributeNameList = [
+            "audioGroupNameToVoiceNameSetMap", "audioProcessorMap",
+            "measureToHumanizationStyleNameMap", "measureToTempoMap",
+            "phaseAndVoiceNameToClefMap", "phaseAndVoiceNameToStaffListMap",
+            "videoFileKindMap", "videoTargetMap", "voiceNameToChordsMap",
+            "voiceNameToLyricsMap", "voiceNameToOverrideFileNameMap",
+            "voiceNameToScoreNameMap", "voiceNameToVariationFactorMap" ]
+
+        for attributeName in criticalAttributeNameList:
+            if getattr(self, attributeName) is None:
+                Logging.trace("--: setting %s to empty", attributeName)
+                SETATTR(self, attributeName, {})
+
+        # adapt several parameters when unset
+        voiceNameList = self.voiceNameList
+
+        # adapt video file kind
+        for kindName, videoFileKind in self.videoFileKindMap.items():
+            if len(videoFileKind.voiceNameList) == 0:
+                Logging.trace("--: setting voice list for %s to all voices",
+                              kindName)
+                SETATTR(videoFileKind, "voiceNameList", list(voiceNameList))
+
+        # when there is no audio group defined, provide a single group
+        # "all" with all voices
+        if len(self.audioGroupNameToVoiceNameSetMap) == 0:
+            Logging.trace("--: adding an artificial 'all' audio group")
+            self.audioGroupNameToVoiceNameSetMap["all"] = \
+                set(voiceNameList)
+
+        # when there is no audio track defined, take the first entry
+        # in audioGroupNameToVoiceNameSetMap and make a track for that
+        if len(self.audioTrackList) == 0:
+            Logging.trace("--: ")
+            audioGroupName = \
+                list(self.audioGroupNameToVoiceNameSetMap.keys())[0]
+            audioLevelMap = { voiceName : 1.0
+                              for voiceName in voiceNameList }
+            audioTrack = \
+                AudioTrack(audioGroupList=[audioGroupName],
+                           albumName=self.albumName,
+                           voiceNameToAudioLevelMap=audioLevelMap)
+            SETATTR(self, "audioTrackList", [ audioTrack ])
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    def _deserialize (self,
+                      parameterNameToValueMap : StringMap,
+                      selectedVoiceNameSet : StringSet):
+        """Deserializes all configuration data from strings in
+           <parameterNameToValueMap> updating <self>"""
+
+        Logging.trace(">>")
+
+        _ConfigDataGlobal.deserialize(self, parameterNameToValueMap)
+        _ConfigDataMidiHumanization.deserialize(self,
+                                                parameterNameToValueMap)
+        _ConfigDataNotation.deserialize(self, parameterNameToValueMap)
+        _ConfigDataSong.deserialize(self, parameterNameToValueMap)
+        _ConfigDataSongGroup.deserialize(self, parameterNameToValueMap)
+        self._constructAdvancedDefaults()
+
+        if len(selectedVoiceNameSet) == 0:
+            # when no voices are selected so far, all voices will be
+            # used
+            selectedVoiceNameSet.update(self.voiceNameList)
 
         Logging.trace("<<")
 
@@ -1376,89 +1659,69 @@ class LTBVC_ConfigurationData:
     #--------------------
 
     def __init__ (self):
+        Logging.trace(">>")
         _LocalValidator.initialize()
-        _ConfigDataGlobal.initialize(self)
-        _ConfigDataMidiHumanization.initialize(self)
-        _ConfigDataNotation.initialize(self)
-        _ConfigDataSong.initialize(self)
-        _ConfigDataSongGroup.initialize(self)
+        SETATTR(self, "_configurationFile", None)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
-    def __str__ (self):
+    def __repr__ (self) -> String:
         """Returns the string representation of <self>"""
 
-        className = self.__class__.__name__
-        st = (("%s(%s, %s, %s, %s, %s)")
-              % (className,
-                 _ConfigDataGlobal.toString(self),
-                 _ConfigDataNotation.toString(self),
-                 _ConfigDataMidiHumanization.toString(self),
-                 _ConfigDataSong.toString(self),
-                 _ConfigDataSongGroup.toString(self)))
-
-        return st
+        return DataTypeSupport.convertToString(self)
 
     #--------------------
 
-    def checkAndSetDerivedVariables (self, selectedVoiceNameSet):
+    def checkAndSetDerivedVariables (self,
+                                     selectedVoiceNameSet : StringSet):
         """Checks data from configuration file read into <self>;
-           <selectedVoiceNameList> gives the set of voices selected
+           <selectedVoiceNameSet> gives the set of voices selected
            for processing"""
 
         Logging.trace(">>")
 
-        self._checkValidity()
+        parameterNameToValueMap = self._configurationFile.asStringMap()
+        parameterNameToValueMap = \
+            self._addMissingSettingsFromDefaults(parameterNameToValueMap)
 
-        configurationFile = self._configurationFile
-        _ConfigDataGlobal.read(self, configurationFile)
-        _ConfigDataMidiHumanization.read(self, configurationFile)
-        _ConfigDataNotation.read(self, configurationFile)
-        _ConfigDataSong.read(self, configurationFile)
-        _ConfigDataSongGroup.read(self, configurationFile)
+        self._checkValidity(parameterNameToValueMap)
+        self._deserialize(parameterNameToValueMap, selectedVoiceNameSet)
 
-        self._deserializeObjects()
-
-        for videoFileKindName, videoFileKind in self.videoFileKindMap.items():
-            if len(videoFileKind.voiceNameList) == 0:
-                videoFileKind.voiceNameList = list(self.voiceNameList)
-
-        if len(selectedVoiceNameSet) == 0:
-            # when no voices are selected so far, all voices will be
-            # used
-            selectedVoiceNameSet.update(self.voiceNameList)
-
-        Logging.trace("<<: '%s'", self)
+        Logging.trace("<<: %r", self)
 
     #--------------------
 
-    def get (self, parameterName):
+    def get (self,
+             parameterName : String) -> String:
         """Gets data from configuration file read into <self> at
            <parameterName>"""
 
-        Logging.trace(">>: %s", parameterName)
+        Logging.trace(">>: %r", parameterName)
 
-        getValueProc = self._configurationFile.getValue
-        result = _LocalValidator.get(parameterName, getValueProc)
+        parameterNameToValueMap = self._configurationFile.asDictionary()
+        result = _LocalValidator.get(parameterName,
+                                     parameterNameToValueMap)
 
-        Logging.trace("<<: '%s'", result)
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
 
-    def readFile (self, configurationFilePath):
-        """Reads data from configuration file with <configurationFilePath>
-           into <self>"""
+    def readFile (self,
+                  configurationFilePath : String):
+        """Reads data from configuration file with
+           <configurationFilePath> into <self>"""
 
-        Logging.trace(">>: '%s'", configurationFilePath)
+        Logging.trace(">>: %r", configurationFilePath)
 
         cls = self.__class__
 
         separator = OperatingSystem.pathSeparator
         configSuffix = separator + "config"
 
-        Logging.trace("--: scriptFilePath = '%s', scriptDirectory = '%s',"
-                      + " homeDirectory = '%s'",
+        Logging.trace("--: scriptFilePath = %r, scriptDirectory = %r,"
+                      + " homeDirectory = %r",
                       cls._scriptFilePath, cls._scriptDirectoryPath,
                       cls._homeDirectoryPath)
 
@@ -1467,7 +1730,7 @@ class LTBVC_ConfigurationData:
             cls._scriptDirectoryPath + "/../.." + configSuffix ]
         ConfigurationFile.setSearchPaths(searchPathList)
         file = ConfigurationFile(configurationFilePath)
-        self._configurationFile = file
+        SETATTR(self, "_configurationFile", file)
 
         Logging.trace("<<")
         return file

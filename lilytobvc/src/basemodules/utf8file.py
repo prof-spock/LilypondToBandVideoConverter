@@ -5,12 +5,10 @@
 #============================================================
 
 import io
-import sys
 
 from .simpleassertion import Assertion
-
-# support for python version 2
-toUnicodeString = unicode if sys.version_info[0] == 2 else str
+from .simpletypes import Natural, String, StringList
+from .typesupport import toUnicodeString
 
 #============================================================
 
@@ -25,7 +23,9 @@ class UTF8File:
     
     #--------------------
 
-    def __init__ (self, fileName, mode):
+    def __init__ (self,
+                  fileName : String,
+                  mode : String):
         """Opens file given by <fileName> in <mode>"""
 
         self._isTextFile = not ("b" in mode)
@@ -47,14 +47,14 @@ class UTF8File:
 
     #--------------------
 
-    def read (self):
+    def read (self) -> String:
         """Reads all from <self> and returns associated string"""
 
         return self._file.read()
 
     #--------------------
 
-    def readlines (self):
+    def readlines (self) -> StringList:
         """Reads all lines from <self> and returns associated
            string list"""
 
@@ -62,7 +62,8 @@ class UTF8File:
 
     #--------------------
 
-    def setIndentationPerLevel (indentationPerLevel):
+    def setIndentationPerLevel (self,
+                                indentationPerLevel : Natural):
         """Sets number of blanks to insert before line for each level of
            indentation"""
 
@@ -70,7 +71,8 @@ class UTF8File:
     
     #--------------------
 
-    def write (self, st):
+    def write (self,
+               st : String):
         """Writes string <st> to <self>"""
 
         if self._isTextFile:
@@ -80,7 +82,8 @@ class UTF8File:
 
     #--------------------
 
-    def writelines (self, list):
+    def writelines (self,
+                    list : StringList):
         """Writes all lines in <list> to <self>, each terminated by a
            newline"""
 
@@ -89,7 +92,9 @@ class UTF8File:
 
     #--------------------
 
-    def writeIndented (self, level, st):
+    def writeIndented (self,
+                       level : Natural,
+                       st : String):
         """Writes string <st> to <self> with (<level> *
            <indentationForLevel>) leading blanks"""
 
@@ -99,7 +104,8 @@ class UTF8File:
 
     #--------------------
 
-    def writeIndentedList (self, list):
+    def writeIndentedList (self,
+                           list : StringList):
         """Writes lines in <list> to output file each terminated by a
            newline; the odd indexed entries contain the encoded
            indentation of the line (an absolute number string for an

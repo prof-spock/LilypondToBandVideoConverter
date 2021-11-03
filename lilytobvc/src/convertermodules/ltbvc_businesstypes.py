@@ -15,83 +15,29 @@
 # IMPORTS
 #====================
 
-from copy import deepcopy
+from dataclasses import dataclass
 
-from basemodules.attributemanager import AttributeManager
-from basemodules.regexppattern import RegExpPattern
+from basemodules.datatypesupport import AbstractDataType, \
+                                        DataTypeSupport, specialField, \
+                                        SETATTR
 from basemodules.simplelogging import Logging
-from basemodules.stringutil import convertStringToList, convertStringToMap
+from basemodules.simpletypes import Boolean, Integer, \
+                                    Map, Object, Real, \
+                                    String, StringList, StringMap
+from basemodules.stringutil import convertStringToList, convertStringToMap, \
+                                   tokenize
 from basemodules.ttbase import adaptToRange, iif2
 from basemodules.validitychecker import ValidityChecker
 
 #====================
-
-_noCommaPattern    = r"(?:'[^']*'|\{[^\}]*\}|[^,'\s]+)"
-
+# PRIVATE FEATURES
 #====================
 
-def _setToDefault (currentMap, key, defaultValue):
-    """sets entry <key> in <map> to <defaultValue> if undefined"""
-
-    originalValue = currentMap.get(key, None)
-    Logging.trace(">>: key = %s, originalValue = %s, default = %s",
-                  key, originalValue, defaultValue)
-
-    if key not in currentMap:
-        currentMap[key] = defaultValue
-
-    Logging.trace("<<")
-    
+#====================
+# PUBLIC FEATURES
 #====================
 
-def generateObjectListFromString (st, prototypeObject):
-    """Generates list of objects as copies of <prototypeObject> from
-       external representation <st> describing a mapping from
-       object name to object value"""
-
-    Logging.trace(">>: %s", st)
-
-    result = []
-    table = convertStringToMap(st)
-
-    for name in table.keys():
-        attributeNameToValueMap = table[name]
-        attributeNameToValueMap["name"] = name
-        Logging.trace("--: converting %s = %s",
-                      name, attributeNameToValueMap)
-        currentObject = deepcopy(prototypeObject)
-        currentObject.checkAndSetFromMap(attributeNameToValueMap)
-        result.append(currentObject)
-
-    Logging.trace("<<: %s", result)
-    return result
-
-#--------------------
-
-def generateObjectMapFromString (st, prototypeObject):
-    """Generates map of objects as copies of <prototypeObject> from
-       external representation <st> describing a mapping from
-       object name to object value"""
-
-    Logging.trace(">>: %s", st)
-
-    result = {}
-    table = convertStringToMap(st)
-
-    for name, attributeNameToValueMap in table.items():
-        attributeNameToValueMap["name"] = name
-        Logging.trace("--: converting %s = %s",
-                      name, attributeNameToValueMap)
-        currentObject = deepcopy(prototypeObject)
-        currentObject.checkAndSetFromMap(attributeNameToValueMap)
-        result[name] = currentObject
-
-    Logging.trace("<<: %s", result)
-    return result
-
-#--------------------
-
-def humanReadableVoiceName (voiceName):
+def humanReadableVoiceName (voiceName : String) -> String:
     """Returns human readable version of given <voiceName>"""
 
     result = iif2(voiceName.endswith("Simple"), voiceName[:-6],
@@ -101,101 +47,31 @@ def humanReadableVoiceName (voiceName):
 
 #====================
 
-class AudioTrack:
-    """Represents information about the audio tracks
-       combining audio groups together with all their
-       properties."""
+@dataclass(frozen=True)
+class AudioTrack (AbstractDataType):
+    """Represents information about the audio tracks combining audio
+       groups together with all their properties."""
 
-    _attributeNameList = \
-        [ "name", "audioGroupList", "audioFileTemplate", "songNameTemplate",
-          "albumName", "description", "languageCode",
-          "voiceNameToAudioLevelMap", "masteringEffectList",
-          "attenuationLevel" ]
-
-    _attributeNameToKindMap = {
-        "albumName"                : "S",
-        "attenuationLevel"         : "F",
-        "audioFileTemplate"        : "S",
-        "audioGroupList"           : "S",
-        "description"              : "S",
-        "languageCode"             : "S",
-        "masteringEffectList"      : "S",
-        "name"                     : "S",
-        "songNameTemplate"         : "S",
-        "voiceNameToAudioLevelMap" : "{}"
-    }
-
-    #--------------------
-    # EXPORTED FEATURES
-    #--------------------
-
-    def __init__ (self):
-        self.name                    = "XXX"
-        self.audioGroupList          = []
-        self.audioFileTemplate       = "%"
-        self.songNameTemplate        = "%"
-        self.albumName               = "[ALBUM NAME]"
-        self.description             = "XXX"
-        self.languageCode            = "eng"
-        self.voiceNameToAudioLevelMap = ""
-
-    #--------------------
-
-    def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
-        cls = self.__class__
-        clsName = cls.__name__
-        st = AttributeManager.convertToString(self, clsName,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    def checkAndSetFromMap (self, attributeNameToValueMap):
-        """Checks validity of variables in
-           <attributeNameToValueMap> and assigns them to current
-           audio track descriptor"""
-
-        cls = self.__class__
-
-        # set optional attributes to default values
-        _setToDefault(attributeNameToValueMap, "attenuationLevel", 0.0)
-        _setToDefault(attributeNameToValueMap, "description", "")
-        _setToDefault(attributeNameToValueMap, "masteringEffectList", "")
-
-        # check and set object values
-        name = attributeNameToValueMap["name"]
-        AttributeManager.checkForTypesAndCompleteness(name, "audio track",
-                                                attributeNameToValueMap,
-                                                cls._attributeNameToKindMap)
-
-        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
-
-        # adapt values
-        self.audioGroupList = convertStringToList(self.audioGroupList, "/")
-        self.attenuationLevel = float(self.attenuationLevel)
-        Logging.trace("--: vntalm = %s", self.voiceNameToAudioLevelMap)
-        self.voiceNameToAudioLevelMap = \
-            { key : float(value)
-              for (key, value) in self.voiceNameToAudioLevelMap.items() }
-
-    #--------------------
-
-    @classmethod
-    def regexpPattern (cls):
-        """Returns regexp pattern for checking an audio track string"""
-
-        attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
-        result = RegExpPattern.makeMapPattern(attributeNamePattern,
-                                              _noCommaPattern, False)
-        return result
-
+    name                     : String     = "XXX"
+    audioGroupList           : StringList = \
+                                   specialField((),
+                                                (lambda st:
+                                                 convertStringToList(st,
+                                                                     "/")))
+    audioFileTemplate        : String     = "$"
+    songNameTemplate         : String     = "$"
+    albumName                : String     = "[ALBUM NAME]"
+    description              : String     = "XXX"
+    languageCode             : String     = "eng"
+    voiceNameToAudioLevelMap : StringMap  = \
+                                   specialField(None,
+                                                (lambda map:
+                                                 { key : float(value)
+                                                   for (key, value)
+                                                   in map.items() }))
+    masteringEffectList      : StringList = specialField((), tokenize)
+    amplificationLevel       : Real       = 0.0
+    
 #====================
 
 class AudioGroup:
@@ -222,7 +98,7 @@ class TempoTrack:
            Note that intermediate measures just maintain the previous
            tempo and length indication (as expected)."""
 
-        Logging.trace(">>: %s", tempoMap)
+        Logging.trace(">>: %r", tempoMap)
 
         result = {}
         separator = "/"
@@ -239,12 +115,12 @@ class TempoTrack:
                 tempo = measureLengthAndTempo[separatorPosition+1:]
                 ValidityChecker.isNumberString(measureLength,
                                                "tempo track measure length",
-                                               floatIsAllowed=True,
+                                               realIsAllowed=True,
                                                rangeKind=">0")
                 measureLength = float(measureLength)
 
             ValidityChecker.isNumberString(tempo, "tempo track tempo",
-                                           floatIsAllowed=True,
+                                           realIsAllowed=True,
                                            rangeKind=">0")
             tempo = float(tempo)
 
@@ -252,235 +128,86 @@ class TempoTrack:
                           measure, measureLength, tempo)
             result[measure] = (tempo, measureLength)
 
-        Logging.trace("<<: %s", repr(result))
+        Logging.trace("<<: %r", result)
         return result
 
 #====================
 
-class TrackSettings:
+@dataclass(frozen=True)
+class TrackSettings (AbstractDataType):
     """Represents the settings of a MIDI track"""
 
-    def __init__ (self, voiceName, midiChannel, midiInstrumentBank,
-                  midiInstrument, midiVolume, panPosition, reverbLevel):
-        """Initializes object with all standard parameters"""
+    voiceName          : String
+    midiChannel        : Integer
+    midiInstrumentBank : Integer
+    midiInstrument     : Integer
+    midiVolume         : Integer
+    panPosition        : Integer
+    reverbLevel        : Integer
+    
+    #--------------------    
 
-        self.voiceName = voiceName
+    def __post_init__ (self):
+        """Adapts attributes to MIDI ranges"""
 
-        # adjust to MIDI parameter ranges
-        self.midiChannel        = adaptToRange(midiChannel, 0, 15)
-        self.midiInstrumentBank = adaptToRange(midiInstrumentBank, 0, 127)
-        self.midiInstrument     = adaptToRange(midiInstrument, 0, 127)
-        self.midiVolume         = adaptToRange(midiVolume, 0, 127)
-        self.panPosition        = adaptToRange(panPosition, 0, 127)
-        self.reverbLevel        = adaptToRange(reverbLevel, 0, 127)
+        rangeAdjustProc = (lambda attributeName, maximumValue:
+                           SETATTR(self, attributeName,
+                                   adaptToRange(getattr(self, attributeName),
+                                                0, maximumValue)))
+
+        rangeAdjustProc("midiChannel", 15)
+        rangeAdjustProc("midiInstrumentBank", 127)
+        rangeAdjustProc("midiInstrument", 127)
+        rangeAdjustProc("midiVolume", 127)
+        rangeAdjustProc("panPosition", 127)
+        rangeAdjustProc("reverbLevel", 127)
 
 #====================
 
-class VideoFileKind:
+@dataclass(frozen=True)
+class VideoFileKind (AbstractDataType):
     """This class encapsulates the settings for a video file kind used
        for video generation."""
 
-    _attributeNameList = \
-        [ "name", "target", "fileNameSuffix", "directoryPath",
-          "voiceNameList" ]
-    
-    _attributeNameToKindMap = {
-        "directoryPath"  : "S",
-        "fileNameSuffix" : "S",
-        "name"           : "S",
-        "target"         : "S",
-        "voiceNameList"  : "S"
-    }
-
-    #--------------------
-    # EXPORTED FEATURES
-    #--------------------
-
-    def __init__ (self):
-        self.name           = None
-        self.target         = None
-        self.fileNameSuffix = None
-        self.directoryPath  = None
-        self.voiceNameList  = None
-
-    #--------------------
-
-    def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
-        cls = self.__class__
-        clsName = cls.__name__
-        st = AttributeManager.convertToString(self, clsName,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    def checkAndSetFromMap (self, attributeNameToValueMap):
-        """Checks validity of variables in
-           <attributeNameToValueMap> and assigns them to
-           current video target"""
-
-        cls = self.__class__
-
-        # check and set object values
-        targetName = attributeNameToValueMap["name"]
-        AttributeManager.checkForTypesAndCompleteness(targetName,
-                                                "video file kind",
-                                                attributeNameToValueMap,
-                                                cls._attributeNameToKindMap)
-
-        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap)
-        self.voiceNameList = convertStringToList(self.voiceNameList)
-
-    #--------------------
-
-    @classmethod
-    def regexpPattern (cls):
-        """Returns regexp pattern for checking a video file kind string"""
-
-        attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
-        result = RegExpPattern.makeMapPattern(attributeNamePattern,
-                                              _noCommaPattern, False)
-        return result
+    name           : String     = ""
+    target         : String     = ""
+    fileNameSuffix : String     = ""
+    directoryPath  : String     = ""
+    voiceNameList  : StringList = specialField((),
+                                               convertStringToList)
 
 #====================
 
-class VideoTarget:
+@dataclass(frozen=True)
+class VideoTarget (AbstractDataType):
     """This class encapsulates the settings for a video target used
        for video generation."""
 
-    _attributeNameList = \
-        [ "name", "resolution", "height", "width", "topBottomMargin",
-          "leftRightMargin", "systemSize", "scalingFactor",
-          "mediaType", "frameRate", "ffmpegPresetName",
-          "subtitleColor", "subtitleFontSize", "subtitlesAreHardcoded" ]
-
-    _attributeNameToKindMap = {
-        "ffmpegPresetName"         : "S",
-        "frameRate"                : "F",
-        "height"                   : "I",
-        "leftRightMargin"          : "F",
-        "mediaType"                : "S",
-        "name"                     : "S",
-        "resolution"               : "I",
-        "scalingFactor"            : "I",
-        "subtitleColor"            : "I",
-        "subtitleFontSize"         : "F",
-        "subtitlesAreHardcoded"    : "B",
-        "systemSize"               : "F",
-        "topBottomMargin"          : "F",
-        "width"                    : "I"
-    }
-
-    #--------------------
-    # EXPORTED FEATURES
-    #--------------------
-
-    def __init__ (self):
-        self.name                     = None
-        self.resolution               = None
-        self.height                   = None
-        self.width                    = None
-        self.topBottomMargin          = None
-        self.leftRightMargin          = None
-        self.scalingFactor            = None
-        self.frameRate                = None
-        self.ffmpegPresetName         = None
-        self.systemSize               = None
-        self.mediaType                = None
-        self.subtitleColor            = None
-        self.subtitleFontSize         = None
-        self.subtitlesAreHardcoded    = None
-
-    #--------------------
-
-    def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
-        cls = self.__class__
-        clsName = cls.__name__
-        st = AttributeManager.convertToString(self, clsName,
-                                              cls._attributeNameList,
-                                              cls._attributeNameToKindMap)
-        return st
-
-    #--------------------
-
-    def checkAndSetFromMap (self, attributeNameToValueMap):
-        """Checks validity of variables in
-           <attributeNameToValueMap> and assigns them to
-           current video target"""
-
-        cls = self.__class__
-
-        # set optional attributes to default values
-        _setToDefault(attributeNameToValueMap, "systemSize", 20)
-        _setToDefault(attributeNameToValueMap, "scalingFactor", 1)
-        _setToDefault(attributeNameToValueMap, "ffmpegPresetName", "")
-        _setToDefault(attributeNameToValueMap, "mediaType", "Normal")
-        _setToDefault(attributeNameToValueMap, "subtitlesAreHardcoded",
-                      "true")
-
-        # check and set object values
-        targetName = attributeNameToValueMap["name"]
-        AttributeManager.checkForTypesAndCompleteness(targetName,
-                                                "video target",
-                                                attributeNameToValueMap,
-                                                cls._attributeNameToKindMap)
-
-        AttributeManager.setAttributesFromMap(self, attributeNameToValueMap,
-                                              cls._attributeNameToKindMap)
-
-    #--------------------
-
-    @classmethod
-    def regexpPattern (cls):
-        """Returns regexp pattern for checking a video target string"""
-
-        attributeNamePattern = \
-            "(?:%s)" % ("|".join(cls._attributeNameToKindMap.keys()))
-        result = RegExpPattern.makeMapPattern(attributeNamePattern,
-                                              _noCommaPattern, False)
-        return result
+    name                  : String  = ""
+    resolution            : Integer = 0
+    height                : Integer = 0
+    width                 : Integer = 0
+    topBottomMargin       : Real    = 0.0
+    leftRightMargin       : Real    = 0.0
+    systemSize            : Real    = 20.0
+    scalingFactor         : Integer = 1
+    mediaType             : String  = "Normal"
+    frameRate             : Real    = 1.0
+    ffmpegPresetName      : String  = ""
+    subtitleColor         : Integer = 0
+    subtitleFontSize      : Real    = 1
+    subtitlesAreHardcoded : Boolean = True
 
 #====================
 
-class VoiceDescriptor:
+@dataclass(frozen=False)
+class VoiceDescriptor (AbstractDataType):
     """Type representing all data for generation of a single voice"""
 
-    def __init__ (self):
-        self.voiceName      = None
-        self.midiChannel    = None
-        self.midiInstrument = None
-        self.midiVolume     = None
-        self.panPosition    = None
-        self.reverbLevel    = None
-        self.soundVariant   = None
-
-    #--------------------
-
-    def __repr__ (self):
-        return str(self)
-
-    #--------------------
-
-    def __str__ (self):
-        className = self.__class__.__name__
-        st = (("%s("
-               + "voice = %s, midiChannel = %s, midiInstrument = %s,"
-               + " midiVolume = %s, panPosition = %s, reverb = %s,"
-               + " soundVariant = %s)")
-               % (className,
-                  self.voiceName, self.midiChannel, self.midiInstrument,
-                  self.midiVolume, self.panPosition, self.reverbLevel,
-                  self.soundVariant))
-        return st
+    voiceName      : String  = ""
+    midiChannel    : Integer = 0
+    midiInstrument : Integer = 0
+    midiVolume     : Integer = 0
+    panPosition    : Integer = 0
+    reverbLevel    : Integer = 0
+    soundVariant   : String  = ""

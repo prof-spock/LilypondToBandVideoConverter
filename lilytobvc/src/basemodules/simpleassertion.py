@@ -8,6 +8,7 @@ import os.path
 import sys
 
 from .simplelogging import Logging
+from .simpletypes import Boolean, String
 
 #====================
 
@@ -22,7 +23,10 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def _internalCheck (cls, condition, checkKind, errorMessage):
+    def _internalCheck (cls,
+                        condition : Boolean,
+                        checkKind : String,
+                        errorMessage : String):
         """Checks whether <condition> holds, otherwise exits with
            <errorMessage> containing <checkKind>."""
         
@@ -37,7 +41,9 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def check (cls, condition, errorMessage):
+    def check (cls,
+               condition : Boolean,
+               errorMessage : String):
         """Checks <condition> within function with <procName> and
            exits with <errorMessage> on failure."""
 
@@ -46,7 +52,9 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def post (cls, condition, errorMessage):
+    def post (cls,
+              condition : Boolean,
+              errorMessage : String):
         """Checks postcondition <condition> within function with
            <procName> and exits with <errorMessage> on failure."""
 
@@ -55,7 +63,9 @@ class Assertion:
     #--------------------
 
     @classmethod
-    def pre (cls, condition, errorMessage):
+    def pre (cls,
+             condition : Boolean,
+             errorMessage : String):
         """Checks precondition <condition> and exits with
            <errorMessage> on failure."""
 

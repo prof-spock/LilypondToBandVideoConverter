@@ -14,7 +14,7 @@ from .simpleassertion import Assertion
 from .simplelogging import Logging
 from .simpletypes import Callable, DataType, Dictionary, Object, \
                          ObjectList, String, StringList, StringMap
-from .stringutil import adaptToKind,convertStringToMap
+from .stringutil import adaptToKind, deserializeToMap
 from .ttbase import iif, iif3
 from .validitychecker import ValidityChecker
 
@@ -351,7 +351,7 @@ class DataTypeSupport:
         Logging.trace(">>: %r", st)
 
         result = []
-        table = convertStringToMap(st)
+        table = deserializeToMap(st)
 
         for name, attributeNameToValueMap in table.items():
             attributeNameToValueMap["name"] = name
@@ -377,7 +377,7 @@ class DataTypeSupport:
         Logging.trace(">>: %r", st)
 
         result = {}
-        table = convertStringToMap(st)
+        table = deserializeToMap(st)
 
         for name, attributeNameToValueMap in table.items():
             attributeNameToValueMap["name"] = name

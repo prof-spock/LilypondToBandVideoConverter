@@ -601,7 +601,7 @@ def PhaseOrFileBox_makeAll =
     % postprocessing phases
     Box_make(phaseRawAudio, "C", btex rawaudio etex);
     Box_make(phaseRefinedAudio, "C", btex refinedaudio etex);
-    Box_make(phaseMixdown, "C", btex mixdown etex);
+    Box_make(phaseMix, "C", btex mix etex);
     Box_make(phaseFinalVideo, "C", btex finalvideo etex);
 
     Box_make(fileRawAudio, "FM", btex \stkC{raw}{audio}{files} etex);
@@ -616,7 +616,7 @@ def PhaseOrFileBox_setPostprocessingBoxes (expr startPosition) =
     % sets up the position and size of postprocessing phases and
     % extracts
 
-    Box_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+    Box_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMix,
                         phaseFinalVideo)
                        (startPosition, PhaseOrFileBox_phaseOffsetVector);
 
@@ -634,8 +634,8 @@ def PhaseOrFileBox_setPostprocessingEdges =
     addForwardFlow(phaseRawAudio,     fileRawAudio);
     addBackwardFlow(fileRawAudio,     phaseRefinedAudio);
     addForwardFlow(phaseRefinedAudio, fileRefinedAudio);
-    addBackwardFlow(fileRefinedAudio, phaseMixdown);
-    addForwardFlow(phaseMixdown,      fileAudio);
+    addBackwardFlow(fileRefinedAudio, phaseMix);
+    addForwardFlow(phaseMix,          fileAudio);
     addBackwardFlow(fileAudio,        phaseFinalVideo);
     addForwardFlow(fileSilentVideo,   phaseFinalVideo);
     addForwardFlow(fileSubtitleText,  phaseFinalVideo);
@@ -924,7 +924,7 @@ beginfig(1);
 
     forsuffixes shape = phaseExtract, phaseScore, phaseMidi,
                         phaseSilentVideo, phaseRawAudio,
-                        phaseRefinedAudio, phaseMixdown,
+                        phaseRefinedAudio, phaseMix,
                         phaseFinalVideo:
         Box_setSizeAndColor(shape, PhaseOrFileBox_phaseBoxSize,
                             PhaseOrFileBox_phaseFillColor);
@@ -936,7 +936,7 @@ beginfig(1);
 
     forsuffixes shape = phaseExtract, phaseScore, phaseMidi,
                         phaseSilentVideo, phaseRawAudio,
-                        phaseRefinedAudio, phaseMixdown,
+                        phaseRefinedAudio, phaseMix,
                         phaseFinalVideo:
         addSupport(fileConfig, shape);
     endfor
@@ -945,7 +945,7 @@ beginfig(1);
               phaseExtract, phaseScore, phaseMidi, phaseSilentVideo,
               fileExtract, fileScore, fileMidi, fileSilentVideo,
               fileSubtitleText,
-              phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+              phaseRawAudio, phaseRefinedAudio, phaseMix,
               phaseFinalVideo, fileRawAudio, fileRefinedAudio,
               fileAudio, fileVideo);
 endfig;
@@ -1020,7 +1020,7 @@ beginfig(3);
     endfor
 
     forsuffixes shape = phaseRawAudio, phaseRefinedAudio,
-                        phaseMixdown, phaseFinalVideo:
+                        phaseMix, phaseFinalVideo:
         Box_setSizeAndColor(shape, PhaseOrFileBox_phaseBoxSize,
                             PhaseOrFileBox_phaseFillColor);
     endfor
@@ -1029,13 +1029,13 @@ beginfig(3);
     PhaseOrFileBox_setPostprocessingEdges;
 
     forsuffixes shape = phaseRawAudio, phaseRefinedAudio,
-                        phaseMixdown, phaseFinalVideo:
+                        phaseMix, phaseFinalVideo:
         addSupport(fileConfig, shape);
     endfor
 
     drawboxed(fileConfig,
               fileMidi, fileSilentVideo, fileSubtitleText,
-              phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+              phaseRawAudio, phaseRefinedAudio, phaseMix,
               phaseFinalVideo, fileRawAudio, fileRefinedAudio,
               fileAudio, fileVideo);
 endfig;

@@ -32,7 +32,7 @@ class Assertion:
 
         if cls.isActive:
             if not condition:
-                Logging.trace("--: %s FAILED - %s", checkKind, errorMessage)
+                Logging.traceError("%s FAILED - %s", checkKind, errorMessage)
                 programName = os.path.basename(sys.argv[0])
                 sys.exit(programName + ": ERROR - " + errorMessage)
 

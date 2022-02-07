@@ -18,7 +18,7 @@ from basemodules.simpletypes import Boolean, Dictionary, Integer, \
                                     List, Map, Natural, Object, Real, \
                                     String, StringList, StringMap, \
                                     StringSet, Tuple
-from basemodules.stringutil import convertStringToMap
+from basemodules.stringutil import deserializeToMap
 from basemodules.ttbase import adaptToRange, iif, iif2, isInRange, \
                                MyRandom
 from basemodules.validitychecker import ValidityChecker
@@ -478,7 +478,7 @@ class _HumanizationStyle:
             else:
                 styleAsString = cls._defaultStyleAsString
 
-        style = convertStringToMap(styleAsString)
+        style = deserializeToMap(styleAsString)
         Logging.trace("--: style = %s", style)
 
         rasterSize = style.get("RASTER", "0.03125")

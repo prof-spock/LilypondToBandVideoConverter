@@ -24,7 +24,7 @@ from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Integer, \
                                     Map, Object, Real, \
                                     String, StringList, StringMap
-from basemodules.stringutil import convertStringToList, convertStringToMap, \
+from basemodules.stringutil import deserializeToList, deserializeToMap, \
                                    tokenize
 from basemodules.ttbase import adaptToRange, iif2
 from basemodules.validitychecker import ValidityChecker
@@ -52,16 +52,16 @@ class AudioTrack (AbstractDataType):
     """Represents information about the audio tracks combining audio
        groups together with all their properties."""
 
-    name                     : String     = "XXX"
+    name                     : String     = ""
     audioGroupList           : StringList = \
                                    specialField((),
                                                 (lambda st:
-                                                 convertStringToList(st,
+                                                 deserializeToList(st,
                                                                      "/")))
     audioFileTemplate        : String     = "$"
     songNameTemplate         : String     = "$"
     albumName                : String     = "[ALBUM NAME]"
-    description              : String     = "XXX"
+    description              : String     = ""
     languageCode             : String     = "eng"
     voiceNameToAudioLevelMap : StringMap  = \
                                    specialField(None,
@@ -174,7 +174,7 @@ class VideoFileKind (AbstractDataType):
     fileNameSuffix : String     = ""
     directoryPath  : String     = ""
     voiceNameList  : StringList = specialField((),
-                                               convertStringToList)
+                                               deserializeToList)
 
 #====================
 

@@ -18,7 +18,7 @@ from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Callable, List, Map, \
                                     Natural, String, StringList, \
                                     StringMap, StringSet, Tuple
-from basemodules.stringutil import convertStringToList
+from basemodules.stringutil import deserializeToList
 from basemodules.ttbase import iif
 from basemodules.validitychecker import ValidityChecker
 
@@ -80,7 +80,7 @@ class _CommandLineOptions:
 
         configurationFilePath = argumentList.configurationFilePath
         loggingFilePath = argumentList.loggingFilePath
-        givenPhaseSet = set(convertStringToList(argumentList.phases, "/"))
+        givenPhaseSet = set(deserializeToList(argumentList.phases, "/"))
 
         ValidityChecker.isReadableFile(configurationFilePath,
                                        "configurationFilePath")
@@ -142,9 +142,9 @@ class _CommandLineOptions:
             selectedVoiceNameSet = set()
         else:
             selectedVoiceNameSet = \
-              set(convertStringToList(argumentList.voices,"/"))
+              set(deserializeToList(argumentList.voices,"/"))
 
-        processingPhaseSet = set(convertStringToList(argumentList.phases, "/"))
+        processingPhaseSet = set(deserializeToList(argumentList.phases, "/"))
         intermediateFilesAreKept = argumentList.keepFiles
 
         result = (intermediateFilesAreKept, processingPhaseSet,

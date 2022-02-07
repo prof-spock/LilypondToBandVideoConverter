@@ -981,25 +981,24 @@ class AudioTrackManager:
     def constructSettingsForAudioTracks \
             (cls,
              configData : LTBVC_ConfigurationData) -> List:
-        """Constructs a list of tuples each representing a target
-           audio file from mapping
-           <audioGroupNameToVoiceNameListMap> and
-           <audioTrackNameToListMap> and given <voiceNameList> in
-           <configData>; each tuple contains the set of voice
-           names used, its album name, its song title and its
-           target file path"""
+        """Constructs a list of tuples each representing a target audio file
+           from mapping <audioGroupNameToVoiceNameListMap> and
+           <audioTrackNameToDataMap> and given <voiceNameList> in
+           <configData>; each tuple contains the set of voice names
+           used, its album name, its song title and its target file
+           path"""
 
         Logging.trace(">>")
 
         result = []
         groupToVoiceSetMap = configData.audioGroupNameToVoiceNameSetMap
-        audioTrackList     = configData.audioTrackList
+        audioTrackNameToDataMap = configData.audioTrackNameToDataMap
 
         Logging.trace("--: groupToVoiceSetMap = %r, trackList = %r",
-                      groupToVoiceSetMap, audioTrackList)
+                      groupToVoiceSetMap, audioTrackNameToDataMap)
 
         # traverse all audio track objects
-        for audioTrack in audioTrackList:
+        for trackName, audioTrack in audioTrackNameToDataMap.items():
             # expand the set of audio groups into a set of voice names
             voiceNameSubset = set()
 

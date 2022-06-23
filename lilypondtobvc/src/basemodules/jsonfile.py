@@ -459,7 +459,7 @@ class SimpleJsonFile:
 
         result = None
         separator = OperatingSystem.pathSeparator
-        simpleFileName = OperatingSystem.basename(originalFileName, True)
+        simpleFileName = OperatingSystem.basename(originalFileName)
 
         for directoryName in cls._searchPathList:
             fileName = iif(directoryName == ".", originalFileName,

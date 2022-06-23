@@ -143,7 +143,7 @@
   \newcommand{\hyperlink}[1]{\textsf{\small \color{blue}#1}}
   \newcommand{\ltbvc}{Lilypond\-To\-Band\-Video\-Converter}
   \newcommand{\ltbvcCommand}{lilypondToBVC}
-  \newcommand{\ltbvcVersion}{1.1}
+  \newcommand{\ltbvcVersion}{1.1.1}
   \newcommand{\macro}[1]{\textbackslash #1}
   \newcommand{\mandatory}{\textbf{MANDATORY}}
   \newcommand{\meta}[1]{\guillemotleft #1\guillemotright}
@@ -328,11 +328,13 @@
 
 \newcommand{\DESCaudioProcessorMixingCommandLine}{%
   audio processor command line for mixing audio files with volume
-  factors containing \placeholder{factor}, \placeholder{infile} and
-  \placeholder{outfile} as placeholders; the group of factor and
-  infile is embraced by parentheses ("[]") and will be repeated
-  depending on the number of infiles with the parentheses removed;
-  if missing, mixing will be done by (slow) internal routines
+  factors containing \placeholder{factor}, \placeholder{pan},
+  \placeholder{infile} and \placeholder{outfile} as placeholders; the
+  group of factor and infile is embraced by parentheses ("[]") and
+  will be repeated depending on the number of infiles with the
+  parentheses removed; if missing, mixing will be done by (slow)
+  internal routines, if ``pan'' is not specified as a placeholder, an
+  internal panning via ffmpeg is done
 }
 
 \newcommand{\DESCaudioProcessorAmplificationEffect}{%
@@ -407,12 +409,15 @@
   dollar-sign)
 }
 
-\newcommand{\DESCaudioTrackVoiceNameToAudioLevelMap}{%
-  mapping from voice names to volume factors used for mixing the
-  refined audio files into cumulated audio file for given track; the
-  factors are decimal values in decibels (where 0.0 means that the
-  refined voice file is taken without change with a conversion of
-  \(10^{{\rm dBValue}/20}\))
+\newcommand{\DESCaudioTrackVoiceNameToMixSettingMap}{%
+  mapping from voice names to volume factors and pan positions used
+  for mixing the refined audio files into cumulated audio file for
+  given track with both elements separated by a slash; the factors
+  are decimal values in decibels (where 0.0 means that the refined
+  voice file is taken without change with a conversion of \(10^{{\rm
+  dBValue}/20}\)), the pan position is given as a decimal value
+  between 0 and 1 with suffix ``R'' or ``L'' (for right/left) or the
+  character ``C'' (for center)
 }
 
 \newcommand{\DESCaudioTrackList}{%
@@ -509,12 +514,6 @@
   127) followed by a colon
 }
 
-\newcommand{\DESCmidiPanList}{%
-  list of pan positions per voice as a decimal value between 0 and 1
-  with suffix ``R'' or ``L'' (for right/left) or the character ``C''
-  (for center)
-}
-
 \newcommand{\DESCmidiToWavRenderingCommandLine}{%
   command line for rendering command from MIDI file to WAV audio file
   (typically ``fluidsynth'' with parameters for input
@@ -532,6 +531,12 @@
 \newcommand{\DESCmpfourboxCommand}{%
   location of mp4box command (if available); if empty ffmpeg is used
   instead
+}
+
+\newcommand{\DESCpanPositionList}{%
+  list of pan positions per voice as a decimal value between 0 and 1
+  with suffix ``R'' or ``L'' (for right/left) or the character ``C''
+  (for center)
 }
 
 \newcommand{\DESCparallelTrack}{%
@@ -2223,8 +2228,8 @@ directory given by \embeddedCode{targetDirectoryPath} with name
                {\DESCmidiVolumeList}
                {see text}
 
-    \varDescriptionLong{midiPanList}
-               {\DESCmidiPanList}
+    \varDescriptionLong{panPositionList}
+               {\DESCpanPositionList}
                {see text}
   \end{variableDescriptionTableLong}
 
@@ -2243,7 +2248,7 @@ For example, the following settings in the configuration file
   midiChannelList    = "   1,      2,     10 "
   midiInstrumentList = "  54,   2:29,     16 "
   midiVolumeList     = "  90,     60,    110 "
-  midiPanList        = "   C,   0.5L,    0.1R"
+  panPositionList    = "   C,   0.5L,    0.1R"
 \end{configurationFileCode}
 
 define vocals to be a synth vox in the center with 3/4 volume, the
@@ -3126,13 +3131,45 @@ configuration variables described for the ``rawaudio'' and
 The ``mix'' phase combines the refined audio files into one or
 more audio file with all voices and in aac audio format.
 
-Audio levels of the individual voices, mastering effects and a final
-amplification factor are specified in the configuration.  Hence the
-audio voices are mixed with those levels, have the mastering audio
-processing applied and finally are amplified by the given factor
-before the result is compressed into an AAC file.
+Audio levels and pan positions of the individual voices, mastering
+effects and a final amplification factor are specified in the
+configuration.  Hence the audio voices are mixed with those levels and
+to the given pan positions, have the mastering audio processing
+applied and finally are amplified by the given factor before the
+result is compressed into an AAC file.
 
-The target file is stored in the
+When the variable \embeddedCode{mixingCommandLine} does not specify a
+``pan'' placeholder, panning is done internally.  This algorithm does
+a traditional balancing of the stereo channels.  That means, when the
+pan value is less than zero the left channel is unchanged, while the
+right channel is linearly attenuated and vice versa for a positive pan
+value. So the amplification factors are
+
+\newcommand{\amplificationFunction}[3]{
+    \begin{displaymath}
+      {\rm amplification~factor}_{\rm #1} =
+      \left \{
+            \begin{array}{cl}
+                #2 & {{\bf if}~\rm panValue}   <  0\\
+                #3 & {{\bf if}~\rm panValue} \geq 0\\
+            \end{array}
+       \right .\\
+    \end{displaymath}
+}
+
+\amplificationFunction{left}{1}{1 - {\rm panValue}}
+\amplificationFunction{right}{1 + {\rm panValue}}{1}
+
+Figure~\ref{figure:panGraph} shows how this default panning function
+affects the left and right channel of a stereo signal.
+
+\begin{centeredFigure}
+  \centeredExternalPicture{0.85}{panGraph.mps}
+  \caption{Default Panning Function for Left and Right Channels}
+  \label{figure:panGraph}
+\end{centeredFigure}
+
+After panning and mixing the target file is stored in the
 \embeddedCode{audioTargetDirectoryPath} with its name constructed as
 the concatenation of \embeddedCode{targetFileNamePrefix},
 \embeddedCode{fileNamePrefix} and suffix ``-ALL.m4a''.
@@ -3198,8 +3235,8 @@ mastering effects for this voice and the final amplification level.
     \varDescriptionShort{languageCode}
                         {\DESCaudioTrackLanguageCode}
 
-    \varDescriptionShort{voiceNameTo\-AudioLevelMap}
-                        {\DESCaudioTrackVoiceNameToAudioLevelMap}
+    \varDescriptionShort{voiceNameTo\-MixSettingMap}
+                        {\DESCaudioTrackVoiceNameToMixSettingMap}
 
     \varDescriptionShort{masteringEffectList}
                         {\DESCaudioTrackMasteringEffectList}
@@ -3233,7 +3270,7 @@ and some language name.  So you must be creative\dots
 The final stage of audio processing is described by several attributes
 in the entry for a single audio track within the list of tracks:
 \embeddedCode{amplificationLevel},
-\embeddedCode{voiceNameToAudioLevelMap} and
+\embeddedCode{voiceNameToMixSettingMap} and
 \embeddedCode{masteringEffectList}.  Figure~\ref{figure:trackMixdown}
 illustrates how the audio voice files from the ``refinedaudio'' phase
 are combined into the several audio tracks by the mix phase.  In
@@ -3243,15 +3280,16 @@ there is no adaptation of the voice files done: they are taken
 unchanged from the previous phase.
 
 Nevertheless you can also define global settings for all of those and
-reference them in the audio track list variable.  Especially the audio
-level map may be global, because the track specific mapping will only
-use the levels of those voices defined in its associated audio groups.
+reference them in the audio track list variable.  Especially the mix
+settings map may be global, because the track specific mapping will
+only use the levels of those voices defined in its associated audio
+groups.
 
 In the configuration file we can define auxiliary variables for the
 audio processing:
 
 \begin{configurationFileCode}
-  _voiceNameToAudioLevelMap = "{"
+  _voiceNameToMixSettingMap = "{"
       " bass : -6, keyboard : -10.5, keyboardSimple : -14,"
       " strings : -2, vocals : 0, bgVocals : -1,"
       " guitar : -4.5, drums : 1.6, percussion : 0"
@@ -3260,19 +3298,24 @@ audio processing:
   _amplificationLevel = -1.2
 \end{configurationFileCode}
 
+Note that an individual mix setting may also contain a pan
+specification (separated by a slash).  Hence ``bass : -6/0.3R'' would
+also be okay and overrides the pan specification given as a list with
+variable \embeddedCode{panPositionList}.
+
 For audio tracks we also define an auxiliary variable each to make
 thing more comprehensible.
 
 This is the track with all voices:
 \begin{configurationFileCode}
    _audioTrackWithAllVoices =
-    "all :   { audioGroupList   : base/voc/gtr/drm,"
+    "all :   { audioGroupList  : base/voc/gtr/drm,"
     " audioFileTemplate        : '$',"
     " songNameTemplate         : '$ [ALL]',"
     " albumName                : 'Best',"
     " description              : 'all voices',"
     " languageCode             : eng,"
-    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap","
+    " voiceNameToMixSettingMap : "_voiceNameToMixSettingMap","
     " masteringEffectList      : "_masteringEffectList","
     " amplificationLevel       : "_amplificationLevel" }"
 \end{configurationFileCode}
@@ -3286,7 +3329,7 @@ This is the track with all voices except for vocals:
     " albumName                : 'Best [no vocals]',"
     " description              : 'no vocals',"
     " languageCode             : deu,"
-    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap","
+    " voiceNameToMixSettingMap : "_voiceNameToMixSettingMap","
     " masteringEffectList      : "_masteringEffectList","
     " amplificationLevel       : "_amplificationLevel"}"
 \end{configurationFileCode}
@@ -3791,20 +3834,21 @@ channels are at their defaults meaning 10 for drums and arbitrary other
 values for non-drums.
 
 \begin{configurationFileCode}
-  voiceNameList      = "vocals,    bass,  guitar,   drums"
-  midiInstrumentList = "    18,      35,      26,      13"
-  midiVolumeList     = "   100,     120,      70,     110"
-  panPositionList    = "     C,    0.5L,    0.6R,    0.1L"
-  reverbLevelList    = "   0.3,     0.0,     0.0,     0.0"
-  soundVariantList   = "SIMPLE,  CRUNCH,  CRUNCH,    GRIT"
+  voiceNameList       = "vocals,    bass,  guitar,   drums"
+  midiInstrumentList  = "    18,      35,      26,      13"
+  midiVolumeList      = "   100,     120,      70,     110"
+  panPositionList = "     C,    0.5L,    0.6R,    0.1L"
+  reverbLevelList     = "   0.3,     0.0,     0.0,     0.0"
+  soundVariantList    = "SIMPLE,  CRUNCH,  CRUNCH,    GRIT"
 \end{configurationFileCode}
 
-The audio levels are given in a mapping, which is used in the audio
-track list.  We use a single mapping for all targets, that means the
-relative levels are identical in all mixes.
+The audio levels and pan positions are given in a separate mapping,
+which is used in the audio track list.  We use a single mapping for
+all targets, that means the relative levels and pan positions are
+identical in all mixes.
 
 \begin{configurationFileCode}
-  _voiceNameToAudioLevelMap =
+  _voiceNameToMixSettingMap =
     "{ vocals : -4, bass : 0, guitar : -6, drums : -2 }"
 \end{configurationFileCode}
 
@@ -3841,7 +3885,7 @@ The overall tempo is 90bpm throughout the song.
 Because we want to set the \embeddedCode{audioTrackList} variable to
 non-default (default is one track with all voices), this must come
 \emph{after} the song parameters, because it relies on the voice name
-to audio level mapping.
+to mix settings mapping.
 
 For a separate global file this means, it has to be included as
 another fragment \emph{after} the song-specific setting.  Since we are
@@ -3853,24 +3897,24 @@ is not mandatory).
 
 \begin{configurationFileCode}
   _audioTrackWithAllVoices =
-    "all : { audioGroupList : base/voc/gtr,"
-    " audioFileTemplate        : '$',"
-    " songNameTemplate         : '$ [ALL]',"
-    " albumName                : '$',"
-    " description              : 'all voices',"
-    " languageCode             : deu,"
-    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}"
+    "all : { audioGroupList     : base/voc/gtr,"
+    " audioFileTemplate         : '$',"
+    " songNameTemplate          : '$ [ALL]',"
+    " albumName                 : '$',"
+    " description               : 'all voices',"
+    " languageCode              : deu,"
+    " voiceNameToMixSettingMap : "_voiceNameToMixSettingMap"}"
 \end{configurationFileCode}
 
 \begin{configurationFileCode}
   _audioTrackWithoutVocals =
     "novocals : { audioGroupList : base/gtr,"
-    " audioFileTemplate        : '$-v',"
-    " songNameTemplate         : '$ [-V]',"
-    " albumName                : '$ [-V]',"
-    " description              : 'no vocals',"
-    " languageCode             : eng,"
-    " voiceNameToAudioLevelMap : "_voiceNameToAudioLevelMap"}"
+    " audioFileTemplate          : '$-v',"
+    " songNameTemplate           : '$ [-V]',"
+    " albumName                  : '$ [-V]',"
+    " description                : 'no vocals',"
+    " languageCode               : eng,"
+    " voiceNameToMixSettingMap   : "_voiceNameToMixSettingMap"}"
 \end{configurationFileCode}
 
 Both are combined into the \embeddedCode{audioTrackList}.
@@ -3882,10 +3926,10 @@ Both are combined into the \embeddedCode{audioTrackList}.
   "}"
 \end{configurationFileCode}
 
-The separate variable \embeddedCode{\_voiceNameToAudioLevelMap}
-defined above defines the audio level for all voices; there are no
-special mastering effects and all amplification levels are (the
-default) 0dB.
+The separate variable \embeddedCode{\_voiceNameToMixSettingMap}
+defined above defines the audio level (and optionally the pan
+positions) for all voices; there are no special mastering effects and
+all amplification levels are (the default) 0dB.
 
 %--------------------------------
 \section{Putting it All Together}
@@ -4333,11 +4377,6 @@ been mentioned first in the current document.
                         {some default assignments from General MIDI}
                         {MidiRelated}
 
-    \varDescriptionFinal{midiPanList}
-                        {\DESCmidiPanList}
-                        {all voices have center pan position}
-                        {MidiRelated}
-
     \varDescriptionFinal{midiToWavRendering\-CommandLine}
                         {\DESCmidiToWavRenderingCommandLine}
                         {\mandatory}
@@ -4357,6 +4396,11 @@ been mentioned first in the current document.
                         {\DESCmpfourboxCommand}
                         {empty, will be replaced by ffmpeg}
                         {Program}
+
+    \varDescriptionFinal{panPositionList}
+                        {\DESCpanPositionList}
+                        {all voices have center pan position}
+                        {MidiRelated}
 
     \varDescriptionFinal{parallelTrack}
                         {\DESCparallelTrack}

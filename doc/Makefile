@@ -62,6 +62,9 @@ figures/humanizationGerman.mps: ltbvcFigure-6.mps
 figures/humanization.mps: ltbvcFigure-7.mps
 	cp $< $@
 
+figures/panGraph.mps: ltbvcFigure-8.mps
+	cp $< $@
+
 #--
 
 $(TARGETPDF): $(LATEXSOURCE) $(TARGETFIGURELIST)

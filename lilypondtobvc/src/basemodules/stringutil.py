@@ -258,8 +258,10 @@ def _deserializeToList (st : String,
                 currentList.append(currentElement)
                 parseState = ParseState_afterElement
         elif parseState == ParseState_afterElement:
-            # ignore everything except a separator
-            if ch == separator:
+            # ignore everything except a separator or a list end
+            if ch == listEndCharacter:
+                break
+            elif ch == separator:
                 parseState = ParseState_beforeElement
 
         position += 1
@@ -357,8 +359,7 @@ def _deserializeToMap (st : String,
 
             # ignore everything except a separator or a colon
             if ch == mapEndCharacter:
-                position -= 1
-                parseState = ParseState_beforeKey
+                break
             elif ch == separator:
                 parseState = ParseState_beforeKey
             elif ch == ":":

@@ -68,7 +68,7 @@ class ValidityChecker:
         if valueName is None:
             result = template % (value, "")
         else:
-            result = template % (value, " (" + valueName + ")")
+            result = template % (value, valueName)
 
         return result
 
@@ -144,6 +144,7 @@ class ValidityChecker:
                                          valueName, commandName))
         template = "Command %r (%s) cannot be executed."
         message = cls._constructErrorMessage(template, commandName, valueName)
+
         try:
             subprocess.run(commandName,
                            stdout=subprocess.DEVNULL,
@@ -151,6 +152,13 @@ class ValidityChecker:
             isOkay = True
         except:
             isOkay = False
+
+        if not isOkay:
+            try:
+                subprocess.call(commandName)
+                isOkay = True
+            except:
+                pass
 
         cls.isValid(isOkay, message)
 
@@ -262,7 +270,8 @@ class ValidityChecker:
                                          valueName, pathName))
         template = "File %r (%s) is not readable."
         message = cls._constructErrorMessage(template, pathName, valueName)
-        cls.isValid(os.path.isfile(pathName), message)
+        isOkay = False if pathName is None else os.path.isfile(pathName)
+        cls.isValid(isOkay, message)
 
     #--------------------
 

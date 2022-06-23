@@ -329,11 +329,11 @@ class LilypondFile:
 
             if isDrumVoice:
                 drumsPrefix  = prefix + "\\drumsCountIn "
-                drumsSuffix = " R1 \\drummode { ss64" + suffix
+                drumsSuffix = " s1 \\drummode { ss64" + suffix
                 voiceText = drumsPrefix + voiceText + drumsSuffix
             else:
                 normalPrefix = prefix + "\\countIn "
-                normalSuffix = " R1 { c64" + suffix
+                normalSuffix = " s1 { c64" + suffix
                 voiceText = normalPrefix + voiceText + normalSuffix
 
         clefString = cls._getPVEntry(self._phaseAndVoiceNameToClefMap,

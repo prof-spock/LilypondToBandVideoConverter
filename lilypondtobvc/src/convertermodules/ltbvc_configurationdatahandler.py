@@ -1,7 +1,7 @@
 # ltbvc_configurationdatahandler -- services for access to the global
 #                                   configuration file of ltbvc
 #
-# author: Dr. Thomas Tensi, 2006 - 2017
+# author: Dr. Thomas Tensi, 2006 - 2022
 
 #====================
 # IMPORTS
@@ -30,7 +30,8 @@ from basemodules.ttbase import iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import AudioTrack, VideoFileKind, \
-                                 VideoTarget, VoiceDescriptor
+                                 VideoTarget, VoiceDescriptor, \
+                                 panPositionStringToReal
 
 # renamings
 generateObjectListFromString= DataTypeSupport.generateObjectListFromString
@@ -1469,7 +1470,7 @@ class _ConfigDataSongGroup (AbstractDataType):
                         in deserializeToMap(st).items() }),
                      "audioGroupToVoicesMap")
     audioTargetDirectoryPath        : String = "."
-    audioTrackNameToDataMap                  : Map = \
+    audioTrackNameToDataMap         : Map = \
         specialField((),
                      lambda st: generateObjectMapFromString(st,
                                                             AudioTrack()),
@@ -1594,7 +1595,8 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
 
         for attributeName in criticalAttributeNameList:
             if getattr(self, attributeName) is None:
-                Logging.trace("--: setting %s to empty", attributeName)
+                Logging.trace("--: %s is undefined, set to empty map",
+                              attributeName)
                 SETATTR(self, attributeName, {})
 
         # adapt several parameters when unset
@@ -1626,13 +1628,13 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
             Logging.trace("--: ")
             audioGroupName = \
                 list(self.audioGroupNameToVoiceNameSetMap.keys())[0]
-            audioLevelMap = { voiceName : 1.0
+            mixSettingMap = { voiceName : (1.0, 0)
                               for voiceName in voiceNameList }
             audioTrack = \
                 AudioTrack(audioGroupList=[audioGroupName],
                            albumName=self.albumName,
                            name="all",
-                           voiceNameToAudioLevelMap=audioLevelMap)
+                           voiceNameToMixSettingMap=mixSettingMap)
             SETATTR(self, "audioTrackNameToDataMap", { "all": audioTrack })
             
         # check the tracks in the audio track list and adapt their
@@ -1648,6 +1650,29 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
                 SETATTR(audioTrack, "audioFileTemplate", "$-%s" % trackName)
             if audioTrack.songNameTemplate == "":
                 SETATTR(audioTrack, "audioFileTemplate", "$ [%s]" % trackName)
+
+            # update pan positions when undefined
+            vnToMixSettingMap = audioTrack.voiceNameToMixSettingMap
+            vnToVoiceDataMap  = self.voiceNameToVoiceDataMap
+
+            for voiceName, mixSetting in vnToMixSettingMap.items():
+                Logging.trace("--: adapting setting for voice %s - %r",
+                              voiceName, mixSetting)
+
+                if mixSetting[1] is None:
+                    # handle unknown pan position
+                    if voiceName not in vnToVoiceDataMap:
+                        panPosition = 0
+                    else:
+                        voiceDescriptor = vnToVoiceDataMap[voiceName]
+                        volume      = mixSetting[0]
+                        panPosition = voiceDescriptor.panPosition
+                        panPosition = \
+                            panPositionStringToReal(panPosition)
+                        
+                    vnToMixSettingMap[voiceName] = (volume, panPosition)
+                    Logging.trace("--: overriding pan for %r by %r",
+                                  voiceName, panPosition)
                 
         Logging.trace("<<")
 

@@ -25,7 +25,7 @@ from basemodules.validitychecker import ValidityChecker
 from .audiotrackmanager import AudioTrackManager
 from .lilypondfilegenerator import LilypondFile
 from .lilypondpngvideogenerator import LilypondPngVideoGenerator
-from .ltbvc_businesstypes import TrackSettings
+from .ltbvc_businesstypes import MidiTrackSettings
 from .ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from .miditransformer import MidiTransformer
 from .videoaudiocombiner import VideoAudioCombiner
@@ -129,7 +129,7 @@ class _CommandLineOptions:
                              + " a voice extract, a full score"
                              + " a video or a midi should be produced;"
                              + " (for postprocessing) tells whether the"
-                             + " single audio tracks, the audio mixdown"
+                             + " single audio tracks, the audio mixing"
                              + " or the final video shall be produced"))
         p.add_argument("--voices",
                        default="",
@@ -262,15 +262,16 @@ class _LilypondProcessor:
             panPosition    = voiceDescriptor.panPosition
             reverbLevel    = voiceDescriptor.reverbLevel
 
-            panPosition = cls._stringToMidiPanPosition(panPosition)
+            midiPanPosition = cls._stringToMidiPanPosition(panPosition)
             midiInstrumentBank, midiInstrument = \
                 cls._stringToMidiInstrument(midiInstrument)
-            reverbLevel = int(127 * reverbLevel)
+            midiReverbLevel = int(127 * reverbLevel)
 
             trackSettingsEntry = \
-                TrackSettings(voiceName, midiChannel, midiInstrumentBank,
-                              midiInstrument, midiVolume, panPosition,
-                              reverbLevel)
+                MidiTrackSettings(voiceName, midiChannel,
+                                  midiInstrumentBank, midiInstrument,
+                                  midiVolume, midiPanPosition,
+                                  midiReverbLevel)
 
             result[voiceName] = trackSettingsEntry
 
@@ -576,13 +577,13 @@ class _LilypondProcessor:
 
     @classmethod
     def processMix (cls):
-        """Mixdown audio tracks."""
+        """Mix audio tracks."""
 
         Logging.trace(">>")
 
         audioTrackManager = \
             AudioTrackManager(cls._configData.tempAudioDirectoryPath)
-        audioTrackManager.mixdown(cls._configData)
+        audioTrackManager.mix(cls._configData)
 
         Logging.trace("<<")
 

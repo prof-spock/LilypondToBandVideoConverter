@@ -18,7 +18,7 @@ panPositionList    = "     C,    0.5L,    0.6R,    0.1L"
 reverbLevelList    = "   0.2,     0.0,     0.0,     0.0"
 soundVariantList   = "SIMPLE,  CRUNCH,  CRUNCH,    GRIT"
 
-_voiceNameToAudioLevelMap =
+_voiceNameToMixSettingMap =
   "{ vocals : -4, bass : 0, guitar : -6, drums : -2 }"
 
 -- preprocessing

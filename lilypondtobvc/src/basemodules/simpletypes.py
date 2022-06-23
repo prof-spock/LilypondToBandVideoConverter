@@ -28,6 +28,7 @@ ObjectList  = List
 RealList    = List[Real]
 StringList  = List[String]
 Tuple       = typing.Tuple
+TupleList   = List[Tuple]
 
 # set types
 Set         = typing.Set

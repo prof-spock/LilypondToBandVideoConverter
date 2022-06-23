@@ -1415,11 +1415,11 @@ class MidiTransformer:
                 st = "%d PrCh ch=%d p=%d" % (midiTime,
                                              activeSettings.midiChannel,
                                              activeSettings.midiInstrument)
-                lineGeneratorProc(0, activeSettings.midiInstrumentBank)
+                lineGeneratorProc( 0, activeSettings.midiInstrumentBank)
                 lineBuffer.writeLine(st)
-                lineGeneratorProc(7, activeSettings.midiVolume)
-                lineGeneratorProc(10, activeSettings.panPosition)
-                lineGeneratorProc(91, activeSettings.reverbLevel)
+                lineGeneratorProc( 7, activeSettings.midiVolume)
+                lineGeneratorProc(10, activeSettings.midiPanPosition)
+                lineGeneratorProc(91, activeSettings.midiReverbLevel)
                 parseState = _ParseState.afterSettings
         else:
             if (cls._channelReferenceRegExp.search(currentLine)

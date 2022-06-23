@@ -13,7 +13,7 @@ import sys
 import subprocess
 
 from .simplelogging import Logging
-from .simpletypes import Boolean, String
+from .simpletypes import Boolean, String, StringList
 from .typesupport import isString, toUnicodeString
 
 #====================
@@ -29,7 +29,7 @@ class OperatingSystem:
     @classmethod
     def basename (cls,
                   fileName : String,
-                  extensionIsShown : Boolean = False) -> String:
+                  extensionIsShown : Boolean = True) -> String:
         """Returns <fileName> without leading path."""
 
         shortFileName = os.path.basename(fileName)
@@ -55,7 +55,7 @@ class OperatingSystem:
 
     @classmethod
     def executeCommand (cls,
-                        command : String,
+                        command : StringList,
                         abortOnFailure : Boolean = False,
                         stdin=None, stdout=None, stderr=None):
         """Processes <command> (specified as list) in operating
@@ -103,7 +103,8 @@ class OperatingSystem:
 
         Logging.trace(">>")
 
-        result = os.getenv("HOME")
+        result = os.getenv("HOMEPATH")
+        result = result if result is not None else os.getenv("HOME")
         result = result if result is not None else os.path.expanduser("~")
         result = toUnicodeString(result)
 

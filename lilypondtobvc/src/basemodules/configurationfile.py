@@ -87,6 +87,7 @@ class ConfigurationFile:
     _continuationMarker = "\\"
     _realRegExp = re.compile(r"^[+\-]?[0-9]+\.[0-9]*$")
     _integerRegExp = re.compile(r"^[+\-]?[0-9]+$")
+    _hexIntegerRegExp = re.compile(r"^0[xX][0-9A-Fa-f]+$")
     _keyValueRegExp = re.compile(r"^(\w+)\s*=\s*(.*)$", re.UNICODE)
     _whiteSpaceCharRegExp = re.compile(r"^\s$")
     _identifierCharRegExp = re.compile(r"[A-Za-z0-9_]")
@@ -115,7 +116,8 @@ class ConfigurationFile:
 
         if uppercasedValue in cls._validBooleanValueNames:
             result = (uppercasedValue in cls._trueBooleanValueNames)
-        elif cls._integerRegExp.match(value):
+        elif (cls._integerRegExp.match(value)
+              or cls._hexIntegerRegExp.match(value)):        
             result = int(value)
         elif cls._realRegExp.match(value):
             result = float(value)
@@ -131,6 +133,8 @@ class ConfigurationFile:
     def _combineFragmentedString (cls, st : String) -> String:
         """Combines - possibly fragmented - external representation of a
            string given by <st> into a sanitized string."""
+
+        Logging.trace(">>: %r", st)
 
         ParseState_inLimbo   = 0
         ParseState_inOther   = 1
@@ -170,6 +174,7 @@ class ConfigurationFile:
                 Assertion.check(False,
                                 "bad parse state - %s" % parseState)
 
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -275,7 +280,7 @@ class ConfigurationFile:
         cls = self.__class__
         result = None
         separator = OperatingSystem.pathSeparator
-        simpleFileName = OperatingSystem.basename(originalFileName, True)
+        simpleFileName = OperatingSystem.basename(originalFileName)
         searchPathList = list(cls._searchPathList)
         searchPathList.append(enclosingDirectoryName)
 
@@ -343,7 +348,7 @@ class ConfigurationFile:
                 cumulatedLine = ""
             else:
                 # this is not an empty line and it does not start with a
-                # definition sequence
+                # definition sequence or an import
                 cumulatedLine += " " + currentLine
                 loggingFormat = "--: collected continuation %d (%r)"
 

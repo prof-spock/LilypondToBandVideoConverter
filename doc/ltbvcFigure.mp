@@ -2,6 +2,7 @@ outputtemplate := "%j-%c.mps";
 %prologues := 3;
 
 input boxes;
+input graph;
 input hatching;
 input TEX;
 
@@ -241,7 +242,7 @@ enddef;
 %=============
 % Humanization
 %=============
-  
+
 numeric Humanization_fontSizeFactorArrowLabel;
 numeric Humanization_fontSizeFactorAxisLabel;
 numeric Humanization_fontSizeFactorTitle;
@@ -769,7 +770,7 @@ def MasteringBox_makeAll =
 
     Box_make(masteringGroupA, "B", "");
     Box_make(mixerBoxA, "B",
-             btex \stkB{mixdown${}_A$~by}{\tt voiceNameToAudioLevelMap} etex
+             btex \stkB{mixing${}_A$~by}{\tt voiceNameToMixSettingsMap} etex
              rotated 90);
     Box_make(masteringBoxA, "B",
              btex \stkB{mastering${}_A$~via}{\tt masteringCommandList} etex
@@ -784,7 +785,7 @@ def MasteringBox_makeAll =
                                    MasteringBoxA_size);
 
     Box_make(masteringGroupK, "B", "");
-    Box_make(mixerBoxK, "B", btex mixdown${}_K$ etex rotated 90);
+    Box_make(mixerBoxK, "B", btex mixing${}_K$ etex rotated 90);
     Box_make(masteringBoxK, "B", btex mastering${}_K$ etex rotated 90);
     Box_make(amplificationBoxK, "B",
              btex amplification${}_K$ etex rotated 90);
@@ -894,6 +895,7 @@ MasteringGroupK_centerPosition := (xpart MasteringGroupA_centerPosition,
                                    20mm);
 TrackBox_xPosition             := xpart MasteringGroupA_centerPosition
                                   + MasteringGroup_xSize/2 + 20mm;
+
 
 %====================
 %====================
@@ -1143,6 +1145,46 @@ beginfig(7);
                                        {$2\cdot\psi\cdot adj_v$} etex,
                              btex \stkC{timing}{variation}
                                        {$2\cdot\tau(p_i)\cdot\ell\cdot adj_t$} etex);
+endfig;
+
+%====================
+
+color PanGraph_gridColor;
+color PanGraph_firstGraphColor;
+color PanGraph_secondGraphColor;
+numeric PanGraph_penWidth;
+PanGraph_panWidth := 2pt;
+PanGraph_gridColor := 0.8 * white;
+PanGraph_firstGraphColor = (0, 0, 1);
+PanGraph_secondGraphColor = (1, 0, 0);
+
+%====================
+
+beginfig(8);
+    path leftPanGraph, rightPanGraph;
+
+    leftPanGraph :=
+        (-1, 1) -- (-0.75, 1) -- (-0.5, 1) -- (-0.25, 1) -- (0, 1)
+        -- (0.25, 0.75) -- (0.5, 0.5) -- (0.75, 0.25) -- (1, 0);
+    rightPanGraph :=
+        (-1, 0) -- (-0.75, 0.25) -- (-0.5, 0.5) -- (-0.25, 0.75) -- (0, 1)
+        -- (0.25, 1) -- (0.5, 1) -- (0.75, 1) -- (1, 1);
+
+    draw begingraph(80mm,60mm);
+    glabel.lft(btex Amplification Factor etex rotated 90, OUT);
+    glabel.bot(btex Pan Position etex, OUT);
+    setrange((-1,0), (1,1.2));
+    autogrid(grid.bot,grid.lft) withcolor PanGraph_gridColor;
+    frame.llft;
+    gdraw leftPanGraph
+        withcolor PanGraph_firstGraphColor
+        withpen pencircle scaled PanGraph_panWidth;
+    glabel.top("left", 2) withcolor PanGraph_firstGraphColor;
+    gdraw rightPanGraph
+        withcolor PanGraph_secondGraphColor
+        withpen pencircle scaled PanGraph_panWidth;
+    glabel.top("right", 6) withcolor PanGraph_secondGraphColor;;
+    endgraph
 endfig;
 
 end

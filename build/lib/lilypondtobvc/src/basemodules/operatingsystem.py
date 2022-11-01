@@ -40,17 +40,6 @@ class OperatingSystem:
     #--------------------
 
     @classmethod
-    def currentDirectoryPath (cls) -> String:
-        """Returns current directory of program."""
-
-        Logging.trace(">>")
-        result = os.getcwd()
-        Logging.trace("<<: %r", result)
-        return result
-
-    #--------------------
-
-    @classmethod
     def dirname (cls,
                  filePath : String) -> String:
         """Returns directory of <filePath>."""
@@ -87,23 +76,6 @@ class OperatingSystem:
 
         Logging.trace("<<")
         return completionCode
-
-    #--------------------
-
-    @classmethod
-    def fullFilePath (cls,
-                      fileName : String) -> String:
-        """Tells the full file path for <fileName>"""
-
-        Logging.trace(">>")
-
-        if cls.isAbsoluteFileName(fileName):
-            result = fileName
-        else:
-            result = "%s/%s" % (cls.currentDirectoryPath(), fileName)
-
-        Logging.trace("<<: %r", result)
-        return result
 
     #--------------------
 

@@ -15,49 +15,15 @@ from .typesupport import toUnicodeString
 
 #====================
 
-class Logging_Level:
-    """Defines the levels of logging"""
-
-    # no logging
-    noLogging           = 0
-    # only logging of errors and assertion failures
-    error               = 1
-    # logging of errors and abbreviated exit-entry traces
-    standardAbbreviated = 2
-    # logging of errors and full exit-entry traces
-    standard            = 3
-    # full logging (including internal traces)
-    verbose             = 4
-
-    #--------------------
-
-    @classmethod
-    def fromString (cls,
-                    st : String) -> String:
-        """Converts string <st> to log level, returns noLogging when
-           string cannot be converted"""
-
-        result = cls.noLogging
-        st = st.lower()
-           
-        if st == "verbose":
-            result = cls.verbose
-        elif st == "standard":
-            result = cls.standard
-        elif st == "standardabbreviated":
-            result = cls.standardAbbreviated
-        elif st == "error":
-            result = cls.error
-       
-        return result
-    
-#====================
-
 class Logging:
     """Provides some primitive logging."""
 
-   
-    _referenceLevel             = Logging_Level.noLogging
+    Level_none     = 0
+    Level_error    = 1
+    Level_standard = 2
+    Level_verbose  = 3
+    
+    _referenceLevel             = Level_none
     _fileName                   = ""
     _fileIsOpen                 = None
     _fileIsKeptOpen             = None
@@ -70,29 +36,9 @@ class Logging:
     _previousTimestamp          = 0
     _timeOfDayString            = ""
 
-    # buffer logs data before log file is opened, otherwise a
-    # write-through will be done
     _buffer = []
-
-    # the list of function names to be ignored when traversing
-    # run-time stack for relevant function names */
-    _ignoredFunctionNameList = \
-        ("check", "_internalCheck", "log", "post", "pre",
-         "trace", "traceError", "_traceWithLevel")
-
-    #-- TRACE PREFICES --
-    # length of allowed prefixes for template in a trace call
-    _tracePrefixLength = 2
-
-    # trace prefix used for internal traces within a function
-    _innerTracePrefix = "--"
-
-    # list of allowed prefixes for template in a entry-exit trace
-    # call
-    _entryExitPrefixList = (">>", "<<")
-  
-    # list of allowed prefixes for template in a trace call
-    _standardPrefixList = _entryExitPrefixList + (_innerTracePrefix,)
+    # buffers log data before log file is opened, otherwise a
+    # write-through will be done
 
     # --------------------
     # LOCAL FEATURES
@@ -110,7 +56,9 @@ class Logging:
         while not found:
             currentFrame = sys._getframe(callerDepth)
             functionName = currentFrame.f_code.co_name
-            found = (functionName not in cls._ignoredFunctionNameList)
+            found = (functionName not in ("log", "trace", "traceError",
+                                          "check", "pre", "post",
+                                          "_internalCheck"))
 
             if not found:
                 callerDepth = callerDepth + 1
@@ -184,60 +132,6 @@ class Logging:
     #--------------------
 
     @classmethod
-    def _prefixBefore (cls, st, otherSt):
-        """Returns part of <st> before <otherSt>; if <otherSt> is not
-           in string, the whole string will be returned"""
-
-        splitPosition = st.indexOf(otherSt)
-        result = st if splitPosition is None else st[0:splitPosition]
-        return result
-        
-    #--------------------
-
-    @classmethod
-    def _traceWithLevel (cls,
-                         level : Natural,
-                         template : String,
-                         *argumentList):
-        """Writes <argumentList> formatted by <template> together with
-           function name to log file."""
-
-        if cls._isEnabled and level <= cls._referenceLevel:
-            functionName = cls._callingFunctionName()
-            prefixLength = cls._tracePrefixLength
-
-            if template[0:prefixLength] not in cls._standardPrefixList:
-                template = (_innerTracePrefix
-                            + iif(len(template) > 0, ":", "")
-                            + template)
-
-            if cls._timeIsLogged:
-                timeString = " (" + cls._currentTimeOfDay() + ")"
-            else:
-                timeString = ""
-
-            st = template[0:prefixLength] + functionName + timeString
-            template = template[prefixLength:]
-
-            # workaround for JYTHON
-            try:
-                st += template % argumentList
-            except:
-                st += template + " ###JYTHON CONVERSION ERROR###"
-
-            st = st.replace("\n", "#")
-
-            if (cls._referenceLevel == Logging_Level.standardAbbreviated
-                and st[0:prefixLength] in cls._standardPrefixList):
-                # this is the level where the entry-exit data after
-                # and including the colon is stripped off
-                st = cls._prefixBefore(st, ":")
-            
-            cls._writeLine(st)
-
-    #--------------------
-
-    @classmethod
     def _writeLine (cls,
                     st : String):
         """Reopens logging file and writes single line <st>"""
@@ -278,7 +172,7 @@ class Logging:
     def initialize (cls):
         """Starts logging"""
 
-        cls._referenceLevel = Logging_Level.noLogging
+        cls._referenceLevel = cls.Level_none
         cls._fileName       = ""
         cls._fileIsOpen     = False
         cls._isEnabled      = True
@@ -312,7 +206,7 @@ class Logging:
 
     @classmethod
     def setLevel (cls,
-                  loggingLevel : Logging_Level):
+                  loggingLevel : Natural):
         """Sets logging reference level to <loggingLevel>"""
 
         cls._referenceLevel = loggingLevel
@@ -368,7 +262,7 @@ class Logging:
     @classmethod
     def log (cls,
              st : String,
-             level : Natural = Logging_Level.standard):
+             level : Natural = Level_standard):
         """Writes <st> as a line to log file, when <level> is below or
            equal to the reference level."""
 
@@ -385,12 +279,30 @@ class Logging:
         """Writes <argumentList> formatted by <template> together with
            function name to log file."""
 
-        templatePrefix = template[0:cls._tracePrefixLength]
-        isEntryExitTrace = templatePrefix in cls._entryExitPrefixList
-        logLevel = iif(isEntryExitTrace,
-                       Logging_Level.standardAbbreviated,
-                       Logging_Level.verbose)
-        cls._traceWithLevel(logLevel, template, *argumentList)
+        if cls._isEnabled:
+            functionName = cls._callingFunctionName()
+            hasStandardPrefix = (template[0:2] in (">>", "<<", "--"))
+
+            if not hasStandardPrefix:
+                template = (iif(len(template) > 0, "--:", "--")
+                            + template)
+
+            if cls._timeIsLogged:
+                timeString = " (" + cls._currentTimeOfDay() + ")"
+            else:
+                timeString = ""
+
+            st = template[0:2] + functionName + timeString
+            template = template[2:]
+
+            # workaround for JYTHON
+            try:
+                st += template % argumentList
+            except:
+                st += template + " ###JYTHON CONVERSION ERROR###"
+
+            st = st.replace("\n", "#")
+            cls.log(st, cls.Level_verbose)
 
     #--------------------
 
@@ -401,6 +313,4 @@ class Logging:
         """Writes <argumentList> formatted by <template> together with
            function name to log file as an error entry."""
 
-        cls._traceWithLevel(Logging_Level.error,
-                            "--: ERROR - " + template,
-                            *argumentList)
+        cls.trace("--: ERROR - " + template, *argumentList)

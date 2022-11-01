@@ -14,7 +14,7 @@ import re
 
 from basemodules.datatypesupport import SETATTR
 from basemodules.operatingsystem import OperatingSystem
-from basemodules.simplelogging import Logging, Logging_Level
+from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Callable, List, Map, \
                                     Natural, String, StringList, \
                                     StringMap, StringSet, Tuple
@@ -842,7 +842,7 @@ def main ():
     """Main program for LTBVC."""
 
     Logging.initialize()
-    Logging.setLevel(Logging_Level.verbose)
+    Logging.setLevel(Logging.Level_verbose)
     Logging.setTracingWithTime(True, 2)
     Logging.trace(">>")
 

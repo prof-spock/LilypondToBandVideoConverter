@@ -59,8 +59,7 @@ class _WavFile:
     """This class provides services for WAV files like shifting, mixing of
        several files or amplification and aggregated services like mixing"""
 
-    _chunkSize = 128  # number of frames to be read from wave file in
-                      # one step
+    _chunkSize = 128  # number of frames to be read from wave file in one step
     maximumSampleValue = 32767
 
     #--------------------
@@ -412,7 +411,7 @@ class AudioTrackManager:
     _soundStyleNameToEffectsMap    : StringMap = {}
 
     # internal configuration settings
-    # _usesSquaredPanningRule : Boolean = False
+    _usesSquaredPanningRule : Boolean = False
     
     #--------------------
     # LOCAL FEATURES

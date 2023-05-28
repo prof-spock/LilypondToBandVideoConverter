@@ -1010,7 +1010,7 @@ class _ConfigDataSong (AbstractDataType):
                         "organ" : "18", "reed" : "64", "strings" : "48",
                         "synthesizer" : "80", "vocals" : "54" }
 
-                    for voiceName in voiceNameList:
+                    for i, voiceName in enumerate(voiceNameList):
                         correctValue += (iif(i > 0, ", ", "")
                                          + voiceToInstrumentMap.get(voiceName,
                                                                     "0"))
@@ -1645,7 +1645,7 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
             if audioTrack.name == "":
                 SETATTR(audioTrack, "name",  trackName)
             if audioTrack.description == "":
-                SETATTR(audioTrack, "description",  groupNameAsString)
+                SETATTR(audioTrack, "description",  groupNamesAsString)
             if audioTrack.audioFileTemplate == "":
                 SETATTR(audioTrack, "audioFileTemplate", "$-%s" % trackName)
             if audioTrack.songNameTemplate == "":

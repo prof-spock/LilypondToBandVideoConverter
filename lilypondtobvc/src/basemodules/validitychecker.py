@@ -41,6 +41,8 @@ class ValidityChecker:
                         value : Object):
         result = "--: checking %s for being %s (%r)"
         result = result % (valueName, typeName, value)
+        # remove any template characters in result string
+        result = result.replace("%", "§")
         return result
 
     #--------------------

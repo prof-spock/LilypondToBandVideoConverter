@@ -255,6 +255,39 @@ class LilypondFile:
     #--------------------
 
     @classmethod
+    def _lilypondDurationCode (cls,
+                               durationInQuarters : Real) -> StringList:
+        """Returns a list of lilypond duration strings from a real
+           number of quarters in <durationInQuarters>; e.g. 4.0
+           quarters would be encoded as [ '1' ] (a single whole note)"""
+
+        Logging.trace(">>: %s", durationInQuarters)
+
+        epsilon = 0.01
+        duration = durationInQuarters / 4.0
+        referenceDurationList = ( 1.5, 1.0 )
+        lilypondNoteNumber = 1
+        result = []
+
+        while duration > 0 and lilypondNoteNumber <= 64:
+            for i in range(2):
+                referenceDuration = \
+                    referenceDurationList[i] / lilypondNoteNumber
+
+                while duration >= referenceDuration:
+                    result.append("%d%s"
+                                  % (lilypondNoteNumber,
+                                     iif(i == 0, ".", "")))
+                    duration -= referenceDuration
+                
+            lilypondNoteNumber *= 2
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    @classmethod
     def _lilypondVoiceName (cls,
                             voiceName : String,
                             drumsNameIsExpanded : Boolean = False):
@@ -535,9 +568,17 @@ class LilypondFile:
             if measure == 1:
                 self._printLine(0, "\\initialTempo")
             else:
-                tempo = self._songMeasureToTempoMap[measure][0]
+                measureData = self._songMeasureToTempoMap[measure]
+                tempo              = measureData[0]
+                quartersPerMeasure = measureData[1]
                 skipCount = measure - previousMeasure
-                self._printLine(0, "\\skip 1*%d" % skipCount)
+                durationStringList = \
+                    cls._lilypondDurationCode(quartersPerMeasure)
+
+                for durationString in durationStringList:
+                    self._printLine(0, ("\\skip %s*%d"
+                                        % (durationString, skipCount)))
+
                 self._printLine(0, "%%%d\n" % measure)
                 self._printLine(0, cls._tempoString(tempo))
 

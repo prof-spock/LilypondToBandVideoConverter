@@ -221,10 +221,9 @@ class _MusicTime:
     def absolute (self) -> Object:
         """Calculates absolute value of <self>"""
 
-        result._isDuration = self._isDuration
-        result._data = array('i',
-                             (abs(self._data[0]), self._data[1],
-                              self._data[2],  self._data[3]))
+        result = _MusicTime(abs(self._data[0]), self._data[1],
+                            self._data[2],  self._data[3],
+                            self._isDuration)
         return result
 
     #--------------------

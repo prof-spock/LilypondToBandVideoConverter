@@ -207,7 +207,7 @@ class Logging:
             prefixLength = cls._tracePrefixLength
 
             if template[0:prefixLength] not in cls._standardPrefixList:
-                template = (_innerTracePrefix
+                template = (cls._innerTracePrefix
                             + iif(len(template) > 0, ":", "")
                             + template)
 

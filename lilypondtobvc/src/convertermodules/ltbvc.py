@@ -348,8 +348,8 @@ class _LilypondProcessor:
         Logging.trace(">>: lilyFile = %r, targetFileNamePrefix=%r",
                       lilypondFilePath, targetFileNamePrefix)
 
-        OperatingSystem.showMessageOnConsole("== processing "
-                                             + targetFileNamePrefix)
+        OperatingSystem.showMessageOnConsole("== processing %s with lilypond"
+                                             % targetFileNamePrefix)
         command = (cls._lilypondCommand,
                    "--output", targetFileNamePrefix,
                    lilypondFilePath)
@@ -596,6 +596,7 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         configData = cls._configData
+        songName = configData.title
         midiFilePath = (configData.targetDirectoryPath + "/"
                         + (cls._midiFileNameTemplate
                            % configData.fileNamePrefix))
@@ -606,7 +607,8 @@ class _LilypondProcessor:
              AudioTrackManager(configData.tempAudioDirectoryPath)
 
         for voiceName in relevantVoiceNameSet:
-            audioTrackManager.generateRawAudio(midiFilePath, voiceName,
+            audioTrackManager.generateRawAudio(songName, midiFilePath,
+                                               voiceName,
                                                configData.shiftOffset)
 
         Logging.trace("<<")
@@ -620,6 +622,7 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         configData = cls._configData
+        songName = configData.title
         audioTrackManager = \
              AudioTrackManager(configData.tempAudioDirectoryPath)
         relevantVoiceNameSet = (cls._selectedVoiceNameSet
@@ -632,13 +635,14 @@ class _LilypondProcessor:
             voiceDescriptor = configData.voiceNameToVoiceDataMap[voiceName]
             soundVariant = voiceDescriptor.soundVariant
             reverbLevel  = voiceDescriptor.reverbLevel
-            audioTrackManager.generateRefinedAudio(voiceName, soundVariant,
-                                                   reverbLevel)
+            audioTrackManager.generateRefinedAudio(songName, voiceName,
+                                                   soundVariant, reverbLevel)
 
         for voiceName in overriddenVoiceNameSet:
             overrideFile = \
                 configData.voiceNameToOverrideFileNameMap[voiceName]
-            audioTrackManager.copyOverrideFile(overrideFile, voiceName,
+            audioTrackManager.copyOverrideFile(songName, voiceName,
+                                               overrideFile,
                                                configData.shiftOffset)
 
         Logging.trace("<<")
@@ -689,30 +693,28 @@ class _LilypondProcessor:
                               videoTargetName, videoFileKind.name)
             else:
                 videoTarget = configData.videoTargetMap[videoTargetName]
-                effectiveVideoResolution = (videoTarget.resolution
-                                            * videoTarget.scalingFactor)
                 factor = mmPerInch / videoTarget.resolution
                 videoWidth  = videoTarget.width  * factor
                 videoHeight = videoTarget.height * factor
                 videoLineWidth = videoWidth - 2 * videoTarget.leftRightMargin
                 lilypondFile = LilypondFile(tempLilypondFilePath)
                 lilypondFile.setVideoParameters(videoTarget.name,
-                                                effectiveVideoResolution,
+                                                videoTarget.resolution,
                                                 videoTarget.systemSize,
                                                 videoTarget.topBottomMargin,
                                                 videoWidth, videoHeight,
                                                 videoLineWidth)
                 lilypondFile.generate(configData.includeFilePath,
-                                    configData.lilypondVersion, "video",
-                                    videoFileKind.voiceNameList,
-                                    configData.title,
-                                    configData.songComposerText,
-                                    configData.voiceNameToChordsMap,
-                                    configData.voiceNameToLyricsMap,
-                                    configData.voiceNameToScoreNameMap,
-                                    configData.measureToTempoMap,
-                                    configData.phaseAndVoiceNameToClefMap,
-                                    configData.phaseAndVoiceNameToStaffListMap)
+                                      configData.lilypondVersion, "video",
+                                      videoFileKind.voiceNameList,
+                                      configData.title,
+                                      configData.songComposerText,
+                                      configData.voiceNameToChordsMap,
+                                      configData.voiceNameToLyricsMap,
+                                      configData.voiceNameToScoreNameMap,
+                                      configData.measureToTempoMap,
+                                      configData.phaseAndVoiceNameToClefMap,
+                                      configData.phaseAndVoiceNameToStaffListMap)
                 targetMp4FileName = (targetDirectoryPath
                                      + cls._pathSeparator
                                      + (silentVideoFileNameTemplate

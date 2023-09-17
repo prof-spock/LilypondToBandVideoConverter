@@ -13,7 +13,8 @@ import sys
 import subprocess
 
 from .simplelogging import Logging
-from .simpletypes import Boolean, String, StringList
+from .simpletypes import Boolean, String, StringList, Tuple
+from .stringutil import newlineReplacedString
 from .typesupport import isString, toUnicodeString
 
 #====================
@@ -36,6 +37,41 @@ class OperatingSystem:
         partList = os.path.splitext(shortFileName)
         result = (shortFileName if extensionIsShown else partList[0])
         return result
+
+    #--------------------
+
+    @classmethod
+    def copyFile (cls,
+                  sourceFileName : String,
+                  targetName : String,
+                  targetDirectoryCreationIsForced : Boolean = False):
+        """Copies file with <sourceFileName> to either file or
+           directory target with <targetName>; if
+           <targetDirectoryCreationIsForced>, target directory is
+           created when it does not exist"""
+
+        Logging.trace(">>: %r -> %r", sourceFileName, targetName)
+
+        isOkay = True
+
+        if cls.hasDirectory(targetName):
+            directoryName = targetName
+        else:
+            directoryName = cls.dirname(targetName)
+
+        if not cls.hasDirectory(directoryName):
+            if targetDirectoryCreationIsForced:
+                os.makedirs(directoryName, exist_ok=True)
+            else:
+                errorMessage = "cannot create directory %s"
+                cls.showMessageOnConsole(errorMessage % directoryName)
+                Logging.traceError(errorMessage, directoryName)
+                isOkay = False
+
+        if isOkay:
+            shutil.copy2(sourceFileName, targetName)
+
+        Logging.trace("<<")
 
     #--------------------
 
@@ -67,26 +103,32 @@ class OperatingSystem:
     @classmethod
     def executeCommand (cls,
                         command : StringList,
-                        abortOnFailure : Boolean = False,
-                        stdin=None, stdout=None, stderr=None):
+                        abortOnFailure : Boolean = False) -> Tuple:
         """Processes <command> (specified as list) in operating
-          system. When <abortOnFailure> is set, any non-zero
-          return code aborts the program at once."""
+           system.  When <abortOnFailure> is set, any non-zero return
+           code aborts the program at once.  Returns completion code
+           and string returned by command in stdout and stderr"""
 
         Logging.trace(">>: %r", command)
 
-        completionCode = subprocess.call(command,
-                                         stdin=stdin, stdout=stdout,
-                                         stderr=stderr)
+        completedProcess = subprocess.run(command,
+                                          stdout = subprocess.PIPE,
+                                          stderr = subprocess.STDOUT)
+
+        loggingString = completedProcess.stdout
+        loggingString = loggingString.decode()
+        completionCode = completedProcess.returncode
 
         if abortOnFailure and completionCode != 0:
             message = ("ERROR: return code %d for %s"
                        % (completionCode, " ".join(command)))
-            Logging.log(message)
-            sys.exit(message)
+            Logging.trace("--: %s", message)
+            sys.exit("%s%n%s" % (loggingString, message))
 
-        Logging.trace("<<")
-        return completionCode
+        result = (completionCode, loggingString)
+        Logging.trace("<<: (%s, %r)",
+                      completionCode, newlineReplacedString(loggingString))
+        return result
 
     #--------------------
 
@@ -185,7 +227,7 @@ class OperatingSystem:
         else:
             directoryName = cls.dirname(targetName)
 
-        if not cls.hasDirectory(targetName):
+        if not cls.hasDirectory(directoryName):
             os.makedirs(directoryName, exist_ok=True)
 
         shutil.copy(sourceFileName, targetName)

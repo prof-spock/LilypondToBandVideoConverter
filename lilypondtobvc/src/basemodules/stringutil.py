@@ -36,7 +36,10 @@ def newlineReplacedString (st : String) -> String:
        (to have multiline strings in a single line)"""
 
     replacementCharacter = "#"
-    result = st.replace("\n", replacementCharacter)
+    result = (st
+              .replace("\r\n", replacementCharacter)
+              .replace("\n", replacementCharacter)
+              .replace("\r", replacementCharacter))
     return result
 
 #--------------------

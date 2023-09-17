@@ -12,6 +12,7 @@ ClassVar = typing.ClassVar
 DataType = type
 
 # primitive types
+Bit      = int
 Boolean  = bool
 Integer  = int
 Natural  = int
@@ -22,6 +23,7 @@ String   = str
 
 # list types
 List        = typing.Sequence
+BitList     = List[Bit]
 IntegerList = List[Integer]
 NaturalList = List[Natural]
 ObjectList  = List

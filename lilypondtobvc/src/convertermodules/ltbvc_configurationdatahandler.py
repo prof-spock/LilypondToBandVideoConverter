@@ -355,7 +355,7 @@ class _LocalValidator:
                       (r"(?:(?:mixing|padding|refinement)CommandLine"
                        + r"|amplificationEffect|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
-        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
+        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|''|G\^8)")
         humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
         humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
                                     % (floatPattern, floatPattern))

@@ -469,27 +469,31 @@ class AudioTrackManager:
     #--------------------
 
     def _convertMidiToAudio (self,
+                             songName : String,
                              voiceMidiFilePath : String,
                              targetFilePath : String):
         """Converts voice data in midi file with <voiceMidiFilePath>
-           to raw audio file with <targetFilePath>"""
+           for song named <songName> to raw audio file with
+           <targetFilePath>"""
 
-        Logging.trace(">>: midiFile = %r, targetFile = %r",
-                      voiceMidiFilePath, targetFilePath)
+        Logging.trace(">>: songName = %r, midiFile = %r, targetFile = %r",
+                      songName, voiceMidiFilePath, targetFilePath)
 
         cls = self.__class__
 
         # processing midi file via given command
-        OperatingSystem.showMessageOnConsole("== convertMidiToWav "
-                                             + targetFilePath)
+        template = "== convertMidiToWav for %r into %s"
+        targetFileBaseName = OperatingSystem.basename(targetFilePath)
+        OperatingSystem.showMessageOnConsole(template
+                                             % (songName,
+                                                targetFileBaseName))
 
         variableMap = { "infile"  : voiceMidiFilePath,
                         "outfile" : targetFilePath }
         command = \
             cls._replaceVariablesByValues(cls._midiToWavRenderingCommandList,
                                           variableMap)
-        OperatingSystem.executeCommand(command, True,
-                                       stdout=OperatingSystem.nullDevice)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -752,8 +756,7 @@ class AudioTrackManager:
             commandList = commandPrefix + command + commandSuffix
             variableMap = { "outfile" : intermediateFilePath }
             command = replaceVariables(commandList, variableMap)
-            OperatingSystem.executeCommand(command, True,
-                                           stdout=OperatingSystem.nullDevice)
+            OperatingSystem.executeCommand(command, True)
 
         if masteringPassIsRequired:
             # do mastering and amplification
@@ -935,6 +938,7 @@ class AudioTrackManager:
 
     @classmethod
     def _shiftAudioFile (cls,
+                         songName : String,
                          audioFilePath : String,
                          shiftedFilePath : String,
                          shiftOffset : Real):
@@ -942,12 +946,15 @@ class AudioTrackManager:
            <shiftedFilePath> with silence prefix of length
            <shiftOffset>"""
 
-        Logging.trace(">>: infile = %r, outfile = %r,"
+        Logging.trace(">>: songName = %r, infile = %r, outfile = %r,"
                       + " shiftOffset = %7.3f",
-                      audioFilePath, shiftedFilePath, shiftOffset)
+                      songName, audioFilePath, shiftedFilePath, shiftOffset)
 
-        OperatingSystem.showMessageOnConsole("== shifting %r by %7.3fs"
-                                             % (shiftedFilePath, shiftOffset))
+        shiftedFileBaseName = OperatingSystem.basename(shiftedFilePath)
+        template = "== shifting %r for %r by %7.3fs"
+        OperatingSystem.showMessageOnConsole(template
+                                             % (shiftedFileBaseName,
+                                                songName, shiftOffset))
 
         if "paddingCommandLine" not in cls._audioProcessorMap:
             _WavFile.shiftAudio(audioFilePath, shiftedFilePath, shiftOffset)
@@ -982,8 +989,7 @@ class AudioTrackManager:
                         "duration" : "%7.3f" % shiftOffset }
         command = cls._replaceVariablesByValues(tokenize(commandLine),
                                                 variableMap)
-        OperatingSystem.executeCommand(command, True,
-                                       stdout=OperatingSystem.nullDevice)
+        OperatingSystem.executeCommand(command, True)
 
         Logging.trace("<<")
 
@@ -1135,41 +1141,46 @@ class AudioTrackManager:
     #--------------------
 
     def copyOverrideFile (self,
-                          filePath : String,
+                          songName : String,
                           voiceName : String,
+                          filePath : String,
                           shiftOffset : Real):
         """Sets refined file from <filePath> for voice with
-           <voiceName> and applies <shiftOffset>"""
+           <voiceName> in song named <songName> and applies
+           <shiftOffset>"""
 
-        Logging.trace(">>: file = %r, voice = %r, offset = %7.3f",
-                      filePath, voiceName, shiftOffset)
+        Logging.trace(">>: song = %r, voice = %r, file = %r, offset = %7.3f",
+                      songName, voiceName, filePath, shiftOffset)
 
         cls = self.__class__
-        message = "== overriding %r from file" % voiceName
+        message = ("== overriding %r in %r from file"
+                   % (voiceName, songName))
         OperatingSystem.showMessageOnConsole(message)
 
         targetFilePath = (_processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        cls._shiftAudioFile(filePath, targetFilePath, shiftOffset)
+        cls._shiftAudioFile(songName, filePath, targetFilePath, shiftOffset)
 
         Logging.trace("<<")
 
     #--------------------
 
     def generateRawAudio (self,
+                          songName : String,
                           midiFilePath : String,
                           voiceName : String,
                           shiftOffset : Real):
-        """Generates audio wave file for <voiceName> from midi file
-           with <midiFilePath> in target directory; if several midi
-           tracks match voice name, the resulting audio files are
-           mixed; output is dry (no chorus, reverb and delay) and
-           contains leading and trailing silent passages; if
-           <shiftOffset> is greater that zero, the target file is
-           shifted by that amount"""
+        """Generates audio wave file for <voiceName> in song named
+           <songName> from midi file with <midiFilePath> in target
+           directory; if several midi tracks match voice name, the
+           resulting audio files are mixed; output is dry (no chorus,
+           reverb and delay) and contains leading and trailing silent
+           passages; if <shiftOffset> is greater that zero, the target
+           file is shifted by that amount"""
 
-        Logging.trace(">>: voice = %s, midiFile = %r, shiftOffset = %7.3f",
-                      voiceName, midiFilePath, shiftOffset)
+        Logging.trace(">>: songName = %r, voice = %s, midiFile = %r,"
+                      + " shiftOffset = %7.3f",
+                      songName, voiceName, midiFilePath, shiftOffset)
 
         cls = self.__class__
         tempMidiFilePath = (cls._intermediateFileDirectoryPath
@@ -1181,12 +1192,13 @@ class AudioTrackManager:
                                             voiceName)
 
         self._makeFilteredMidiFile(voiceName, midiFilePath, tempMidiFilePath)
-        self._convertMidiToAudio(tempMidiFilePath, audioFilePath)
+        self._convertMidiToAudio(songName, tempMidiFilePath, audioFilePath)
 
         if isShifted:
             targetFilePath = defaultTemplate % (self._audioDirectoryPath,
                                                 voiceName)
-            cls._shiftAudioFile(audioFilePath, targetFilePath, shiftOffset)
+            cls._shiftAudioFile(songName, audioFilePath, targetFilePath,
+                                shiftOffset)
             OperatingSystem.removeFile(audioFilePath,
                                        cls._intermediateFilesAreKept)
 
@@ -1198,17 +1210,19 @@ class AudioTrackManager:
     #--------------------
 
     def generateRefinedAudio (self,
+                              songName : String,
                               voiceName : String,
                               soundVariant : String,
                               reverbLevel : Real):
-        """Generates refined audio wave file for <voiceName> from raw
-           audio file in target directory; <soundVariant> gives the
-           kind of postprocessing ('COPY', 'STD', 'EXTREME', ...) and
-           <reverbLevel> the percentage of reverb to be used for that
-           voice"""
+        """Generates refined audio wave file for <voiceName> in song
+           named <songName> from raw audio file in target directory;
+           <soundVariant> gives the kind of postprocessing ('COPY',
+           'STD', 'EXTREME', ...) and <reverbLevel> the percentage of
+           reverb to be used for that voice"""
 
-        Logging.trace(">>: voice = %s, variant = %s, reverb = %4.3f",
-                      voiceName, soundVariant, reverbLevel)
+        Logging.trace(">>: song = %r, voice = %s, variant = %s,"
+                      + " reverb = %4.3f",
+                      songName, voiceName, soundVariant, reverbLevel)
 
         cls = self.__class__
         extendedSoundVariant = soundVariant.capitalize()
@@ -1226,7 +1240,8 @@ class AudioTrackManager:
                 "soundStyle%s%s" % (capitalizedVoiceName,
                                     extendedSoundVariant)
 
-        message = "== processing %s (%s)" % (voiceName, soundVariant)
+        message = ("== processing %s (%s) in %r"
+                   % (voiceName, soundVariant, songName))
         OperatingSystem.showMessageOnConsole(message)
 
         # prepare list of audio processing commands

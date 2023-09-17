@@ -366,7 +366,7 @@ class MP4Video:
     # video parameters
     _ffmpegPresetName = None
     _frameRate = None
-    _scaleFactor = None
+    _scalingFactor = None
     _generatorLogLevel = None
     _defaultMp4BaselineLevel = "3.0"
 
@@ -392,11 +392,11 @@ class MP4Video:
                                             "-version")
 
         # check the numeric parameters
-        ValidityChecker.isNumberString(cls._scaleFactor, "scale factor",
+        ValidityChecker.isNumberString(cls._scalingFactor, "scaling factor",
                                        realIsAllowed=False, rangeKind=">0")
         ValidityChecker.isNumberString(cls._frameRate, "frame rate",
                                        realIsAllowed=True, rangeKind=">0"),
-        cls._scaleFactor = int(cls._scaleFactor)
+        cls._scalingFactor = round(cls._scalingFactor)
         cls._frameRate   = float(cls._frameRate)
 
         Logging.trace("<<: parameters okay")
@@ -455,13 +455,11 @@ class MP4Video:
 
             # make silent video from single lilypond page
             command = ((cls._ffmpegCommand,
-                       "-loglevel", cls._generatorLogLevel,
-                       "-framerate", "1/" + str(requiredNumberOfFrames),
-                       "-i", str(pageFileName),
-                       "-vf", "scale=iw/%d:ih/%d" % (cls._scaleFactor,
-                                                     cls._scaleFactor),
-                       "-r", str(cls._frameRate),
-                       "-t", "%02.2f" % pageDuration)
+                        "-loglevel", cls._generatorLogLevel,
+                        "-loop", "1",
+                        "-i", str(pageFileName),
+                        "-filter:v", ("fps=%2.4f" % cls._frameRate),
+                        "-t", "%02.2f" % pageDuration)
                        + iif(cls._ffmpegPresetName != "",
                              ("-fpre", cls._ffmpegPresetName),
                              ("-pix_fmt", "yuv420p",
@@ -658,7 +656,7 @@ class LilypondPngVideoGenerator:
 
         # technical parameters
         MP4Video._frameRate         = self._frameRate
-        MP4Video._scaleFactor       = self._scaleFactor
+        MP4Video._scalingFactor     = self._scalingFactor
         MP4Video._ffmpegPresetName  = self._ffmpegPresetName
         MP4Video._generatorLogLevel = _ffmpegLogLevel
 
@@ -688,6 +686,7 @@ class LilypondPngVideoGenerator:
         command = (self._lilypondCommand,
                    "-l", "WARNING",
                    "-dno-point-and-click",
+                   ("-danti-alias-factor=%d" % self._scalingFactor),
                    "--ps",
                    "--png",
                    "--output=" + self._pictureFileStem,
@@ -721,7 +720,7 @@ class LilypondPngVideoGenerator:
                   measureToTempoMap : Map,
                   countInMeasures : Natural,
                   frameRate : Real,
-                  scalingFactor : Real,
+                  scalingFactor : Natural,
                   ffmpegPresetName : String,
                   intermediateFileDirectoryPath : String,
                   intermediateFilesAreKept : Boolean = False):
@@ -756,7 +755,7 @@ class LilypondPngVideoGenerator:
         # video parameters
         self._countInMeasures                = countInMeasures
         self._frameRate                      = frameRate
-        self._scaleFactor                    = scalingFactor
+        self._scalingFactor                  = scalingFactor
         self._ffmpegPresetName               = ffmpegPresetName
 
         # -- initialize other modules
@@ -787,7 +786,7 @@ class LilypondPngVideoGenerator:
                    self._postscriptFileName, self._targetMp4FileName,
                    self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
-                   self._scaleFactor, self._ffmpegPresetName,
+                   self._scalingFactor, self._ffmpegPresetName,
                    self._intermediateFileDirectoryPath,
                    self._intermediateFilesAreKept))
         return result

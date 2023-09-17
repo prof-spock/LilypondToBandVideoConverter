@@ -183,7 +183,7 @@ class VideoAudioCombiner:
                       subtitleFilePath, targetVideoFilePath)
 
         command = [ cls._mp4boxCommand,
-                    "-isma", "-ipod", "-strict-error",
+                    "-noprog", "-isma", "-ipod", "-strict-error",
                     sourceVideoFilePath ]
 
         for (audioFilePath, language, description) in audioTrackDataList:

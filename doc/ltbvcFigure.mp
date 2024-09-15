@@ -2,6 +2,7 @@ outputtemplate := "%j-%c.mps";
 %prologues := 3;
 
 input boxes;
+input graph;
 input hatching;
 input TEX;
 
@@ -241,7 +242,7 @@ enddef;
 %=============
 % Humanization
 %=============
-  
+
 numeric Humanization_fontSizeFactorArrowLabel;
 numeric Humanization_fontSizeFactorAxisLabel;
 numeric Humanization_fontSizeFactorTitle;
@@ -601,7 +602,7 @@ def PhaseOrFileBox_makeAll =
     % postprocessing phases
     Box_make(phaseRawAudio, "C", btex rawaudio etex);
     Box_make(phaseRefinedAudio, "C", btex refinedaudio etex);
-    Box_make(phaseMixdown, "C", btex mixdown etex);
+    Box_make(phaseMix, "C", btex mix etex);
     Box_make(phaseFinalVideo, "C", btex finalvideo etex);
 
     Box_make(fileRawAudio, "FM", btex \stkC{raw}{audio}{files} etex);
@@ -616,7 +617,7 @@ def PhaseOrFileBox_setPostprocessingBoxes (expr startPosition) =
     % sets up the position and size of postprocessing phases and
     % extracts
 
-    Box_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+    Box_setBoxPositions(phaseRawAudio, phaseRefinedAudio, phaseMix,
                         phaseFinalVideo)
                        (startPosition, PhaseOrFileBox_phaseOffsetVector);
 
@@ -634,8 +635,8 @@ def PhaseOrFileBox_setPostprocessingEdges =
     addForwardFlow(phaseRawAudio,     fileRawAudio);
     addBackwardFlow(fileRawAudio,     phaseRefinedAudio);
     addForwardFlow(phaseRefinedAudio, fileRefinedAudio);
-    addBackwardFlow(fileRefinedAudio, phaseMixdown);
-    addForwardFlow(phaseMixdown,      fileAudio);
+    addBackwardFlow(fileRefinedAudio, phaseMix);
+    addForwardFlow(phaseMix,          fileAudio);
     addBackwardFlow(fileAudio,        phaseFinalVideo);
     addForwardFlow(fileSilentVideo,   phaseFinalVideo);
     addForwardFlow(fileSubtitleText,  phaseFinalVideo);
@@ -769,7 +770,7 @@ def MasteringBox_makeAll =
 
     Box_make(masteringGroupA, "B", "");
     Box_make(mixerBoxA, "B",
-             btex \stkB{mixdown${}_A$~by}{\tt voiceNameToAudioLevelMap} etex
+             btex \stkB{mixing${}_A$~by}{\tt voiceNameToMixSettingsMap} etex
              rotated 90);
     Box_make(masteringBoxA, "B",
              btex \stkB{mastering${}_A$~via}{\tt masteringCommandList} etex
@@ -784,7 +785,7 @@ def MasteringBox_makeAll =
                                    MasteringBoxA_size);
 
     Box_make(masteringGroupK, "B", "");
-    Box_make(mixerBoxK, "B", btex mixdown${}_K$ etex rotated 90);
+    Box_make(mixerBoxK, "B", btex mixing${}_K$ etex rotated 90);
     Box_make(masteringBoxK, "B", btex mastering${}_K$ etex rotated 90);
     Box_make(amplificationBoxK, "B",
              btex amplification${}_K$ etex rotated 90);
@@ -895,6 +896,7 @@ MasteringGroupK_centerPosition := (xpart MasteringGroupA_centerPosition,
 TrackBox_xPosition             := xpart MasteringGroupA_centerPosition
                                   + MasteringGroup_xSize/2 + 20mm;
 
+
 %====================
 %====================
 beginfig(1);
@@ -924,7 +926,7 @@ beginfig(1);
 
     forsuffixes shape = phaseExtract, phaseScore, phaseMidi,
                         phaseSilentVideo, phaseRawAudio,
-                        phaseRefinedAudio, phaseMixdown,
+                        phaseRefinedAudio, phaseMix,
                         phaseFinalVideo:
         Box_setSizeAndColor(shape, PhaseOrFileBox_phaseBoxSize,
                             PhaseOrFileBox_phaseFillColor);
@@ -936,7 +938,7 @@ beginfig(1);
 
     forsuffixes shape = phaseExtract, phaseScore, phaseMidi,
                         phaseSilentVideo, phaseRawAudio,
-                        phaseRefinedAudio, phaseMixdown,
+                        phaseRefinedAudio, phaseMix,
                         phaseFinalVideo:
         addSupport(fileConfig, shape);
     endfor
@@ -945,7 +947,7 @@ beginfig(1);
               phaseExtract, phaseScore, phaseMidi, phaseSilentVideo,
               fileExtract, fileScore, fileMidi, fileSilentVideo,
               fileSubtitleText,
-              phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+              phaseRawAudio, phaseRefinedAudio, phaseMix,
               phaseFinalVideo, fileRawAudio, fileRefinedAudio,
               fileAudio, fileVideo);
 endfig;
@@ -1020,7 +1022,7 @@ beginfig(3);
     endfor
 
     forsuffixes shape = phaseRawAudio, phaseRefinedAudio,
-                        phaseMixdown, phaseFinalVideo:
+                        phaseMix, phaseFinalVideo:
         Box_setSizeAndColor(shape, PhaseOrFileBox_phaseBoxSize,
                             PhaseOrFileBox_phaseFillColor);
     endfor
@@ -1029,13 +1031,13 @@ beginfig(3);
     PhaseOrFileBox_setPostprocessingEdges;
 
     forsuffixes shape = phaseRawAudio, phaseRefinedAudio,
-                        phaseMixdown, phaseFinalVideo:
+                        phaseMix, phaseFinalVideo:
         addSupport(fileConfig, shape);
     endfor
 
     drawboxed(fileConfig,
               fileMidi, fileSilentVideo, fileSubtitleText,
-              phaseRawAudio, phaseRefinedAudio, phaseMixdown,
+              phaseRawAudio, phaseRefinedAudio, phaseMix,
               phaseFinalVideo, fileRawAudio, fileRefinedAudio,
               fileAudio, fileVideo);
 endfig;
@@ -1143,6 +1145,46 @@ beginfig(7);
                                        {$2\cdot\psi\cdot adj_v$} etex,
                              btex \stkC{timing}{variation}
                                        {$2\cdot\tau(p_i)\cdot\ell\cdot adj_t$} etex);
+endfig;
+
+%====================
+
+color PanGraph_gridColor;
+color PanGraph_firstGraphColor;
+color PanGraph_secondGraphColor;
+numeric PanGraph_penWidth;
+PanGraph_panWidth := 2pt;
+PanGraph_gridColor := 0.8 * white;
+PanGraph_firstGraphColor = (0, 0, 1);
+PanGraph_secondGraphColor = (1, 0, 0);
+
+%====================
+
+beginfig(8);
+    path leftPanGraph, rightPanGraph;
+
+    leftPanGraph :=
+        (-1, 1) -- (-0.75, 1) -- (-0.5, 1) -- (-0.25, 1) -- (0, 1)
+        -- (0.25, 0.75) -- (0.5, 0.5) -- (0.75, 0.25) -- (1, 0);
+    rightPanGraph :=
+        (-1, 0) -- (-0.75, 0.25) -- (-0.5, 0.5) -- (-0.25, 0.75) -- (0, 1)
+        -- (0.25, 1) -- (0.5, 1) -- (0.75, 1) -- (1, 1);
+
+    draw begingraph(80mm,60mm);
+    glabel.lft(btex Amplification Factor etex rotated 90, OUT);
+    glabel.bot(btex Pan Position etex, OUT);
+    setrange((-1,0), (1,1.2));
+    autogrid(grid.bot,grid.lft) withcolor PanGraph_gridColor;
+    frame.llft;
+    gdraw leftPanGraph
+        withcolor PanGraph_firstGraphColor
+        withpen pencircle scaled PanGraph_panWidth;
+    glabel.top("left", 2) withcolor PanGraph_firstGraphColor;
+    gdraw rightPanGraph
+        withcolor PanGraph_secondGraphColor
+        withpen pencircle scaled PanGraph_panWidth;
+    glabel.top("right", 6) withcolor PanGraph_secondGraphColor;;
+    endgraph
 endfig;
 
 end

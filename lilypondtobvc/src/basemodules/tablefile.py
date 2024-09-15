@@ -10,10 +10,10 @@
 
 import re
 
-from .simplelogging import Logging
-from .simpletypes import String, StringList, StringMap, Tuple
-from .stringutil import splitAndStrip
-from .utf8file import UTF8File
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import String, StringList, StringMap, Tuple
+from basemodules.stringutil import splitAndStrip
+from basemodules.utf8file import UTF8File
 
 #============================================================
 

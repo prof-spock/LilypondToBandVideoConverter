@@ -1,10 +1,10 @@
-# simpletypes - provide the internal type names like String, Real, ...
+# types - provide the internal type names like String, Real, ...
 #
 # author: Dr. Thomas Tensi, 2014
 
 #====================
 
-import typing
+import basemodules.typing as typing
 
 #====================
 
@@ -26,26 +26,26 @@ String    = str
 
 # list types
 List        = typing.Sequence
-BitList     = List[Bit]
-ByteList    = List[Byte]
-IntegerList = List[Integer]
-NaturalList = List[Natural]
+BitList     = List #List[Bit]
+ByteList    = List #List[Byte]
+IntegerList = List #List[Integer]
+NaturalList = List #List[Natural]
 ObjectList  = List
-RealList    = List[Real]
-StringList  = List[String]
+RealList    = List #List[Real]
+StringList  = List #List[String]
 Tuple       = typing.Tuple
 Pair        = Tuple
-TupleList   = List[Tuple]
+TupleList   = List #List[Tuple]
 
 # set types
 Set         = typing.Set
 ObjectSet   = Set
-StringSet   = Set[String]
+StringSet   = Set #Set[String]
 
 # mapping types
 Map        = typing.Mapping
-Dictionary = Map[String, String]
-StringMap  = Map[String, Object]
+Dictionary = Map #Map[String, String]
+StringMap  = Map #Map[String, Object]
 
 # function types
 Callable = typing.Callable

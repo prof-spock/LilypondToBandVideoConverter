@@ -18,7 +18,7 @@ panPositionList    = "     C,    0.5L,    0.6R,    0.1L"
 reverbLevelList    = "   0.2,     0.0,     0.0,     0.0"
 soundVariantList   = "SIMPLE,  CRUNCH,  CRUNCH,    GRIT"
 
-_voiceNameToAudioLevelMap = \
+_voiceNameToMixSettingMap =
   "{ vocals : -4, bass : 0, guitar : -6, drums : -2 }"
 
 -- preprocessing
@@ -27,14 +27,14 @@ voiceNameToLyricsMap = "{ vocals : e2/s2/v }"
 -- humanization
 countInMeasureCount = 2
 
-humanizationStyleRockHard  = \
-    "{ 0.00: 0.95/A0.1, 0.25: 1.15/0," \
-    "  0.50: 0.98/A0.2, 0.75: 1.1/0," \
-    "  OTHER: 0.85/0.2," \
+humanizationStyleRockHard  =
+    "{ 0.00: 0.95/A0.1, 0.25: 1.15/0,"
+    "  0.50: 0.98/A0.2, 0.75: 1.1/0,"
+    "  OTHER: 0.85/0.2,"
     "  SLACK:0.1, RASTER: 0.03125 }"
 
 humanizedVoiceNameSet = "bass, guitar, drums"
-measureToHumanizationStyleNameMap = \
+measureToHumanizationStyleNameMap =
      "{ 1 : humanizationStyleRockHard }"
 
 -- tempo
@@ -44,17 +44,17 @@ measureToTempoMap = "{ 1 : 90 }"
 -- audio postprocessing
 -- ....................
 
-soundStyleBassCrunch = \
-    " compand 0.03,0.1 6:-20,0,-15" \
-    " highpass -2 60 1o  lowpass -2 800 1o  equalizer 120 1o +3" \
+soundStyleBassCrunch =
+    " compand 0.03,0.1 6:-20,0,-15"
+    " highpass -2 60 1o  lowpass -2 800 1o  equalizer 120 1o +3"
     " reverb 60 100 20 100 10"
 
 soundStyleDrumsGrit = "overdrive 4 0  reverb 25 50 60 100 40"
 
-soundStyleGuitarCrunch = \
-    " compand 0.01,0.1 6:-10,0,-7.5 -6" \
-    " overdrive 30 0  gain -10" \
-    " highpass -2 300 0.5o  lowpass -1 1200" \
+soundStyleGuitarCrunch =
+    " compand 0.01,0.1 6:-10,0,-7.5 -6"
+    " overdrive 30 0  gain -10"
+    " highpass -2 300 0.5o  lowpass -1 1200"
     " reverb 40 50 50 100 30"
 
 soundStyleVocalsSimple = " overdrive 5 20"

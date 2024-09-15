@@ -12,8 +12,9 @@ import json
 
 from .operatingsystem import OperatingSystem
 from .simplelogging import Logging
-from .simpletypes import Boolean, Dictionary, Natural, Positive, \
-                         String, StringList, StringSet
+from .simpletypes import Boolean, Dictionary, Natural, Object, \
+                         Positive, String, StringList, StringMap, \
+                         StringSet
 from .ttbase import iif
 
 #====================
@@ -86,7 +87,7 @@ class _Token:
 
     @classmethod
     def adaptKind (cls,
-                   token : _Token,
+                   token : Object,
                    nameToValueMap : Dictionary):
         """Handles special strings in <token> and adapts it accordingly; if
            token is an identifier, it might be replaced by value in
@@ -405,7 +406,7 @@ class SimpleJsonFile:
     _commentMarker = "--"
     _definitionCommandName = "#define"
     _importCommandName = "#include"
-    _searchPathList = ["."]
+    _searchPathList = []
 
     # the map from names in define statements to associated values
     _nameToValueMap = {}
@@ -416,33 +417,40 @@ class SimpleJsonFile:
 
     @classmethod
     def _importFile (cls,
+                     referenceDirectoryName : String,
                      fileName : String,
                      lineList : StringList,
                      visitedFileNameSet : StringSet):
-        """Imports file named <fileName> and appends line to <lineList>,
+        """Imports file named <fileName> (possibly relative to
+           <referenceDirectoryName>) and appends line to <lineList>,
            updates <visitedFileNameSet> to break import cycles"""
 
-        Logging.trace(">>: file = %r, visitedFiles = %r",
-                      fileName, visitedFileNameSet)
+        Logging.trace(">>: referenceDirectory = '%s', file = '%s',"
+                      + " visitedFiles = %r",
+                      referenceDirectoryName, fileName, visitedFileNameSet)
 
         separator = OperatingSystem.pathSeparator
         isAbsolutePath = \
-            OperatingSystem.isAbsoluteFileName(importedFileName)
+            OperatingSystem.isAbsoluteFileName(fileName)
 
         if isAbsolutePath:
-            directoryPrefix = ""
+            effectiveFileName = fileName
         else:
-            directoryName = OperatingSystem.dirname(fileName)
-            directoryPrefix = iif(directoryName == ".", "",
-                                  directoryName
-                                  + iif(directoryName > "",
-                                        separator, ""))
+            # try to find file in search paths
+            effectiveFileName = cls._lookupFileName(fileName)
 
-        importedFileName = directoryPrefix + importedFileName
-        Logging.trace("--: IMPORT %r", importedFileName)
+            if effectiveFileName is None:
+                # file is relative to reference directory
+                effectiveFileName = ("%s%s%s"
+                                     % (referenceDirectoryName,
+                                        separator,
+                                        fileName))
 
-        isOkay = cls._readFile(importedFileName, lineList,
-                               visitedFileNameSet)
+        effectiveFileName = \
+            OperatingSystem.normalizedFileName(effectiveFileName)
+        Logging.trace("--: IMPORT %r", effectiveFileName)
+        isOkay = \
+            cls._readFile(effectiveFileName, lineList, visitedFileNameSet)
 
         Logging.trace("<<: %r", isOkay)
         return isOkay
@@ -459,11 +467,11 @@ class SimpleJsonFile:
 
         result = None
         separator = OperatingSystem.pathSeparator
-        simpleFileName = OperatingSystem.basename(originalFileName, True)
+        simpleFileName = OperatingSystem.basename(originalFileName)
 
         for directoryName in cls._searchPathList:
             fileName = iif(directoryName == ".", originalFileName,
-                            directoryName + separator + simpleFileName)
+                           directoryName + separator + simpleFileName)
             isFound = OperatingSystem.hasFile(fileName)
             Logging.trace("--: %r -> found = %r", fileName, isFound)
 
@@ -520,16 +528,14 @@ class SimpleJsonFile:
         errorMessage = ""
         isOkay = True
 
-        originalFileName = fileName
-        fileName = cls._lookupFileName(originalFileName)
-
-        if fileName is None:
-            errorMessage = "cannot find %r" % originalFileName
+        if not OperatingSystem.hasFile(fileName):
+            errorMessage = "cannot find %r" % fileName
             isOkay = False
         elif fileName in visitedFileNameSet:
-            Logging.trace("--: file already included %r", originalFileName)
+            Logging.trace("--: file already included %r", fileName)
         else:
             visitedFileNameSet.update(fileName)
+            referenceDirectoryName = OperatingSystem.dirname(fileName)
 
             with io.open(fileName, "rt",
                          encoding="utf-8") as configurationFile:
@@ -554,8 +560,10 @@ class SimpleJsonFile:
                     if isDefinitionLine:
                         cls._processDefinition(trimmedLine)
                     elif isImportLine:
-                        isOkay = cls._importFile(importedFileName, lineList,
-                                                 visitedFileNameSet)
+                        isOkay = \
+                            cls._importFile(referenceDirectoryName,
+                                            importedFileName,
+                                            lineList, visitedFileNameSet)
 
                         if not isOkay:
                             Logging.trace("--:import failed for %r in %r",
@@ -605,7 +613,7 @@ class SimpleJsonFile:
         """Sets list of search paths to <searchPathList>."""
 
         Logging.trace(">>: %r", searchPathList)
-        cls._searchPathList = ["."] + searchPathList
+        cls._searchPathList = searchPathList
         Logging.trace("<<")
 
     #--------------------
@@ -625,7 +633,9 @@ class SimpleJsonFile:
 
         visitedFileNameSet = set()
         lineList = []
-        isOkay = cls._readFile(fileName, lineList, visitedFileNameSet)
+        referenceDirectoryName = OperatingSystem.currentDirectoryPath()
+        isOkay = cls._importFile(referenceDirectoryName, fileName,
+                                 lineList, visitedFileNameSet)
 
         tokenList = ([] if not isOkay else cls._tokenize(lineList))
 

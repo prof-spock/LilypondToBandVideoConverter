@@ -7,11 +7,12 @@
 # IMPORTS
 #====================
 
-from .simplelogging import Logging
-from .simpletypes import Dictionary, Object, String, StringList
-from .stringutil import adaptToKind
-from .validitychecker import ValidityChecker
-from .ttbase import iif, iif3
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Dictionary, Object, String, \
+                                    StringList
+from basemodules.stringutil import adaptToKind
+from basemodules.validitychecker import ValidityChecker
+from basemodules.ttbase import iif, iif3
 
 #====================
 

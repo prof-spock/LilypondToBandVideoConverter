@@ -5,8 +5,8 @@
 _programDirectory = "/usr/local"
 _soundFonts = _programDirectory "/soundfonts/FluidR3_GM.SF2"
 aacCommandLine = _programDirectory "/qaac -V100 -i ${infile} -o ${outfile}"
-midiToWavRenderingCommandLine = \
-  _programDirectory "/fluidsynth.exe -n -i -g 1 -R 0" \
+midiToWavRenderingCommandLine =
+  _programDirectory "/fluidsynth.exe -n -i -g 1 -R 0"
   " -F ${outfile} " _soundFonts " ${infile}"
 
 --====================
@@ -25,48 +25,48 @@ targetFileNamePrefix = "test-"
 --====================
 
 _voiceNameToStaffListMap = "{ drums : DrumStaff }"
-_voiceNameToClefMap = "{" \
-  "bass : bass_8, drums : '', guitar : G_8" \
+_voiceNameToClefMap = "{"
+  "bass : bass_8, drums : '', guitar : G_8"
 "}"
 
-phaseAndVoiceNameToStaffListMap = "{"      \
-    "extract :" _voiceNameToStaffListMap ","  \
-    "midi    :" _voiceNameToStaffListMap ","  \
-    "score   :" _voiceNameToStaffListMap ","  \
+phaseAndVoiceNameToStaffListMap = "{"
+    "extract :" _voiceNameToStaffListMap ","
+    "midi    :" _voiceNameToStaffListMap ","
+    "score   :" _voiceNameToStaffListMap ","
     "video   :" _voiceNameToStaffListMap "}"
 
-phaseAndVoiceNameToClefMap = "{"      \
-    "extract :" _voiceNameToClefMap ","  \
-    "midi    :" _voiceNameToClefMap ","  \
-    "score   :" _voiceNameToClefMap ","  \
+phaseAndVoiceNameToClefMap = "{"
+    "extract :" _voiceNameToClefMap ","
+    "midi    :" _voiceNameToClefMap ","
+    "score   :" _voiceNameToClefMap ","
     "video   :" _voiceNameToClefMap "}"
 
-voiceNameToChordsMap = "{" \
-    "vocals : s/v, bass : e, guitar : e" \
+voiceNameToChordsMap = "{"
+    "vocals : s/v, bass : e, guitar : e"
 "}"
 
 --====================
 -- VIDEO OUTPUT
 --====================
 
-videoTargetMap = "{" \
-    "tablet: { resolution: 132," \
-	     " height: 1024," \
-	     " width: 768," \
-	     " topBottomMargin: 5," \
-	     " leftRightMargin: 10," \
-	     " scalingFactor: 4," \
-	     " frameRate: 10.0," \
-	     " mediaType: 'Music Video'," \
-	     " systemSize: 25," \
-	     " subtitleColor: 2281766911," \
-	     " subtitleFontSize: 20," \
+videoTargetMap = "{"
+    "tablet: { resolution: 132,"
+	     " height: 1024,"
+	     " width: 768,"
+	     " topBottomMargin: 5,"
+	     " leftRightMargin: 10,"
+	     " scalingFactor: 4,"
+	     " frameRate: 10.0,"
+	     " mediaType: 'Music Video',"
+	     " systemSize: 25,"
+	     " subtitleColor: 2281766911,"
+	     " subtitleFontSize: 20,"
 	     " subtitlesAreHardcoded: true } }"
 
-videoFileKindMap = "{" \
-    "tabletVocGtr: { target:         tablet,"      \
-		   " fileNameSuffix: '-tblt-vg',"     \
-		   " directoryPath:  './mediaFiles' ," \
+videoFileKindMap = "{"
+    "tabletVocGtr: { target:         tablet,"
+		   " fileNameSuffix: '-tblt-vg',"
+		   " directoryPath:  './mediaFiles' ,"
 		   " voiceNameList:  'vocals, guitar' } }"
 
 --====================
@@ -75,8 +75,8 @@ videoFileKindMap = "{" \
 
 albumArtFilePath = "demo.jpg"
 
-audioGroupToVoicesMap = "{" \
-    " base : bass/keyboard/strings/drums/percussion," \
-    " voc  : vocals/bgVocals," \
-    " gtr  : guitar" \
+audioGroupToVoicesMap = "{"
+    " base : bass/keyboard/strings/drums/percussion,"
+    " voc  : vocals/bgVocals,"
+    " gtr  : guitar"
 "}"

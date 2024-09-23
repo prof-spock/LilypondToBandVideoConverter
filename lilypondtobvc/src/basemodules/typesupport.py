@@ -7,7 +7,8 @@
 import re
 import sys
 
-from .simpletypes import Boolean, Integer, Object, Real, String
+from basemodules.simpletypes import Boolean, Integer, Object, Real, \
+                                    String
 
 #====================
 

@@ -9,14 +9,15 @@
 from copy import deepcopy
 import dataclasses
 
-from .regexppattern import RegExpPattern
-from .simpleassertion import Assertion
-from .simplelogging import Logging
-from .simpletypes import Callable, DataType, Dictionary, Object, \
-                         ObjectList, String, StringList, StringMap
-from .stringutil import adaptToKind,convertStringToMap
-from .ttbase import iif, iif3
-from .validitychecker import ValidityChecker
+from basemodules.regexppattern import RegExpPattern
+from basemodules.simpleassertion import Assertion
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Callable, DataType, Dictionary, \
+                                    Object, ObjectList, String, \
+                                    StringList, StringMap
+from basemodules.stringutil import adaptToKind, deserializeToMap
+from basemodules.ttbase import iif, iif3
+from basemodules.validitychecker import ValidityChecker
 
 #====================
 # PRIVATE FEATURES
@@ -351,7 +352,7 @@ class DataTypeSupport:
         Logging.trace(">>: %r", st)
 
         result = []
-        table = convertStringToMap(st)
+        table = deserializeToMap(st)
 
         for name, attributeNameToValueMap in table.items():
             attributeNameToValueMap["name"] = name
@@ -377,7 +378,7 @@ class DataTypeSupport:
         Logging.trace(">>: %r", st)
 
         result = {}
-        table = convertStringToMap(st)
+        table = deserializeToMap(st)
 
         for name, attributeNameToValueMap in table.items():
             attributeNameToValueMap["name"] = name

@@ -18,7 +18,7 @@ from basemodules.simpletypes import Boolean, Dictionary, Integer, \
                                     List, Map, Natural, Object, Real, \
                                     String, StringList, StringMap, \
                                     StringSet, Tuple
-from basemodules.stringutil import convertStringToMap
+from basemodules.stringutil import deserializeToMap
 from basemodules.ttbase import adaptToRange, iif, iif2, isInRange, \
                                MyRandom
 from basemodules.validitychecker import ValidityChecker
@@ -221,10 +221,9 @@ class _MusicTime:
     def absolute (self) -> Object:
         """Calculates absolute value of <self>"""
 
-        result._isDuration = self._isDuration
-        result._data = array('i',
-                             (abs(self._data[0]), self._data[1],
-                              self._data[2],  self._data[3]))
+        result = _MusicTime(abs(self._data[0]), self._data[1],
+                            self._data[2],  self._data[3],
+                            self._isDuration)
         return result
 
     #--------------------
@@ -478,7 +477,7 @@ class _HumanizationStyle:
             else:
                 styleAsString = cls._defaultStyleAsString
 
-        style = convertStringToMap(styleAsString)
+        style = deserializeToMap(styleAsString)
         Logging.trace("--: style = %s", style)
 
         rasterSize = style.get("RASTER", "0.03125")
@@ -1080,6 +1079,8 @@ class _Humanizer:
                           measureIndex : Integer):
         """Returns style that is valid at given <measureIndex>"""
 
+        Logging.trace(">>: %r", measureIndex)
+
         if measureIndex in self._measureToHumanizationStyleMap:
             result = self._measureToHumanizationStyleMap[measureIndex]
         else:
@@ -1091,6 +1092,7 @@ class _Humanizer:
 
             self._measureToHumanizationStyleMap[measureIndex] = result
 
+        Logging.trace("<<: %r", result._name)
         return result
 
     #--------------------
@@ -1102,7 +1104,7 @@ class _Humanizer:
         Logging.trace(">>: %r", musicTime)
 
         cls = self.__class__
-        measure = musicTime.measure() - cls._countInMeasureCount
+        measure = musicTime.measure() #  - cls._countInMeasureCount
         result = self._styleForMeasure(measure)
 
         Logging.trace("<<: %r", result._name)
@@ -1415,11 +1417,11 @@ class MidiTransformer:
                 st = "%d PrCh ch=%d p=%d" % (midiTime,
                                              activeSettings.midiChannel,
                                              activeSettings.midiInstrument)
-                lineGeneratorProc(0, activeSettings.midiInstrumentBank)
+                lineGeneratorProc( 0, activeSettings.midiInstrumentBank)
                 lineBuffer.writeLine(st)
-                lineGeneratorProc(7, activeSettings.midiVolume)
-                lineGeneratorProc(10, activeSettings.panPosition)
-                lineGeneratorProc(91, activeSettings.reverbLevel)
+                lineGeneratorProc( 7, activeSettings.midiVolume)
+                lineGeneratorProc(10, activeSettings.midiPanPosition)
+                lineGeneratorProc(91, activeSettings.midiReverbLevel)
                 parseState = _ParseState.afterSettings
         else:
             if (cls._channelReferenceRegExp.search(currentLine)

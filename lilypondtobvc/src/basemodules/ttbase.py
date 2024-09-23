@@ -5,12 +5,18 @@
 
 #====================
 
-from .simpletypes import Boolean, IntegerList, Object, Real, String
+import sys
+
+from basemodules.simpletypes import Boolean, IntegerList, Object, Real, \
+                                    String
 
 #====================
 
 missingValue = "@!XYZZY"
 infinity = 1e99
+
+isStdPython = (sys.implementation.name == "cpython")
+isMicroPython = (sys.implementation.name == "micropython")
 
 #====================
 

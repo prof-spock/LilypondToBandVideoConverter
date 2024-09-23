@@ -6,10 +6,11 @@
 
 #====================
 
-from .simplelogging import Logging
-from .simpletypes import IntegerList, Map, Natural, Object, \
-                         ObjectList, String, StringList, StringMap, Tuple
-from .ttbase import iif, intListToHex
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import IntegerList, Map, Natural, Object, \
+                                    ObjectList, String, StringList, \
+                                    StringMap, Tuple
+from basemodules.ttbase import iif, intListToHex
 
 #====================
 
@@ -36,7 +37,10 @@ def newlineReplacedString (st : String) -> String:
        (to have multiline strings in a single line)"""
 
     replacementCharacter = "#"
-    result = st.replace("\n", replacementCharacter)
+    result = (st
+              .replace("\r\n", replacementCharacter)
+              .replace("\n", replacementCharacter)
+              .replace("\r", replacementCharacter))
     return result
 
 #--------------------
@@ -67,215 +71,6 @@ def stringToHex (st : String) -> String:
     """Returns hex representation of <st>"""
 
     return intListToHex(stringToIntList(st))
-
-#===============================
-# STRING TO CONTAINER CONVERSION
-#===============================
-
-_quoteCharacterSet           = set(["\"", "'"])
-_structureLeadinCharacterSet = set(["{", "[", "("])
-
-#--------------------
-
-def _convertStringToList (st : String,
-                          startPosition : Natural,
-                          separator : String) -> StringList:
-    """Splits <st> starting from <startPosition> at <separator> into
-       list of parts; sublists or submaps are correctly handled and
-       embedded into the list; returns end position and resulting list"""
-
-    # do a finite state automaton with "{", "[", "(", " ", "\"" and "'"
-    # as state changing inputs
-    ParseState_beforeElement = 1
-    ParseState_inElement     = 2
-    ParseState_inString      = 3
-    ParseState_afterElement  = 4
-    ParseState_afterList     = 5
-
-    result = []
-    lastPosition = len(st) - 1
-    listEndCharacter = iif(st[startPosition] == "[", "]", ")")
-    position = startPosition + 1
-    parseState = ParseState_beforeElement
-
-    while position <= lastPosition:
-        ch = st[position]
-
-        if parseState == ParseState_beforeElement:
-            if ch == listEndCharacter:
-                break
-            elif ch == " ":
-                pass
-            elif ch == separator:
-                # unexpected separator => ignore
-                pass
-            elif ch in _quoteCharacterSet:
-                endQuote = ch
-                currentElement = ""
-                parseState = ParseState_inString
-            elif ch in _structureLeadinCharacterSet:
-                if ch == "{":
-                    position, currentElement = \
-                              _convertStringToMap(st, position, separator)
-                else:
-                    position, currentElement = \
-                              _convertStringToList(st, position, separator)
-
-                result.append(currentElement)
-                parseState = ParseState_afterElement
-            else:
-                currentElement = ch
-                parseState = ParseState_inElement
-        elif parseState == ParseState_inElement:
-            if ch not in [" ", separator, listEndCharacter]:
-                currentElement += ch
-            else:
-                result.append(currentElement)
-
-                if ch == listEndCharacter:
-                    break
-                else:
-                    parseState = iif(ch == " ", ParseState_afterElement,
-                                     ParseState_beforeElement)
-        elif parseState == ParseState_inString:
-            if ch != endQuote:
-                currentElement += ch
-            else:
-                result.append(currentElement)
-                parseState = ParseState_afterElement
-        elif parseState == ParseState_afterElement:
-            # ignore everything except a separator
-            if ch == separator:
-                parseState = ParseState_beforeElement
-
-        position += 1
-
-    return (position, result)
-
-#--------------------
-
-def _convertStringToMap (st : String,
-                         startPosition : Natural,
-                         separator : String) -> StringMap:
-    """Splits <st> starting from <startPosition> at <separator> into map
-       of key-value-pairs; sublists or submaps as values are correctly
-       handled and embedded into the map; returns end position and
-       resulting map"""
-
-    # do a finite state automaton with "{", "[", "(", " ", "\"" and "'"
-    # as state changing inputs
-    ParseState_beforeKey     = 1
-    ParseState_inKey         = 2
-    ParseState_inKeyString   = 3
-    ParseState_afterKey      = 4
-    ParseState_beforeValue   = 5
-    ParseState_inValue       = 6
-    ParseState_inValueString = 7
-    ParseState_afterValue    = 8
-    ParseState_afterMap      = 9
-
-    result = {}
-
-    mapEndCharacter = "}"
-    lastPosition = len(st) - 1
-    position = startPosition + 1
-    parseState = ParseState_beforeKey
-
-    while position <= lastPosition:
-        ch = st[position]
-
-        if parseState == ParseState_beforeKey:
-            currentKey = ""
-
-        if parseState in [ParseState_beforeKey, ParseState_beforeValue]:
-            elementIsUnhandled = True
-
-            if ch == mapEndCharacter:
-                break
-            elif ch == " ":
-                pass
-            elif ch == separator:
-                # unexpected separator => ignore
-                pass
-            elif ch in _quoteCharacterSet:
-                endQuote = ch
-                currentElement = ""
-                parseState += 2
-            elif ch in _structureLeadinCharacterSet:
-                if ch == "{":
-                    position, currentElement = \
-                              _convertStringToMap(st, position, separator)
-                else:
-                    position, currentElement = \
-                              _convertStringToList(st, position, separator)
-
-                parseState += 3
-            else:
-                currentElement = ch
-                parseState += 1
-        elif parseState in [ParseState_inKey, ParseState_inValue]:
-            if ch not in [" ", separator, ":", mapEndCharacter]:
-                currentElement += ch
-            else:
-                parseState += 2
-                position -= iif(ch == " ", 0, 1)
-        elif parseState in [ParseState_inKeyString, ParseState_inValueString]:
-            if ch != endQuote:
-                currentElement += ch
-            else:
-                parseState += 1
-        elif parseState in [ParseState_afterKey, ParseState_afterValue]:
-            if elementIsUnhandled:
-                elementIsUnhandled = False
-
-                if parseState == ParseState_afterKey:
-                    currentKey = currentElement
-                else:
-                    result[currentKey] = currentElement
-
-            # ignore everything except a separator or a colon
-            if ch == mapEndCharacter:
-                position -= 1
-                parseState = ParseState_beforeKey
-            elif ch == separator:
-                parseState = ParseState_beforeKey
-            elif ch == ":":
-                parseState = ParseState_beforeValue
-
-        position += 1
-
-    return (position, result)
-
-#--------------------
-
-def convertStringToList (st : String,
-                         separator : String = ",",
-                         kind : String = "S") -> ObjectList:
-    """Splits <st> with parts separated by <separator> into list with
-       all parts having leading and trailing whitespace removed; if
-       <kind> is 'I' or 'R' the elements are transformed into ints or
-       floats"""
-
-    _, result = _convertStringToList("[" + st + "]", 0, separator)
-    result = list(map(lambda x: adaptToKind(x, kind), result))
-    return result
-
-#--------------------
-
-def convertStringToMap (st : String,
-                        separator : String = ",") -> Map:
-    """Splits <st> with parts separated by <separator> into map where
-       key and value is separated by colons with all parts
-       having leading and trailing whitespace removed"""
-
-    result = {}
-    st = st.strip()
-
-    if not st.startswith("{"):
-        st = "{" + st + "}"
-
-    _, result = _convertStringToMap(st, 0, separator)
-    return result
 
 #--------------------
 
@@ -385,3 +180,234 @@ def tokenize (st : String) -> StringList:
     Logging.trace("--: accumulatedTrace = %r", fsaTrace)
     Logging.trace("<<: %r", result)
     return result
+
+#===============================
+# STRING TO CONTAINER CONVERSION
+#===============================
+
+_quoteCharacterSet           = set(["\"", "'"])
+_structureLeadinCharacterSet = set(["{", "[", "("])
+
+#--------------------
+
+def _deserializeToList (st : String,
+                        startPosition : Natural,
+                        separator : String) -> StringList:
+    """Splits <st> starting from <startPosition> at <separator> into
+       list of parts; sublists or submaps are correctly handled and
+       embedded into the list; returns end position and resulting list"""
+
+    Logging.trace(">>: separator = %r, st = %s#|#%s",
+                  separator, st[:startPosition], st[startPosition:])
+
+    # do a finite state automaton with "{", "[", "(", " ", "\"" and "'"
+    # as state changing inputs
+    ParseState_beforeElement = 1
+    ParseState_inElement     = 2
+    ParseState_inString      = 3
+    ParseState_afterElement  = 4
+    ParseState_afterList     = 5
+
+    currentList = []
+    lastPosition = len(st) - 1
+    listEndCharacter = iif(st[startPosition] == "[", "]", ")")
+    position = startPosition + 1
+    parseState = ParseState_beforeElement
+    fsaTrace = ""
+
+    while position <= lastPosition:
+        ch = st[position]
+        fsaTrace += (" [%d] %s" % (parseState, ch))
+
+        if parseState == ParseState_beforeElement:
+            if ch == listEndCharacter:
+                break
+            elif ch == " ":
+                pass
+            elif ch == separator:
+                # unexpected separator => ignore
+                pass
+            elif ch in _quoteCharacterSet:
+                endQuote = ch
+                currentElement = ""
+                parseState = ParseState_inString
+            elif ch in _structureLeadinCharacterSet:
+                if ch == "{":
+                    position, currentElement = \
+                              _deserializeToMap(st, position, separator)
+                else:
+                    position, currentElement = \
+                              _deserializeToList(st, position, separator)
+
+                currentList.append(currentElement)
+                parseState = ParseState_afterElement
+            else:
+                currentElement = ch
+                parseState = ParseState_inElement
+        elif parseState == ParseState_inElement:
+            if ch not in [" ", separator, listEndCharacter]:
+                currentElement += ch
+            else:
+                currentList.append(currentElement)
+
+                if ch == listEndCharacter:
+                    break
+                else:
+                    parseState = iif(ch == " ", ParseState_afterElement,
+                                     ParseState_beforeElement)
+        elif parseState == ParseState_inString:
+            if ch != endQuote:
+                currentElement += ch
+            else:
+                currentList.append(currentElement)
+                parseState = ParseState_afterElement
+        elif parseState == ParseState_afterElement:
+            # ignore everything except a separator or a list end
+            if ch == listEndCharacter:
+                break
+            elif ch == separator:
+                parseState = ParseState_beforeElement
+
+        position += 1
+
+    Logging.trace("--: fsa = %s", fsaTrace)
+    result = (position, currentList)
+    Logging.trace("<<: %r", result)
+    return result
+
+#--------------------
+
+def _deserializeToMap (st : String,
+                       startPosition : Natural,
+                       separator : String) -> StringMap:
+    """Splits <st> starting from <startPosition> at <separator> into map
+       of key-value-pairs; sublists or submaps as values are correctly
+       handled and embedded into the map; returns end position and
+       resulting map"""
+
+    Logging.trace(">>: separator = %r, st = %s#|#%s",
+                  separator, st[:startPosition], st[startPosition:])
+
+    # do a finite state automaton with "{", "[", "(", " ", "\"" and "'"
+    # as state changing inputs
+    ParseState_beforeKey     = 1
+    ParseState_inKey         = 2
+    ParseState_inKeyString   = 3
+    ParseState_afterKey      = 4
+    ParseState_beforeValue   = 5
+    ParseState_inValue       = 6
+    ParseState_inValueString = 7
+    ParseState_afterValue    = 8
+    ParseState_afterMap      = 9
+
+    table = {}
+
+    mapEndCharacter = "}"
+    lastPosition = len(st) - 1
+    position = startPosition + 1
+    parseState = ParseState_beforeKey
+    fsaTrace = ""
+
+    while position <= lastPosition:
+        ch = st[position]
+        fsaTrace += (" [%d] %s" % (parseState, ch))
+
+        if parseState == ParseState_beforeKey:
+            currentKey = ""
+
+        if parseState in [ParseState_beforeKey, ParseState_beforeValue]:
+            elementIsUnhandled = True
+
+            if ch == mapEndCharacter:
+                break
+            elif ch == " ":
+                pass
+            elif ch == separator:
+                # unexpected separator => ignore
+                pass
+            elif ch in _quoteCharacterSet:
+                endQuote = ch
+                currentElement = ""
+                parseState += 2
+            elif ch in _structureLeadinCharacterSet:
+                if ch == "{":
+                    position, currentElement = \
+                              _deserializeToMap(st, position, separator)
+                else:
+                    position, currentElement = \
+                              _deserializeToList(st, position, separator)
+
+                parseState += 3
+            else:
+                currentElement = ch
+                parseState += 1
+        elif parseState in [ParseState_inKey, ParseState_inValue]:
+            if ch not in [" ", separator, ":", mapEndCharacter]:
+                currentElement += ch
+            else:
+                parseState += 2
+                position -= iif(ch == " ", 0, 1)
+        elif parseState in [ParseState_inKeyString, ParseState_inValueString]:
+            if ch != endQuote:
+                currentElement += ch
+            else:
+                parseState += 1
+        elif parseState in [ParseState_afterKey, ParseState_afterValue]:
+            if elementIsUnhandled:
+                elementIsUnhandled = False
+
+                if parseState == ParseState_afterKey:
+                    currentKey = currentElement
+                else:
+                    table[currentKey] = currentElement
+
+            # ignore everything except a separator or a colon
+            if ch == mapEndCharacter:
+                break
+            elif ch == separator:
+                parseState = ParseState_beforeKey
+            elif ch == ":":
+                parseState = ParseState_beforeValue
+
+        position += 1
+
+    Logging.trace("--: fsa = %s", fsaTrace)
+    result = (position, table)
+    Logging.trace("<<: %r", result)
+    return result
+
+#--------------------
+
+def deserializeToList (st : String,
+                       separator : String = ",",
+                       kind : String = "S") -> ObjectList:
+    """Splits <st> with parts separated by <separator> into list with
+       all parts having leading and trailing whitespace removed; if
+       <kind> is 'I' or 'R' the elements are transformed into ints or
+       floats"""
+
+    Logging.trace(">>: separator = %r, kind = %r, st = %s",
+                  separator, kind, st)
+    st = st.strip()
+    st = iif(st.startswith("["), st, "[%s]" % st)
+    _, result = _deserializeToList(st, 0, separator)
+    result = list(map(lambda x: adaptToKind(x, kind), result))
+    Logging.trace("<<: %r", result)
+    return result
+
+#--------------------
+
+def deserializeToMap (st : String,
+                      separator : String = ",") -> Map:
+    """Splits <st> with parts separated by <separator> into map where
+       key and value is separated by colons with all parts
+       having leading and trailing whitespace removed"""
+
+    Logging.trace(">>: separator = %r, st = %s", separator, st)
+    result = {}
+    st = st.strip()
+    st = iif(st.startswith("{"), st, "{%s}" % st)
+    _, result = _deserializeToMap(st, 0, separator)
+    Logging.trace("<<: %r", result)
+    return result
+

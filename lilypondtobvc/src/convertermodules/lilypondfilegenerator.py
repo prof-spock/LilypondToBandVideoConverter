@@ -255,6 +255,39 @@ class LilypondFile:
     #--------------------
 
     @classmethod
+    def _lilypondDurationCode (cls,
+                               durationInQuarters : Real) -> StringList:
+        """Returns a list of lilypond duration strings from a real
+           number of quarters in <durationInQuarters>; e.g. 4.0
+           quarters would be encoded as [ '1' ] (a single whole note)"""
+
+        Logging.trace(">>: %s", durationInQuarters)
+
+        epsilon = 0.01
+        duration = durationInQuarters / 4.0
+        referenceDurationList = ( 1.5, 1.0 )
+        lilypondNoteNumber = 1
+        result = []
+
+        while duration > 0 and lilypondNoteNumber <= 64:
+            for i in range(2):
+                referenceDuration = \
+                    referenceDurationList[i] / lilypondNoteNumber
+
+                while duration >= referenceDuration:
+                    result.append("%d%s"
+                                  % (lilypondNoteNumber,
+                                     iif(i == 0, ".", "")))
+                    duration -= referenceDuration
+                
+            lilypondNoteNumber *= 2
+
+        Logging.trace("<<: %s", result)
+        return result
+
+    #--------------------
+
+    @classmethod
     def _lilypondVoiceName (cls,
                             voiceName : String,
                             drumsNameIsExpanded : Boolean = False):
@@ -329,11 +362,11 @@ class LilypondFile:
 
             if isDrumVoice:
                 drumsPrefix  = prefix + "\\drumsCountIn "
-                drumsSuffix = " R1 \\drummode { ss64" + suffix
+                drumsSuffix = " s1 \\drummode { ss64" + suffix
                 voiceText = drumsPrefix + voiceText + drumsSuffix
             else:
                 normalPrefix = prefix + "\\countIn "
-                normalSuffix = " R1 { c64" + suffix
+                normalSuffix = " s1 { c64" + suffix
                 voiceText = normalPrefix + voiceText + normalSuffix
 
         clefString = cls._getPVEntry(self._phaseAndVoiceNameToClefMap,
@@ -535,9 +568,17 @@ class LilypondFile:
             if measure == 1:
                 self._printLine(0, "\\initialTempo")
             else:
-                tempo = self._songMeasureToTempoMap[measure][0]
+                measureData = self._songMeasureToTempoMap[measure]
+                tempo              = measureData[0]
+                quartersPerMeasure = measureData[1]
                 skipCount = measure - previousMeasure
-                self._printLine(0, "\\skip 1*%d" % skipCount)
+                durationStringList = \
+                    cls._lilypondDurationCode(quartersPerMeasure)
+
+                for durationString in durationStringList:
+                    self._printLine(0, ("\\skip %s*%d"
+                                        % (durationString, skipCount)))
+
                 self._printLine(0, "%%%d\n" % measure)
                 self._printLine(0, cls._tempoString(tempo))
 
@@ -706,9 +747,9 @@ class LilypondFile:
 
         Logging.trace(">>")
 
-        self._printLine(0, "% -- use high resolution and scale it down later")
+        self._printLine(0, "% -- define the resolution in pixels per inch")
         self._printLine(0, "#(ly:set-option 'resolution %d)"
-                        % self._videoEffectiveResolution)
+                        % self._videoResolution)
         self._printEmptyLine()
         self._printLine(0,
                         "#(set-global-staff-size %d)" % self._videoSystemSize)
@@ -837,13 +878,13 @@ class LilypondFile:
         self._voiceToLabelMap             = {}
 
         # video parameters (set to arbitrary values)
-        self._videoDeviceName             = ""
-        self._videoEffectiveResolution    = 100
-        self._videoTopBottomMargin        = 5
-        self._videoSystemSize             = 25
-        self._videoPaperWidth             = 10
-        self._videoPaperHeight            = 10
-        self._videoLineWidth              = 8
+        self._videoDeviceName      = ""
+        self._videoResolution      = 100
+        self._videoTopBottomMargin = 5
+        self._videoSystemSize      = 25
+        self._videoPaperWidth      = 10
+        self._videoPaperHeight     = 10
+        self._videoLineWidth       = 8
 
         # derived data
         self._targetIsPdf                 = False
@@ -860,14 +901,14 @@ class LilypondFile:
                + " includeFileName = %r, lilypondVersion = %s,"
                + " voiceNameList = %r, voiceNameToChordsMap = %r,"
                + " voiceNameToLyricsMap = %r, songMeasureToTempoMap = %r,"
-               + " videoEffectiveResolution = %r, videoSystemSize = %r,"
+               + " videoResolution = %r, videoSystemSize = %r,"
                + " videoTopBottomMargin = %r, videoPaperWidth = %r,"
                + " videoPaperHeight = %r, videoLineWidth = %r)")
               % (self._phase, self._title, self._composerText,
                  self._includeFileName, self._lilypondVersion,
                  self._voiceNameList, self._voiceNameToChordsMap,
                  self._voiceNameToLyricsMap, self._songMeasureToTempoMap,
-                 self._videoEffectiveResolution, self._videoSystemSize,
+                 self._videoResolution, self._videoSystemSize,
                  self._videoTopBottomMargin, self._videoPaperWidth,
                  self._videoPaperHeight, self._videoLineWidth))
 
@@ -986,7 +1027,7 @@ class LilypondFile:
 
     def setVideoParameters (self,
                             deviceName : String,
-                            effectiveResolution : Natural,
+                            videoResolution : Natural,
                             systemSize : Natural,
                             topBottomMargin : Real,
                             paperWidth : Real,
@@ -994,19 +1035,19 @@ class LilypondFile:
                             lineWidth : Real):
         """Sets all parameters needed for subsequent video generation"""
 
-        Logging.trace(">>: deviceName = %r, effectiveResolution = %d,"
+        Logging.trace(">>: deviceName = %r, scalingFactor = %d,"
                       + " systemSize = %d,"
                       + " topBottomMargin = %4.2f, paperWidth = %5.2f,"
                       + " paperHeight = %5.2f, lineWidth = %5.2f",
-                      deviceName, effectiveResolution, systemSize,
+                      deviceName, videoResolution, systemSize,
                       topBottomMargin, paperWidth, paperHeight, lineWidth)
 
-        self._videoDeviceName          = deviceName
-        self._videoEffectiveResolution = effectiveResolution
-        self._videoSystemSize          = systemSize
-        self._videoTopBottomMargin     = topBottomMargin
-        self._videoPaperWidth          = paperWidth
-        self._videoPaperHeight         = paperHeight
-        self._videoLineWidth           = lineWidth
+        self._videoDeviceName      = deviceName
+        self._videoResolution      = videoResolution
+        self._videoSystemSize      = systemSize
+        self._videoTopBottomMargin = topBottomMargin
+        self._videoPaperWidth      = paperWidth
+        self._videoPaperHeight     = paperHeight
+        self._videoLineWidth       = lineWidth
 
         Logging.trace("<<")

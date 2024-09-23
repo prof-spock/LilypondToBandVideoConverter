@@ -9,12 +9,14 @@
 import io
 import re
 
-from .operatingsystem import OperatingSystem
-from .simpletypes import Dictionary, List, Natural, Object, ObjectSet, Map, \
-                         String, StringList, StringMap, StringSet, Tuple
-from .typesupport import isString
-from .simplelogging import Logging
-from .ttbase import iif, missingValue
+from basemodules.operatingsystem import OperatingSystem
+from basemodules.simpleassertion import Assertion
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Dictionary, List, Natural, Object, \
+                                    ObjectSet, Map, String, StringList, \
+                                    StringMap, StringSet, Tuple
+from basemodules.typesupport import isString
+from basemodules.ttbase import iif, isStdPython, missingValue
 
 #====================
 
@@ -69,7 +71,10 @@ class _Token:
         
 #====================
 
-_TokenList = List[_Token]
+if isStdPython:
+    _TokenList = List[_Token]
+else:
+    _TokenList = List # List[_Token]
 
 #====================
 
@@ -86,14 +91,21 @@ class ConfigurationFile:
     _continuationMarker = "\\"
     _realRegExp = re.compile(r"^[+\-]?[0-9]+\.[0-9]*$")
     _integerRegExp = re.compile(r"^[+\-]?[0-9]+$")
-    _keyValueRegExp = re.compile(r"^(\w+)\s*=\s*(.*)$", re.UNICODE)
+    _hexIntegerRegExp = re.compile(r"^0[xX][0-9A-Fa-f]+$")
+    _keyValueRegExp = re.compile(r"^(\w+)\s*=\s*(.*)$")
     _whiteSpaceCharRegExp = re.compile(r"^\s$")
     _identifierCharRegExp = re.compile(r"[A-Za-z0-9_]")
+    _identifierLineRegExp = re.compile(r"\s*"
+                                       + r"[A-Za-z_][A-Za-z0-9_]*"
+                                       + r"\s*=")
     _escapeCharacter = "\\"
     _doubleQuoteCharacter = '"'
 
     _searchPathList = ["."]
 
+    # error messages
+    _errorMsg_badOpeningCharacter = "expected either { or ["
+    
     #--------------------
     # LOCAL FEATURES
     #--------------------
@@ -110,6 +122,8 @@ class ConfigurationFile:
             result = (uppercasedValue in cls._trueBooleanValueNames)
         elif cls._integerRegExp.match(value):
             result = int(value)
+        elif cls._hexIntegerRegExp.match(value):
+            result = int(value, 16)
         elif cls._realRegExp.match(value):
             result = float(value)
         else:
@@ -124,6 +138,8 @@ class ConfigurationFile:
     def _combineFragmentedString (cls, st : String) -> String:
         """Combines - possibly fragmented - external representation of a
            string given by <st> into a sanitized string."""
+
+        Logging.trace(">>: %r", st)
 
         ParseState_inLimbo   = 0
         ParseState_inOther   = 1
@@ -148,19 +164,22 @@ class ConfigurationFile:
             elif parseState == ParseState_inString:
                 if ch == cls._doubleQuoteCharacter:
                     parseState = ParseState_inLimbo
-                elif ch == cls._escapeCharacter:
-                    parseState = ParseState_inEscape
                 else:
                     result += ch
+                    parseState = iif(ch == cls._escapeCharacter,
+                                     ParseState_inEscape, parseState)
             elif parseState == ParseState_inLiteral:
                 result += ch
                 if cls._whiteSpaceCharRegExp.search(ch):
                     parseState = ParseState_inLimbo
-            else:
-                assert (parseState == ParseState_inEscape)
+            elif parseState == ParseState_inEscape:
                 result += ch
                 parseState = ParseState_inString
+            else:
+                Assertion.check(False,
+                                "bad parse state - %s" % parseState)
 
+        Logging.trace("<<: %r", result)
         return result
 
     #--------------------
@@ -239,7 +258,7 @@ class ConfigurationFile:
         if identifier not in self._keyToValueMap:
             # leave identifier as is (it might be some value name like
             # wahr or false
-            Logging.trace("--: no expansion found")
+            Logging.traceError("no expansion found")
             result = identifier
         else:
             result = self._keyToValueMap[identifier]
@@ -255,19 +274,24 @@ class ConfigurationFile:
 
     #--------------------
 
-    def _lookupFileName (self, originalFileName : String) -> String:
+    def _lookupFileName (self,
+                         enclosingDirectoryName : String,
+                         originalFileName : String) -> String:
         """Returns file name in search paths based on <originalFileName>"""
 
-        Logging.trace(">>: %r", originalFileName)
+        Logging.trace(">>: directory = %r, file = %r",
+                      enclosingDirectoryName, originalFileName)
 
         cls = self.__class__
         result = None
         separator = OperatingSystem.pathSeparator
-        simpleFileName = OperatingSystem.basename(originalFileName, True)
+        simpleFileName = OperatingSystem.basename(originalFileName)
+        searchPathList = list(cls._searchPathList)
+        searchPathList.append(enclosingDirectoryName)
 
-        for directoryName in cls._searchPathList:
+        for directoryName in searchPathList:
             fileName = iif(directoryName == ".", originalFileName,
-                            directoryName + separator + simpleFileName)
+                           directoryName + separator + simpleFileName)
             isFound = OperatingSystem.hasFile(fileName)
             Logging.trace("--: %r -> found = %r", fileName, isFound)
 
@@ -282,9 +306,16 @@ class ConfigurationFile:
 
     @classmethod
     def _mergeContinuationLines (cls, lineList : StringList):
-        """Merges continuation lines in <lineList> into single
-           cumulated line and replaces continuations by empty lines
-           (to preserve line numbers)."""
+        """Merges continuation lines in <lineList> into single cumulated line
+           and replaces continuations by empty lines (to preserve line
+           numbers); the continuation logic is simple: a new
+           identifier definition line (starting with an identifier and
+           an equals sign) starts a new logical line unconditionally,
+           otherwise physical lines are collected and combined with
+           the previous logical line; embedded comment lines are
+           skipped and an empty (whitespace only) physical line stops
+           the collection process (unless followed by a continuation
+           character)"""
 
         Logging.trace(">>")
 
@@ -292,25 +323,45 @@ class ConfigurationFile:
         markerLength = len(cls._continuationMarker)
         lineListLength = len(lineList)
 
-        for i, currentLine in enumerate(lineList):
-            currentLine = currentLine.rstrip()
-            cumulatedLine += iif(cumulatedLine == "", "", " ")
+        for i, originalLine in enumerate(lineList):
+            currentLine  = originalLine.strip()
+            lineList[i] = ""
 
-            if (currentLine.endswith(cls._continuationMarker)
-                and i < lineListLength - 1):
-                # strip off marker, add to cumulated line and empty
-                # entry in line list
+            if currentLine.endswith(cls._continuationMarker):
+                # strip off obsolete continuation marker
                 currentLine = currentLine[:-markerLength].rstrip()
-                cumulatedLine += currentLine
-                lineList[i] = ""
-                loggingFormat = "--: collected %d (%r)"
-            else:
-                cumulatedLine += currentLine
-                lineList[i] = cumulatedLine
+
+            if cls._identifierLineRegExp.match(currentLine):
+                # this is a new definition
+
+                if cumulatedLine > "":
+                    lineList[i - 1] = cumulatedLine
+
+                cumulatedLine = currentLine
+                loggingFormat = "--: new definition %d (%r)"
+            elif currentLine.startswith(cls._commentMarker):
+                # skip comment
+                loggingFormat = "--: skipped comment %d (%r)"
+            elif originalLine == "":
+                if cumulatedLine == "":
+                    loggingFormat = "--: empty line %d (%r)"
+                else:
+                    lineList[i - 1] = cumulatedLine
+                    loggingFormat = \
+                        "--: empty line ended previous definition %d (%r)"
+
                 cumulatedLine = ""
-                loggingFormat = "--: cumulated into %d (%r)"
+            else:
+                # this is not an empty line and it does not start with a
+                # definition sequence or an import
+                cumulatedLine += " " + currentLine
+                loggingFormat = "--: collected continuation %d (%r)"
 
             Logging.trace(loggingFormat, i+1, currentLine)
+
+        if cumulatedLine > "":
+            lineList[-1] = cumulatedLine
+            Logging.trace("--: final line (%s)", currentLine);
 
         Logging.trace("<<")
 
@@ -326,8 +377,7 @@ class ConfigurationFile:
         Logging.trace(">>: token = %r, kindSet = %r, valueSet = %r",
                       token, kindSet, valueSet)
 
-        errorPosition = -1
-        errorMessage  = ""
+        errorPosition, errorMessage = -1, ""
 
         if token.kind not in kindSet:
             errorPosition = token.start
@@ -368,8 +418,8 @@ class ConfigurationFile:
                 match = cls._keyValueRegExp.search(currentLine)
 
                 if not match:
-                    Logging.trace("--: bad line %d without key-value-pair",
-                                  lineNumber)
+                    Logging.traceError("bad line %d without key-value-pair",
+                                       lineNumber)
                 else:
                     key = match.group(1)
                     value = match.group(2)
@@ -385,96 +435,26 @@ class ConfigurationFile:
 
     #--------------------
 
-    @classmethod
-    def _parseTableString (cls,
-                           tokenList : _TokenList,
-                           position : Natural) -> Tuple:
-        """Parses <tokenList> containing a table definition mapping
-           keys to values where values may be tables itself; returns
-           triple of dictionary object, error position within string
-           and error message"""
-
-        Logging.trace(">>: position = %d, tokens = %r",
-                      position, tokenList)
-
-        table = {}
-        errorPosition = -1
-        errorMessage = ""
-
-        ParseState_inLimbo    = 0
-        ParseState_atKey      = 1
-        ParseState_atColon    = 2
-        ParseState_atValue    = 3
-        ParseState_afterValue = 4
-        ParseState_done       = 5
-        
-        parseState = ParseState_inLimbo
-
-        currentKey   = None
-        currentValue = None
-
-        while parseState != ParseState_done:
-            token = tokenList[position]
-            nextParseState = parseState + 1
-
-            if parseState == ParseState_inLimbo:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], "{")
-            elif parseState == ParseState_atKey:
-                allowedTokenKindList = [ _Token.Kind_number,
-                                         _Token.Kind_string ]
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, allowedTokenKindList, None)
-                currentKey = token.value
-            elif parseState == ParseState_atColon:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], ":")
-            elif parseState == ParseState_atValue:
-                if token.kind != _Token.Kind_operator:
-                    currentValue = token.value
-                else:
-                    # value is a table itself => recursion
-                    errorPosition, errorMessage = \
-                        cls._mustHave(token, [ _Token.Kind_operator ], "{")
-                    
-                    if errorPosition < 0:
-                        errorPosition, errorMessage, currentValue, position = \
-                             cls._parseTableString(tokenList, position)
-                        
-                table[currentKey] = currentValue
-            elif parseState == ParseState_afterValue:
-                errorPosition, errorMessage = \
-                    cls._mustHave(token, [ _Token.Kind_operator ], ",}")
-                nextParseState = iif(token.value == "}", ParseState_done,
-                                     ParseState_atKey)
-                
-            parseState = iif(errorPosition >= 0, ParseState_done,
-                             nextParseState)
-            position += iif(parseState == ParseState_done, 0, 1)
-
-        result = (errorPosition, errorMessage, table, position)
-        Logging.trace("<<: %r", result)
-        return result
-
-    #--------------------
-
     def _readFile (self,
+                   directoryName : String,
                    fileName : String,
                    lineList : StringList,
                    visitedFileNameSet : StringSet):
-        """Appends lines of configuration file with <fileName> to <lineList>;
-           also handles embedded imports of files; <visitedFileNameSet>
-           tells which files have already been visited"""
+        """Appends lines of configuration file with <fileName> to <lineList>
+           with leading and trailing whitespace stripped; also handles
+           embedded imports of files (relative to <directoryName>;
+           <visitedFileNameSet> tells which files have already been
+           visited"""
 
-        Logging.trace(">>: fileName = %r, visitedFiles = %r",
-                      fileName, visitedFileNameSet)
+        Logging.trace(">>: fileName = %r, directory = %r, visitedFiles = %r",
+                      fileName, directoryName, visitedFileNameSet)
 
         cls = self.__class__
         errorMessage = ""
         isOkay = True
 
         originalFileName = fileName
-        fileName = self._lookupFileName(originalFileName)
+        fileName = self._lookupFileName(directoryName, originalFileName)
 
         if fileName is None:
             errorMessage = "cannot find %r" % originalFileName
@@ -482,7 +462,8 @@ class ConfigurationFile:
         elif fileName in visitedFileNameSet:
             Logging.trace("--: file already included %r", originalFileName)
         else:
-            visitedFileNameSet.update(fileName)
+            visitedFileNameSet.add(fileName)
+            directoryName = OperatingSystem.dirname(fileName)
 
             with io.open(fileName, "rt",
                          encoding="utf-8") as configurationFile:
@@ -504,118 +485,31 @@ class ConfigurationFile:
                                           or importedFileName.startswith("\\")
                                           or importedFileName[1] == ":")
 
-                        if isAbsolutePath:
-                            directoryPrefix = ""
-                        else:
-                            directoryName = OperatingSystem.dirname(fileName)
-                            directoryPrefix = iif(directoryName == ".", "",
-                                                  directoryName
-                                                  + iif(directoryName > "",
-                                                        "/", ""))
+                        # if isAbsolutePath:
+                        #     directoryPrefix = ""
+                        # else:
+                        #     directoryName = OperatingSystem.dirname(fileName)
+                        #     directoryPrefix = iif(directoryName == ".", "",
+                        #                           directoryName
+                        #                           + iif(directoryName > "",
+                        #                                 "/", ""))
 
                         #importedFileName = directoryPrefix + importedFileName
                         Logging.trace("--: IMPORT %r", importedFileName)
 
-                        isOkay = self._readFile(importedFileName, lineList,
+                        isOkay = self._readFile(directoryName,
+                                                importedFileName, lineList,
                                                 visitedFileNameSet)
                         if not isOkay:
-                            Logging.trace("--:import failed for %r in %r",
-                                          importedFileName,
-                                          cls._searchPathList)
+                            Logging.traceError("import failed for %r in %r",
+                                               importedFileName,
+                                               cls._searchPathList)
                             isOkay = False
                             break
 
         Logging.trace("<<: %r, %r", isOkay, errorMessage)
         return isOkay
             
-    #--------------------
-
-    @classmethod
-    def _tokenizeTableString (cls, st : String) -> _TokenList:
-        """Converts table definition string into list of tokens where
-           a token is a pair of kind and value"""
-
-        Logging.trace(">>: %s", st)
-
-        ScanState_inLimbo  = 0
-        ScanState_inString = 1
-        ScanState_inNumber = 2
-
-        digits    = "0123456789"
-        operators = "{}:,"
-
-        tokenList = []
-        errorPosition, errorMessage = -1, ""
-        tokenStart, tokenText, tokenKind, tokenValue = None, None, None, None
-        scanState = ScanState_inLimbo
-        i = 0
-
-        while i < len(st):
-            ch = st[i]
-            tokenIsDone = False
-            isQuoteCharacter = (ch == "'")
-
-            if scanState == ScanState_inLimbo:
-                if ch == " ":
-                    pass
-                elif not ch in "'" + operators + digits:
-                    tokenValue = None
-                    errorPosition = i
-                    errorMessage = "illegal character %r" % ch
-                    break
-                else:
-                    tokenStart = i
-                    tokenText = ch
-                    tokenValue = iif(isQuoteCharacter, "", ch)
-
-                    if isQuoteCharacter:
-                        tokenKind = _Token.Kind_string
-                        scanState = ScanState_inString
-                    elif ch in operators:
-                        tokenKind = _Token.Kind_operator
-                        tokenIsDone = True
-                    elif ch in digits:
-                        tokenKind = _Token.Kind_integerNumber
-                        scanState = ScanState_inNumber
-            elif scanState == ScanState_inString:
-                tokenText += ch
-
-                if not isQuoteCharacter:
-                    tokenValue += ch
-                else:
-                    tokenIsDone = True
-            elif scanState == ScanState_inNumber:
-                if ch in digits:
-                    tokenText  += ch
-                    tokenValue += ch
-                elif ch == ".":
-                    tokenKind = _Token.Kind_realNumber
-                    tokenText  += ch
-                    tokenValue += ch
-                else:
-                    i -= 1
-                    tokenIsDone = True
-                    tokenValue = iif(tokenKind == _Token.Kind_realNumber,
-                                     float(tokenValue), int(tokenValue))
-                    tokenKind = _Token.Kind_number
-
-            if tokenIsDone:
-                token = _Token(tokenStart, tokenText, tokenKind, tokenValue)
-                Logging.trace("--: adding %r", token)
-                tokenList.append(token)
-                tokenValue = None
-                scanState = ScanState_inLimbo
-
-            i += 1
-
-        if tokenValue is not None:
-            errorPosition = i
-            errorMessage = "unterminated token %s" % tokenKind
-
-        result = (errorPosition, errorMessage, tokenList)
-        Logging.trace("<<: %r", result)
-        return result
-        
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -640,7 +534,7 @@ class ConfigurationFile:
         self._keyToStringValueMap = {}
         visitedFileNameSet = set()
         lineList = []
-        isOkay = self._readFile(fileName, lineList, visitedFileNameSet)
+        isOkay = self._readFile("", fileName, lineList, visitedFileNameSet)
         self._parseConfiguration(lineList)
 
         Logging.trace("<<: %s",
@@ -696,34 +590,12 @@ class ConfigurationFile:
 
         if key in self._keyToValueMap:
             result = self._keyToValueMap[key]
+            if isString(result):
+                result = result.replace("\\\"", "\"")
         elif isMandatory:
-            Logging.trace("--: cannot find value for %s", key)
+            Logging.traceError("cannot find value for %s", key)
         else:
             result = defaultValue
 
         Logging.trace("<<: %s", result)
-        return result
-
-    #--------------------
-
-    @classmethod
-    def parseTableDefinitionString (cls, st : String) -> Tuple:
-        """Parses <st> as configuration string containing a table
-           definition mapping keys to values where values may be
-           tables itself; returns triple of dictionary object, error
-           position within string and error message"""
-
-        Logging.trace(">>: %r", st)
-
-        st = "{" + st + "}"
-        errorPosition, errorMessage, tokenList = cls._tokenizeTableString(st)
-
-        if errorPosition < 0:
-            errorPosition, errorMessage, table, newPosition = \
-                cls._parseTableString(tokenList, 0)
-
-        errorPosition = errorPosition + iif(errorPosition > 0, -1, 0)
-        result = (errorPosition, errorMessage, table)
-
-        Logging.trace("<<: %r", result)
         return result

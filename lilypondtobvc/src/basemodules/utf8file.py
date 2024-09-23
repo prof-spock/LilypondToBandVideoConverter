@@ -6,9 +6,9 @@
 
 import io
 
-from .simpleassertion import Assertion
-from .simpletypes import Natural, String, StringList
-from .typesupport import toUnicodeString
+from basemodules.simpleassertion import Assertion
+from basemodules.simpletypes import Natural, String, StringList
+from basemodules.typesupport import toUnicodeString
 
 #============================================================
 

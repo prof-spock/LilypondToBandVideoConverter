@@ -1,7 +1,7 @@
 # ltbvc_configurationdatahandler -- services for access to the global
 #                                   configuration file of ltbvc
 #
-# author: Dr. Thomas Tensi, 2006 - 2017
+# author: Dr. Thomas Tensi, 2006 - 2022
 
 #====================
 # IMPORTS
@@ -24,13 +24,14 @@ from basemodules.simpletypes import Boolean, Callable, ClassVar, \
                                     Natural, Object, ObjectList, Real, \
                                     String, StringList, StringMap, \
                                     StringSet, Tuple
-from basemodules.stringutil import adaptToKind, convertStringToList, \
-                                   convertStringToMap
+from basemodules.stringutil import adaptToKind, deserializeToList, \
+                                   deserializeToMap
 from basemodules.ttbase import iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import AudioTrack, VideoFileKind, \
-                                 VideoTarget, VoiceDescriptor
+                                 VideoTarget, VoiceDescriptor, \
+                                 panPositionStringToReal
 
 # renamings
 generateObjectListFromString= DataTypeSupport.generateObjectListFromString
@@ -354,7 +355,7 @@ class _LocalValidator:
                       (r"(?:(?:mixing|padding|refinement)CommandLine"
                        + r"|amplificationEffect|chainSeparator|redirector)")
         beatPattern = r"(?:(?:%s)|OTHER)" % floatPattern
-        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|'')")
+        clefPattern = makeCompactListPat(r"(?:bass_8|G_8|bass|G|''|G\^8)")
         humanizationKeyPattern = r"(?:%s|RASTER|SLACK)" % beatPattern
         humanizationValuePattern = (r"%s(?:/[BA]?%s)?"
                                     % (floatPattern, floatPattern))
@@ -633,7 +634,7 @@ class _ConfigDataGlobal (AbstractDataType):
         Logging.trace(">>: %s", st)
 
         result = {}
-        externalMap = convertStringToMap(st)
+        externalMap = deserializeToMap(st)
 
         for key, value in cls._defaultAudioProcessorMap.items():
             result[key] = externalMap.get(key, value)
@@ -706,7 +707,7 @@ class _ConfigDataGlobal (AbstractDataType):
         parameterName = cls._audioProcessorMapAliasName
         audioProcessorMapAsString = \
             parameterNameToValueMap.get(cls._audioProcessorMapAliasName)
-        audioProcessorMap = convertStringToMap(audioProcessorMapAsString)
+        audioProcessorMap = deserializeToMap(audioProcessorMapAsString)
         apmGet = audioProcessorMap.get
 
         chainSeparator        = apmGet("chainSeparator", ";")
@@ -799,13 +800,13 @@ class _ConfigDataMidiHumanization (AbstractDataType):
     # -- attributes
     humanizationStyleNameToTextMap : StringMap = None
     humanizedVoiceNameSet          : StringMap = \
-        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+        specialField(frozenset(), lambda st : set(deserializeToList(st)))
     voiceNameToVariationFactorMap  : StringMap = \
         specialField(None,
                      (lambda st :
                       { voiceName : list(map(float, factors.split("/")))
                         for voiceName, factors
-                            in convertStringToMap(st).items()}))
+                            in deserializeToMap(st).items()}))
 
     #--------------------
 
@@ -878,18 +879,18 @@ class _ConfigDataNotation (AbstractDataType):
     #--------------------
 
     phaseAndVoiceNameToClefMap      : StringMap = \
-        specialField(None, lambda st : convertStringToMap(st))
+        specialField(None, lambda st : deserializeToMap(st))
     phaseAndVoiceNameToStaffListMap : StringMap = \
         specialField(None,
                      lambda st:
                      { phase : { voiceName :
-                                 convertStringToList(staffListString, "/")
+                                 deserializeToList(staffListString, "/")
                                  for voiceName, staffListString
                                  in voiceNameToStaffListMap.items() }
                        for phase, voiceNameToStaffListMap
-                       in convertStringToMap(st).items() })
+                       in deserializeToMap(st).items() })
     voiceNameToScoreNameMap         : StringMap = \
-        specialField(None, lambda st : convertStringToMap(st))
+        specialField(None, lambda st : deserializeToMap(st))
 
     #--------------------
 
@@ -989,7 +990,7 @@ class _ConfigDataSong (AbstractDataType):
             if value is not None:
                 correctValue = (value + ", ")  * (voiceCount - 1) + value
             else:
-                voiceNameList = convertStringToList(voiceNames)
+                voiceNameList = deserializeToList(voiceNames)
                 correctValue = ""
 
                 if attributeListName == "midiChannelList":
@@ -1009,7 +1010,7 @@ class _ConfigDataSong (AbstractDataType):
                         "organ" : "18", "reed" : "64", "strings" : "48",
                         "synthesizer" : "80", "vocals" : "54" }
 
-                    for voiceName in voiceNameList:
+                    for i, voiceName in enumerate(voiceNameList):
                         correctValue += (iif(i > 0, ", ", "")
                                          + voiceToInstrumentMap.get(voiceName,
                                                                     "0"))
@@ -1063,13 +1064,13 @@ class _ConfigDataSong (AbstractDataType):
     #--------------------
 
     @classmethod
-    def _convertStringToRealMap (cls,
-                                 st : String) -> Map:
-        """Reads map from <st> and changes its keys of to real"""
+    def _deserializeToIntegerMap (cls,
+                                  st : String) -> Map:
+        """Reads map from <st> and changes its keys to integer"""
 
         Logging.trace(">>: st = %r", st)
-        currentMap = convertStringToMap(st)
-        result = { adaptToKind(key, "R") : value
+        currentMap = deserializeToMap(st)
+        result = { adaptToKind(key, "I") : value
                    for (key, value) in currentMap.items() }
         Logging.trace("<<: %r", result)
         return result
@@ -1095,14 +1096,14 @@ class _ConfigDataSong (AbstractDataType):
                       midiVolumes, panPositions, reverbLevels,
                       soundVariants)
 
-        voiceNameList = convertStringToList(voiceNames)
+        voiceNameList = deserializeToList(voiceNames)
 
-        midiChannelList    = convertStringToList(midiChannels, kind="I")
-        midiInstrumentList = convertStringToList(midiInstruments)
-        midiVolumeList     = convertStringToList(midiVolumes, kind="I")
-        panPositionList    = convertStringToList(panPositions)
-        reverbLevelList    = convertStringToList(reverbLevels, kind="R")
-        soundVariantList   = convertStringToList(soundVariants)
+        midiChannelList    = deserializeToList(midiChannels, kind="I")
+        midiInstrumentList = deserializeToList(midiInstruments)
+        midiVolumeList     = deserializeToList(midiVolumes, kind="I")
+        panPositionList    = deserializeToList(panPositions)
+        reverbLevelList    = deserializeToList(reverbLevels, kind="R")
+        soundVariantList   = deserializeToList(soundVariants)
 
         voiceNameToVoiceDataMap = {}
 
@@ -1138,7 +1139,7 @@ class _ConfigDataSong (AbstractDataType):
 
         targetAbbrevToNameMap = { "e": "extract", "m": "midi",
                                   "s": "score",   "v": "video" }
-        currentMap = convertStringToMap(mapAsString)
+        currentMap = deserializeToMap(mapAsString)
 
         if currentMap is None:
             result = None
@@ -1227,7 +1228,7 @@ class _ConfigDataSong (AbstractDataType):
         Logging.trace(">>: %s", st)
 
         tempoMap = { adaptToKind(key, "R") : value
-                     for key, value in convertStringToMap(st).items() }
+                     for key, value in deserializeToMap(st).items() }
 
         for key, value in tempoMap.items():
             if "|" not in value:
@@ -1249,20 +1250,20 @@ class _ConfigDataSong (AbstractDataType):
     #--------------------
 
     audioVoiceNameSet                 : StringSet = \
-        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+        specialField(frozenset(), lambda st : set(deserializeToList(st)))
     countInMeasureCount               : Natural = 0
     extractVoiceNameSet               : StringSet = \
-        specialField(frozenset(), lambda st : set(convertStringToList(st)))
+        specialField(frozenset(), lambda st : set(deserializeToList(st)))
     fileNamePrefix                    : String = "XXXX"
     includeFilePath                   : String = ""
     intermediateFilesAreKept          : Boolean = False
     measureToHumanizationStyleNameMap : StringMap = \
         specialField(None,
-                     lambda st: _ConfigDataSong._convertStringToRealMap(st))
+                     lambda st: _ConfigDataSong._deserializeToIntegerMap(st))
     measureToTempoMap                 : Map = \
         specialField(None, lambda st: _ConfigDataSong._stringToTempoMap(st))
     midiVoiceNameList                 : StringList = \
-        specialField((), convertStringToList)
+        specialField((), deserializeToList)
     parallelTrackFilePath             : String = \
         specialField("",
                      lambda st: _ConfigDataSong._splitParallelTrackInfo(st)[0],
@@ -1274,7 +1275,7 @@ class _ConfigDataSong (AbstractDataType):
                      "parallelTrack",
                      lambda st: st.split(",")[1].strip())
     scoreVoiceNameList                : StringList = \
-        specialField((), convertStringToList)
+        specialField((), deserializeToList)
     shiftOffset                       : Real =  \
         specialField(0.0,
                      lambda st: _ConfigDataSong._splitParallelTrackInfo(st)[2],
@@ -1287,7 +1288,7 @@ class _ConfigDataSong (AbstractDataType):
     title                             : String = "%title%"
     trackNumber                       : Natural = 0
     voiceNameList                     : StringList = \
-        specialField((), convertStringToList)
+        specialField((), deserializeToList)
     voiceNameToChordsMap              : StringMap = \
         specialField(None,
                      lambda st: _ConfigDataSong._convertTargetMapping(st,
@@ -1297,7 +1298,7 @@ class _ConfigDataSong (AbstractDataType):
                      lambda st: _ConfigDataSong._convertTargetMapping(st,
                                                                       True))
     voiceNameToOverrideFileNameMap    : StringMap = \
-        specialField(None, convertStringToMap)
+        specialField(None, deserializeToMap)
     voiceNameToVoiceDataMap           : StringMap = None
 
     #--------------------
@@ -1441,16 +1442,16 @@ class _ConfigDataSongGroup (AbstractDataType):
 
     _attributeNameList : ClassVar = [
         "albumArtFilePath", "albumName", "artistName",
-        "audioTargetDirectoryPath", "audioTrackList",
+        "audioTargetDirectoryPath",
         "targetFileNamePrefix"
     ]
 
     _derivedAttributeNameList : ClassVar = [
-        "audioGroupNameToVoiceNameSetMap"
+        "audioGroupNameToVoiceNameSetMap", "audioTrackNameToDataMap"
     ]
 
     _externalAttributeNameList : ClassVar = [
-        "audioGroupToVoicesMap"
+        "audioGroupToVoicesMap", "audioTrackList"
     ]
     
     #--------------------
@@ -1464,15 +1465,16 @@ class _ConfigDataSongGroup (AbstractDataType):
         specialField(None,
                      (lambda st:
                       { audioGroupName :
-                            set(convertStringToList(voiceNames, "/"))
+                            set(deserializeToList(voiceNames, "/"))
                         for audioGroupName, voiceNames
-                        in convertStringToMap(st).items() }),
+                        in deserializeToMap(st).items() }),
                      "audioGroupToVoicesMap")
     audioTargetDirectoryPath        : String = "."
-    audioTrackList                  : ObjectList = \
+    audioTrackNameToDataMap         : Map = \
         specialField((),
-                     lambda st: generateObjectListFromString(st,
-                                                             AudioTrack()))
+                     lambda st: generateObjectMapFromString(st,
+                                                            AudioTrack()),
+                     "audioTrackList")
     targetFileNamePrefix            : String = ""
 
     #--------------------
@@ -1578,7 +1580,7 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
     #--------------------
 
     def _constructAdvancedDefaults (self):
-        """Constructs additional defaults  updating <self>"""
+        """Constructs additional defaults updating <self>"""
 
         Logging.trace(">>")
 
@@ -1593,7 +1595,8 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
 
         for attributeName in criticalAttributeNameList:
             if getattr(self, attributeName) is None:
-                Logging.trace("--: setting %s to empty", attributeName)
+                Logging.trace("--: %s is undefined, set to empty map",
+                              attributeName)
                 SETATTR(self, attributeName, {})
 
         # adapt several parameters when unset
@@ -1607,26 +1610,70 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
                 SETATTR(videoFileKind, "voiceNameList", list(voiceNameList))
 
         # when there is no audio group defined, provide a single group
-        # "all" with all voices
+        # "all" with all voices and a group for each voice with the
+        # voice name
         if len(self.audioGroupNameToVoiceNameSetMap) == 0:
-            Logging.trace("--: adding an artificial 'all' audio group")
+            Logging.trace("--: adding an artificial 'all' audio group"
+                          + " and one for each voice")
             self.audioGroupNameToVoiceNameSetMap["all"] = \
                 set(voiceNameList)
 
+            for voiceName in voiceNameList:
+                self.audioGroupNameToVoiceNameSetMap[voiceName] = \
+                    set(voiceName)
+
         # when there is no audio track defined, take the first entry
         # in audioGroupNameToVoiceNameSetMap and make a track for that
-        if len(self.audioTrackList) == 0:
+        if len(self.audioTrackNameToDataMap) == 0:
             Logging.trace("--: ")
             audioGroupName = \
                 list(self.audioGroupNameToVoiceNameSetMap.keys())[0]
-            audioLevelMap = { voiceName : 1.0
+            mixSettingMap = { voiceName : (1.0, 0)
                               for voiceName in voiceNameList }
             audioTrack = \
                 AudioTrack(audioGroupList=[audioGroupName],
                            albumName=self.albumName,
-                           voiceNameToAudioLevelMap=audioLevelMap)
-            SETATTR(self, "audioTrackList", [ audioTrack ])
+                           name="all",
+                           voiceNameToMixSettingMap=mixSettingMap)
+            SETATTR(self, "audioTrackNameToDataMap", { "all": audioTrack })
+            
+        # check the tracks in the audio track list and adapt their
+        # unset attributes to reasonable values
+        for trackName, audioTrack in self.audioTrackNameToDataMap.items():
+            groupNamesAsString = ", ".join(audioTrack.audioGroupList)
 
+            if audioTrack.name == "":
+                SETATTR(audioTrack, "name",  trackName)
+            if audioTrack.description == "":
+                SETATTR(audioTrack, "description",  groupNamesAsString)
+            if audioTrack.audioFileTemplate == "":
+                SETATTR(audioTrack, "audioFileTemplate", "$-%s" % trackName)
+            if audioTrack.songNameTemplate == "":
+                SETATTR(audioTrack, "audioFileTemplate", "$ [%s]" % trackName)
+
+            # update pan positions when undefined
+            vnToMixSettingMap = audioTrack.voiceNameToMixSettingMap
+            vnToVoiceDataMap  = self.voiceNameToVoiceDataMap
+
+            for voiceName, mixSetting in vnToMixSettingMap.items():
+                Logging.trace("--: adapting setting for voice %s - %r",
+                              voiceName, mixSetting)
+
+                if mixSetting[1] is None:
+                    # handle unknown pan position
+                    if voiceName not in vnToVoiceDataMap:
+                        panPosition = 0
+                    else:
+                        voiceDescriptor = vnToVoiceDataMap[voiceName]
+                        volume      = mixSetting[0]
+                        panPosition = voiceDescriptor.panPosition
+                        panPosition = \
+                            panPositionStringToReal(panPosition)
+                        
+                    vnToMixSettingMap[voiceName] = (volume, panPosition)
+                    Logging.trace("--: overriding pan for %r by %r",
+                                  voiceName, panPosition)
+                
         Logging.trace("<<")
 
     #--------------------

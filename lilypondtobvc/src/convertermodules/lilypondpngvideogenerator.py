@@ -10,17 +10,16 @@
 #====================
 
 import re
+from tarfile import TarFile
 
-import basemodules.simpleassertion
+from basemodules.simpleassertion import Assertion
 from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Map, Natural, Real, \
-                                    RealList, String
+                                    RealList, String, StringList
 from basemodules.operatingsystem import OperatingSystem
 from basemodules.ttbase import iif
 from basemodules.utf8file import UTF8File
 from basemodules.validitychecker import ValidityChecker
-
-simpleassertion = basemodules.simpleassertion
 
 #====================
 
@@ -41,24 +40,15 @@ _postscriptFileEncoding = "latin_1"
 
 # ==== end of configuration settings ====
 
+_lineListToString = lambda lst: "\n".join(lst) + "\n"
+
 #============================================================
 
-class Assertion:
+class _Assertion:
     """Provides all services for assertion checking."""
 
     #--------------------
     # EXPORTED FEATURES
-    #--------------------
-
-    @classmethod
-    def check (cls,
-               condition : Boolean,
-               message : String):
-        """Checks for <condition> and if not satisfied, raises exception
-           with <message>."""
-
-        simpleassertion.Assertion.check(condition, message)
-
     #--------------------
 
     @classmethod
@@ -69,11 +59,9 @@ class Assertion:
            error message about file kind mentioning file name."""
 
         Logging.trace(">>: name = %r, kind = %s", fileName, fileKind)
-
         errorTemplate = "%s file does not exist - %r"
         errorMessage = errorTemplate % (fileKind, fileName)
-        cls.check(OperatingSystem.hasFile(fileName), errorMessage)
-
+        Assertion.check(OperatingSystem.hasFile(fileName), errorMessage)
         Logging.trace("<<")
 
     #--------------------
@@ -88,17 +76,15 @@ class Assertion:
            command-line option for program."""
 
         Logging.trace(">>: '%s %s'", programName, option)
-
-        cls.check(OperatingSystem.programIsAvailable(programPath, option),
-                  ("cannot execute %s program - path %r'"
-                   % (programName, programPath)))
-
+        Assertion.check(OperatingSystem.programIsAvailable(programPath,
+                                                           option),
+                        ("cannot execute %s program - path %r'"
+                         % (programName, programPath)))
         Logging.trace("<<")
-
 
 #============================================================
 
-class DurationManager:
+class _DurationManager:
     """Handles all duration related services like e.g. the calculation
        of the duration list from tempo map and page to measure map."""
 
@@ -220,7 +206,7 @@ class DurationManager:
 
 #============================================================
 
-class PostscriptFile:
+class _PostscriptFile:
     """Represents the source for getting the transitions between the
        pages i.e. the mapping from page index to first measure on
        page."""
@@ -249,7 +235,7 @@ class PostscriptFile:
 
         Logging.trace(">>: %r", name)
 
-        Assertion.ensureFileExistence(name, "postscript")
+        _Assertion.ensureFileExistence(name, "postscript")
         cls._fileName = name
 
         Logging.trace("<<")
@@ -346,29 +332,31 @@ class PostscriptFile:
 
 #============================================================
 
-class MP4Video:
-    """Handles the generation of the target MP4 video file."""
+class _NotationVideo:
+    """Handles the generation of the target notation video file."""
 
     #--------------------
     # LOCAL FEATURES
     #--------------------
-
-    _tempFileName = "temp-noaudio.mp4"
 
     # command
     _ffmpegCommand = None
 
     # files and paths
     _concatSpecificationFileName = None
+    _intermediateFileDirectoryPath = None
     _intermediateFileNameTemplate = None
     _pageFileNameTemplate = None
 
-    # video parameters
+    # general video parameters
+    _scalingFactor = None
+    
+    # MP4 video parameters
     _ffmpegPresetName = None
     _frameRate = None
-    _scaleFactor = None
     _generatorLogLevel = None
     _defaultMp4BaselineLevel = "3.0"
+    _tempMP4FileName = "temp-noaudio.mp4"
 
     _pageCount = None
 
@@ -388,15 +376,15 @@ class MP4Video:
         Logging.trace(">>")
 
         # check the executables
-        Assertion.ensureProgramAvailability("ffmpeg", cls._ffmpegCommand,
-                                            "-version")
+        _Assertion.ensureProgramAvailability("ffmpeg", cls._ffmpegCommand,
+                                             "-version")
 
         # check the numeric parameters
-        ValidityChecker.isNumberString(cls._scaleFactor, "scale factor",
+        ValidityChecker.isNumberString(cls._scalingFactor, "scaling factor",
                                        realIsAllowed=False, rangeKind=">0")
         ValidityChecker.isNumberString(cls._frameRate, "frame rate",
-                                       realIsAllowed=True, rangeKind=">0"),
-        cls._scaleFactor = int(cls._scaleFactor)
+                                       realIsAllowed=True, rangeKind=">=0"),
+        cls._scalingFactor = round(cls._scalingFactor)
         cls._frameRate   = float(cls._frameRate)
 
         Logging.trace("<<: parameters okay")
@@ -420,7 +408,7 @@ class MP4Video:
         OperatingSystem.removeFile(cls._concatSpecificationFileName,
                                    filesAreKept)
 
-        if cls.fileName and cls.fileName == cls._tempFileName:
+        if cls.fileName and cls.fileName == cls._tempMP4FileName:
             OperatingSystem.removeFile(cls.fileName, filesAreKept)
 
         Logging.trace("<<")
@@ -428,8 +416,8 @@ class MP4Video:
     #--------------------
 
     @classmethod
-    def make (cls,
-              pageDurationList : RealList):
+    def makeMP4File (cls,
+                     pageDurationList : RealList):
         """Generate an MP4 video from durations in <pageDurationList>
            and generated PNG images."""
 
@@ -455,13 +443,11 @@ class MP4Video:
 
             # make silent video from single lilypond page
             command = ((cls._ffmpegCommand,
-                       "-loglevel", cls._generatorLogLevel,
-                       "-framerate", "1/" + str(requiredNumberOfFrames),
-                       "-i", str(pageFileName),
-                       "-vf", "scale=iw/%d:ih/%d" % (cls._scaleFactor,
-                                                     cls._scaleFactor),
-                       "-r", str(cls._frameRate),
-                       "-t", "%02.2f" % pageDuration)
+                        "-loglevel", cls._generatorLogLevel,
+                        "-loop", "1",
+                        "-i", str(pageFileName),
+                        "-filter:v", ("fps=%2.4f" % cls._frameRate),
+                        "-t", "%02.2f" % pageDuration)
                        + iif(cls._ffmpegPresetName != "",
                              ("-fpre", cls._ffmpegPresetName),
                              ("-pix_fmt", "yuv420p",
@@ -490,6 +476,71 @@ class MP4Video:
     #--------------------
 
     @classmethod
+    def makeTARFile (cls,
+                     pageToMeasureMap : Map,
+                     measureToDurationMap : Map,
+                     countInMeasures : Natural):
+        """Generate a notation video TAR file from the mapping from
+           page numbers to measures in <pageToMeasureMap>, the mapping
+           from measures to measure durations in
+           <measureToDurationMap> and the <countInMeasures> together
+           with the generated PNG images"""
+
+        Logging.trace(">>: pageToMeasureMap = %r,"
+                      + " measureToDurationMap = %r,"
+                      + " countInMeasures = %d",
+                      pageToMeasureMap, measureToDurationMap,
+                      countInMeasures)
+
+        baseNameProc = lambda name: OperatingSystem.basename(name, True)
+        cls._pageCount = len(pageToMeasureMap) - 1
+
+        # construct subtitle file
+        subtitleFileName = ("%s/subtitle.srt"
+                            % cls._intermediateFileDirectoryPath)
+        _SubtitleFile.make(measureToDurationMap, countInMeasures,
+                           subtitleFileName)
+
+        # make image map file from page to measure map
+        imageMapFileName = ("%s/imagemap.txt"
+                            % cls._intermediateFileDirectoryPath)
+        lineList = []
+
+        for i in range(cls._pageCount):
+            page = i + 1
+            measure = pageToMeasureMap[page]
+            pageFileName = baseNameProc(cls._pageFileNameTemplate
+                                        % page)
+            line = "%d -> %r" % (measure, pageFileName)
+            Logging.trace("--: image file line %s", line)
+            lineList.append(line)
+
+        imageMapFile = UTF8File(imageMapFileName, 'wt')
+        imageMapFile.write(_lineListToString(lineList))
+        imageMapFile.close()
+
+        # make tar file and add page images, subtitle file and image
+        # map file
+        fileNameList = ([ subtitleFileName, imageMapFileName ]
+                        + [ cls._pageFileNameTemplate % (i + 1)
+                            for i in range(cls._pageCount) ])
+
+        Logging.trace("--: creating archive %s", cls.fileName)
+        tarFile = TarFile(cls.fileName, "w")
+        
+        for fileName in fileNameList:
+            nameInArchive = baseNameProc(fileName)
+            Logging.trace("--: adding file %s to archive as %s",
+                          fileName, nameInArchive)
+            tarFile.add(fileName, nameInArchive)
+
+        tarFile.close()
+        
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
     def setName (cls,
                  fileName : String):
         """Sets file name for MP4 generation to <fileName>; if empty, some
@@ -498,14 +549,14 @@ class MP4Video:
         Logging.trace(">>: %r", fileName)
 
         if fileName == "":
-            fileName = cls._tempFileName
+            fileName = cls._tempMP4FileName
 
         cls.fileName = fileName
         Logging.trace("<<")
 
 #============================================================
 
-class SubtitleFile:
+class _SubtitleFile:
     """Encapsulates generation of an SRT subtitle file."""
 
     _tempFileName = "temp-subtitle.srt"
@@ -525,22 +576,17 @@ class SubtitleFile:
         timeInSeconds -= minutes * 60
         seconds = int(timeInSeconds)
         milliseconds = 1000 * (timeInSeconds - seconds)
-        return "%02d:%02d:%02d,%03d" % (hours, minutes, seconds, milliseconds)
-
-    #--------------------
-    # EXPORTED FEATURES
-    #--------------------
-
-    fileName = None
+        return ("%02d:%02d:%02d,%03d"
+                % (hours, minutes, seconds, milliseconds))
 
     #--------------------
 
     @classmethod
-    def make (cls,
-              measureToDurationMap : Map,
-              countInMeasures : Natural):
-        """Generates SRT subtitle file from <measureToDuration> and
-           <countInMeasures>."""
+    def _makeLineList (cls,
+                       measureToDurationMap : Map,
+                       countInMeasures : Natural) -> StringList:
+        """Makes a list of lines from <measureToDuration> and
+           <countInMeasures>"""
 
         Logging.trace(">>: mToDMap = %r, countIn = %d",
                       measureToDurationMap, countInMeasures)
@@ -549,8 +595,7 @@ class SubtitleFile:
         measureNumberList.sort()
 
         startTime = 0
-
-        subtitleFile = UTF8File(cls.fileName, 'wt')
+        lineList = []
 
         for measureNumber in measureNumberList:
             duration = measureToDurationMap[measureNumber]
@@ -563,12 +608,40 @@ class SubtitleFile:
                 # write 4 lines of SRT data: number, time interval,
                 # measure number and an empty separation line
                 Logging.trace("--: measure %d: %s", measureNumber, st)
-                st = ("%d\n%s\n%d\n\n"
-                      % (measureNumber, st, measureNumber))
-                subtitleFile.write(st)
+                lineList.extend(("%d" % measureNumber,
+                                 st,
+                                 "%d" % measureNumber,
+                                 ""))
 
+        Logging.trace("<<: count = %d", len(lineList))
+        return lineList
+
+    #--------------------
+    # EXPORTED FEATURES
+    #--------------------
+
+    fileName = None
+
+    #--------------------
+
+    @classmethod
+    def make (cls,
+              measureToDurationMap : Map,
+              countInMeasures : Natural,
+              fileName : String):
+        """Generates SRT subtitle file named <fileName> from
+           <measureToDuration> and <countInMeasures>."""
+
+        Logging.trace(">>: mToDMap = %r, countIn = %d, fileName = %r",
+                      measureToDurationMap, countInMeasures, fileName)
+
+        lineList = cls._makeLineList(measureToDurationMap,
+                                     countInMeasures)
+        subtitleFile = UTF8File(fileName, 'wt')
+        subtitleFile.write(_lineListToString(lineList))
         subtitleFile.close()
-        Logging.trace("<<: subtitles done.")
+
+        Logging.trace("<<")
 
     #--------------------
 
@@ -591,8 +664,7 @@ class SubtitleFile:
     @classmethod
     def cleanUpConditionally (cls,
                               filesAreKept : Boolean):
-        """Cleans up subtitle file if <filesAreKept> is unset,
-           otherwise moves it to directory given by <targetPath>"""
+        """Cleans up subtitle file if <filesAreKept> is unset"""
 
         Logging.trace(">>: %r", filesAreKept)
 
@@ -617,25 +689,26 @@ class LilypondPngVideoGenerator:
         Logging.trace(">>: %r", self)
 
         # check the executables
-        Assertion.ensureProgramAvailability("lilypond", self._lilypondCommand,
-                                            "-v")
+        _Assertion.ensureProgramAvailability("lilypond",
+                                             self._lilypondCommand,
+                                             "-v")
 
         # check the input files
-        Assertion.ensureFileExistence(self._lilypondFileName, "lilypond")
+        _Assertion.ensureFileExistence(self._lilypondFileName, "lilypond")
 
         # check the numeric parameters
         ValidityChecker.isNumberString(self._countInMeasures,
                                        "count-in measures",
                                        realIsAllowed=True)
         ValidityChecker.isNumberString(self._frameRate, "frame rate",
-                                       realIsAllowed=True, rangeKind=">0")
+                                       realIsAllowed=True, rangeKind=">=0")
         Assertion.check(len(self._measureToTempoMap) > 0,
                         "at least one tempo must be specified")
 
         self._countInMeasures = float(self._countInMeasures)
         self._frameRate       = float(self._frameRate)
 
-        MP4Video.checkParameters()
+        _NotationVideo.checkParameters()
         Logging.trace("<<: parameters okay")
 
     #--------------------
@@ -647,24 +720,27 @@ class LilypondPngVideoGenerator:
         Logging.trace(">>: %r", self)
 
         # set commands
-        MP4Video._ffmpegCommand = self._ffmpegCommand
+        _NotationVideo._ffmpegCommand = self._ffmpegCommand
 
         # intermediate file names or paths
-        MP4Video._concatSpecificationFileName   = \
+        _NotationVideo._concatSpecificationFileName   = \
             self._makePath("temp-concat.txt")
-        MP4Video._intermediateFileNameTemplate  = \
+        _NotationVideo._intermediateFileDirectoryPath = \
+            self._intermediateFileDirectoryPath
+        _NotationVideo._intermediateFileNameTemplate  = \
             self._makePath("temp%d.mp4")
-        MP4Video._pageFileNameTemplate = self._pictureFileStem + "-page%d.png"
+        _NotationVideo._pageFileNameTemplate = \
+            self._pictureFileStem + "-page%d.png"
 
         # technical parameters
-        MP4Video._frameRate         = self._frameRate
-        MP4Video._scaleFactor       = self._scaleFactor
-        MP4Video._ffmpegPresetName  = self._ffmpegPresetName
-        MP4Video._generatorLogLevel = _ffmpegLogLevel
+        _NotationVideo._frameRate         = self._frameRate
+        _NotationVideo._scalingFactor     = self._scalingFactor
+        _NotationVideo._ffmpegPresetName  = self._ffmpegPresetName
+        _NotationVideo._generatorLogLevel = _ffmpegLogLevel
 
         # file parameters
-        SubtitleFile.setName(self._targetSubtitleFileName)
-        MP4Video.setName(self._targetMp4FileName)
+        _SubtitleFile.setName(self._targetSubtitleFileName)
+        _NotationVideo.setName(self._targetVideoFileName)
 
         Logging.trace("<<")
 
@@ -688,6 +764,7 @@ class LilypondPngVideoGenerator:
         command = (self._lilypondCommand,
                    "-l", "WARNING",
                    "-dno-point-and-click",
+                   ("-danti-alias-factor=%d" % self._scalingFactor),
                    "--ps",
                    "--png",
                    "--output=" + self._pictureFileStem,
@@ -716,25 +793,26 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self,
                   lilypondFileName : String,
-                  targetMp4FileName : String,
+                  targetVideoFileName : String,
                   targetSubtitleFileName : String,
                   measureToTempoMap : Map,
                   countInMeasures : Natural,
                   frameRate : Real,
-                  scalingFactor : Real,
+                  scalingFactor : Natural,
                   ffmpegPresetName : String,
                   intermediateFileDirectoryPath : String,
                   intermediateFilesAreKept : Boolean = False):
         """Initializes generator"""
 
-        Logging.trace(">>: lilypondFileName = %r, targetMp4FileName = %r,"
+        Logging.trace(">>: lilypondFileName = %r,"
+                      + " targetVideoFileName = %r,"
                       + " targetSubtitleFileName = %r,"
                       + " measureToTempoMap = %r, countInMeasures = %r,"
                       + " frameRate = %r, scalingFactor = %d,"
                       + " ffmpegPresetName = %r,"
                       + " intermediateFileDirectoryPath = %r,"
                       + " intermediateFilesAreKept = %r",
-                      lilypondFileName, targetMp4FileName,
+                      lilypondFileName, targetVideoFileName,
                       targetSubtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
                       ffmpegPresetName, intermediateFileDirectoryPath,
@@ -748,15 +826,16 @@ class LilypondPngVideoGenerator:
         self._intermediateFileDirectoryPath  = intermediateFileDirectoryPath
         self._lilypondFileName               = lilypondFileName
         self._pictureFileStem                = self._makePath("temp_frame")
-        self._postscriptFileName             = self._pictureFileStem + ".ps"
-        self._targetMp4FileName              = targetMp4FileName
+        self._postscriptFileName             = (self._pictureFileStem
+                                                + ".ps")
+        self._targetVideoFileName            = targetVideoFileName
         self._targetSubtitleFileName         = targetSubtitleFileName
         self._measureToTempoMap              = measureToTempoMap
 
         # video parameters
         self._countInMeasures                = countInMeasures
         self._frameRate                      = frameRate
-        self._scaleFactor                    = scalingFactor
+        self._scalingFactor                  = scalingFactor
         self._ffmpegPresetName               = ffmpegPresetName
 
         # -- initialize other modules
@@ -775,7 +854,7 @@ class LilypondPngVideoGenerator:
         className = self.__class__.__name__
         result = (("%s(ffmpegCommand = %r, lilypondCommand = %r,"
                    + " lilypondFileName = %r, pictureFileStem = %r,"
-                   + " postscriptFileName = %r, targetMp4FileName = %r,"
+                   + " postscriptFileName = %r, targetVideoFileName = %r,"
                    + " targetSubtitleFileName = %r,"
                    + " measureToTempoMap = %r, countInMeasures = %r,"
                    + " frameRate = %r, scaleFactor = %r,"
@@ -784,10 +863,10 @@ class LilypondPngVideoGenerator:
                    + " intermediateFilesAreKept = %r)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
-                   self._postscriptFileName, self._targetMp4FileName,
+                   self._postscriptFileName, self._targetVideoFileName,
                    self._targetSubtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
-                   self._scaleFactor, self._ffmpegPresetName,
+                   self._scalingFactor, self._ffmpegPresetName,
                    self._intermediateFileDirectoryPath,
                    self._intermediateFilesAreKept))
         return result
@@ -801,8 +880,8 @@ class LilypondPngVideoGenerator:
 
         filesAreKept = self._intermediateFilesAreKept
         OperatingSystem.removeFile(self._postscriptFileName, filesAreKept)
-        MP4Video.cleanUpConditionally(filesAreKept)
-        SubtitleFile.cleanUpConditionally(filesAreKept)
+        _NotationVideo.cleanUpConditionally(filesAreKept)
+        _SubtitleFile.cleanUpConditionally(filesAreKept)
 
         Logging.trace("<<")
 
@@ -813,33 +892,46 @@ class LilypondPngVideoGenerator:
 
         Logging.trace(">>: %r", self)
 
+        cls = self.__class__
+
         try:
             self._processLilypondFile()
 
             # parse postscript file for mapping from page to first
             # measure
-            PostscriptFile.setName(self._postscriptFileName)
-            pageToMeasureMap = PostscriptFile.pageToMeasureMap()
+            _PostscriptFile.setName(self._postscriptFileName)
+            pageToMeasureMap = _PostscriptFile.pageToMeasureMap()
 
             lastMeasureNumber = max(pageToMeasureMap.values())
             Logging.trace("--: lastMeasureNumber = %d ", lastMeasureNumber)
 
-            # generate ffmpeg command fragment from frame rate, page
-            # to measure map and measure to tempo map
             measureToDurationMap = \
-                DurationManager.measureToDurationMap(self._measureToTempoMap,
-                                                     self._countInMeasures,
-                                                     lastMeasureNumber)
-            pageDurationList = \
-                DurationManager.pageDurationList(pageToMeasureMap,
-                                                 measureToDurationMap)
-            DurationManager.quantizeDurationList(pageDurationList,
-                                                 self._frameRate)
-            MP4Video.make(pageDurationList)
+                _DurationManager.measureToDurationMap(self._measureToTempoMap,
+                                                      self._countInMeasures,
+                                                      lastMeasureNumber)
 
             # generate subtitle file (if specified)
-            if SubtitleFile.fileName:
-                SubtitleFile.make(measureToDurationMap, self._countInMeasures)
+            if _SubtitleFile.fileName:
+                _SubtitleFile.make(measureToDurationMap,
+                                   self._countInMeasures,
+                                   _SubtitleFile.fileName)
+
+            isTarArchive = self._targetVideoFileName.endswith(".tar")
+
+            if isTarArchive:
+                _NotationVideo.makeTARFile(pageToMeasureMap,
+                                           measureToDurationMap,
+                                           self._countInMeasures)
+            else:
+                # generate MP4 video file via ffmpeg command fragment using
+                # frame rate, page to measure map and measure to tempo map
+                pageDurationList = \
+                    _DurationManager.pageDurationList(pageToMeasureMap,
+                                                      measureToDurationMap)
+                _DurationManager.quantizeDurationList(pageDurationList,
+                                                      self._frameRate)
+                _NotationVideo.makeMP4File(pageDurationList)
+
 
         except RuntimeError as exception:
             Logging.trace("--: exception %s", exception.args[0])

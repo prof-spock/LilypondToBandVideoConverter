@@ -3,8 +3,8 @@
 #                        across modules:
 #
 #                          - AudioTrack
+#                          - MidiTrackSettings
 #                          - TempoTrack
-#                          - TrackSettings
 #                          - VideoFileKind
 #                          - VideoTarget
 #                          - VoiceDescriptor
@@ -22,16 +22,39 @@ from basemodules.datatypesupport import AbstractDataType, \
                                         SETATTR
 from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Integer, \
-                                    Map, Object, Real, \
+                                    Map, Object, Real, RealList, \
                                     String, StringList, StringMap
-from basemodules.stringutil import convertStringToList, convertStringToMap, \
+from basemodules.stringutil import deserializeToList, deserializeToMap, \
                                    tokenize
-from basemodules.ttbase import adaptToRange, iif2
+from basemodules.ttbase import adaptToRange, iif, iif2
 from basemodules.validitychecker import ValidityChecker
 
 #====================
 # PRIVATE FEATURES
 #====================
+
+def _adaptMixSettingsMap (inputMap : StringMap) -> StringMap:
+    """Adapts map <inputMap> containing mix settings into a map from voice
+       name to pairs of volume and pan settings"""
+
+    Logging.trace(">>: %s", inputMap)
+
+    separator = "/"
+    result = {}
+
+    for voiceName, mixSettings in inputMap.items():
+        if separator not in mixSettings:
+            volume      = float(mixSettings)
+            panPosition = None
+        else:
+            firstPart, lastPart = mixSettings.split(separator)
+            volume = float(firstPart)
+            panPosition = panPositionStringToReal(lastPart)
+
+        result[voiceName] = (volume, panPosition)
+    
+    Logging.trace("<<: %s", result)
+    return result
 
 #====================
 # PUBLIC FEATURES
@@ -45,6 +68,26 @@ def humanReadableVoiceName (voiceName : String) -> String:
                   voiceName)
     return result
 
+#--------------------
+
+def panPositionStringToReal (st : String) -> Real:
+    """Converts <st> to pan position between -1 and 1 assuming string is
+       correctly formatted"""
+
+    Logging.trace(">>: %r", st)
+
+    st = st.upper()
+
+    if st == "C":
+        result = 0
+    else:
+        suffix = st[-1]
+        value = float(st[0:-1])
+        result = iif(suffix == "L", -value, value)
+    
+    Logging.trace("<<: %r", result)
+    return result
+
 #====================
 
 @dataclass(frozen=True)
@@ -52,23 +95,20 @@ class AudioTrack (AbstractDataType):
     """Represents information about the audio tracks combining audio
        groups together with all their properties."""
 
-    name                     : String     = "XXX"
+    name                     : String     = ""
     audioGroupList           : StringList = \
                                    specialField((),
                                                 (lambda st:
-                                                 convertStringToList(st,
-                                                                     "/")))
+                                                 deserializeToList(st,
+                                                                   "/")))
     audioFileTemplate        : String     = "$"
     songNameTemplate         : String     = "$"
     albumName                : String     = "[ALBUM NAME]"
-    description              : String     = "XXX"
+    description              : String     = ""
     languageCode             : String     = "eng"
-    voiceNameToAudioLevelMap : StringMap  = \
+    voiceNameToMixSettingMap : StringMap  = \
                                    specialField(None,
-                                                (lambda map:
-                                                 { key : float(value)
-                                                   for (key, value)
-                                                   in map.items() }))
+                                                _adaptMixSettingsMap)
     masteringEffectList      : StringList = specialField((), tokenize)
     amplificationLevel       : Real       = 0.0
     
@@ -134,7 +174,7 @@ class TempoTrack:
 #====================
 
 @dataclass(frozen=True)
-class TrackSettings (AbstractDataType):
+class MidiTrackSettings (AbstractDataType):
     """Represents the settings of a MIDI track"""
 
     voiceName          : String
@@ -142,8 +182,8 @@ class TrackSettings (AbstractDataType):
     midiInstrumentBank : Integer
     midiInstrument     : Integer
     midiVolume         : Integer
-    panPosition        : Integer
-    reverbLevel        : Integer
+    midiPanPosition    : Integer
+    midiReverbLevel    : Integer
     
     #--------------------    
 
@@ -159,8 +199,8 @@ class TrackSettings (AbstractDataType):
         rangeAdjustProc("midiInstrumentBank", 127)
         rangeAdjustProc("midiInstrument", 127)
         rangeAdjustProc("midiVolume", 127)
-        rangeAdjustProc("panPosition", 127)
-        rangeAdjustProc("reverbLevel", 127)
+        rangeAdjustProc("midiPanPosition", 127)
+        rangeAdjustProc("midiReverbLevel", 127)
 
 #====================
 
@@ -174,7 +214,7 @@ class VideoFileKind (AbstractDataType):
     fileNameSuffix : String     = ""
     directoryPath  : String     = ""
     voiceNameList  : StringList = specialField((),
-                                               convertStringToList)
+                                               deserializeToList)
 
 #====================
 
@@ -208,6 +248,6 @@ class VoiceDescriptor (AbstractDataType):
     midiChannel    : Integer = 0
     midiInstrument : Integer = 0
     midiVolume     : Integer = 0
-    panPosition    : Integer = 0
-    reverbLevel    : Integer = 0
+    panPosition    : Real    = 0  # in range -1 to +1
+    reverbLevel    : Real    = 0  # in range 0 to 1
     soundVariant   : String  = ""

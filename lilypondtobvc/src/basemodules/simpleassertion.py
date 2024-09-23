@@ -4,11 +4,14 @@
 
 #====================
 
-import os.path
 import sys
 
-from .simplelogging import Logging
-from .simpletypes import Boolean, String
+from basemodules.simplelogging import Logging
+from basemodules.simpletypes import Boolean, String
+from basemodules.ttbase import isStdPython
+
+if isStdPython:
+    import os.path
 
 #====================
 
@@ -29,13 +32,14 @@ class Assertion:
                         errorMessage : String):
         """Checks whether <condition> holds, otherwise exits with
            <errorMessage> containing <checkKind>."""
-        
+
         if cls.isActive:
             if not condition:
-                Logging.trace("--: %s FAILED - %s", checkKind, errorMessage)
-                programName = os.path.basename(sys.argv[0])
+                Logging.traceError("%s FAILED - %s", checkKind, errorMessage)
+                programName = ("PROGRAM" if not isStdPython
+                               else os.path.basename(sys.argv[0]))
                 sys.exit(programName + ": ERROR - " + errorMessage)
-    
+
     #--------------------
     # EXPORTED FEATURES
     #--------------------
@@ -70,4 +74,3 @@ class Assertion:
            <errorMessage> on failure."""
 
         cls._internalCheck(condition, "PRECONDITION", errorMessage)
-

@@ -142,7 +142,7 @@
 
   \newcommand{\glossaryLink}[1]{\(\rightarrow\)\textit{#1}}
   \newcommand{\hyperlink}[1]{\textsf{\small \color{blue}#1}}
-  \newcommand{\ltbvc}{Lilypond\-To\-Band\-Video\-Converter}
+  \newcommand{\ltbvc}{\textsl{Lilypond\-To\-Band\-Video\-Converter}}
   \newcommand{\ltbvcCommand}{lilypondToBVC}
   \newcommand{\ltbvcVersion}{1.1.1}
   \newcommand{\macro}[1]{\textbackslash #1}
@@ -2744,6 +2744,37 @@ subtitle file and file with mapping from measures to image names.  Its
 target must have a \embeddedCode{frameRate} of zero, because this
 should not occur for real videos.
 
+So the video target definition for such files might be
+\begin{configurationFileCode}
+  videoTargetMap = "{"
+      ...
+      "other: { resolution: 120,"
+              " height: 720,"
+              " width:  960,"
+              " topBottomMargin: 3,"
+              " leftRightMargin: 5,"
+              " frameRate: 0.0,"
+              " systemSize: 25 }"
+      ...
+  "}"
+\end{configurationFileCode}
+
+And the video file kind map might have entries like
+\begin{configurationFileCode}
+  videoFileKindMap = "{"
+    ...
+    "tarVocGtr: { target: other,"
+                " directoryPath:  '/temp/vocalsGuitar',"
+                " fileNameSuffix: '-vocGtr',"
+                " voiceNameList:  'vocals, guitar' },"
+    "tarBass:   { target: other,"
+                " directoryPath:  '/temp/bass',"
+                " fileNameSuffix: '-bs',"
+                " voiceNameList:  'bass' },"
+    ...
+  "}"
+\end{configurationFileCode}
+
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \subsection{Postprocessing Phases}
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4101,8 +4132,7 @@ planned for future versions:
         providing the location of those breaks programmatically.  Some
         better solution must be found.
 
-  \item Currently the humanization algorithm can only cope with a
-        single time signature for the complete song and uses the same
+  \item Currently the humanization algorithm only uses the same
         (measure-specific) humanization pattern for all voices.
         Similarly to the sound variants a map should be used from
         measure and voice to the humanization pattern.

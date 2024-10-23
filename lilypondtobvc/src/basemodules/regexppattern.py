@@ -226,4 +226,4 @@ class RegExpPattern:
         """Constructs regular expression from <pattern> with leading
            whitespace and trailing end-of-string"""
 
-        return re.compile("^\s*%s\s*$" % pattern)
+        return re.compile(r"^\s*%s\s*$" % pattern)

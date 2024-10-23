@@ -25,7 +25,8 @@ from basemodules.validitychecker import ValidityChecker
 from .audiotrackmanager import AudioTrackManager
 from .lilypondfilegenerator import LilypondFile
 from .lilypondpngvideogenerator import LilypondPngVideoGenerator
-from .ltbvc_businesstypes import MidiTrackSettings
+from .ltbvc_businesstypes import MidiTrackSettings, VideoFileKind, \
+                                 VideoTarget
 from .ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from .miditransformer import MidiTransformer
 from .videoaudiocombiner import VideoAudioCombiner
@@ -360,6 +361,181 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
+    def _processSingleFinalVideoFile (cls,
+                                      videoTarget : VideoTarget,
+                                      videoFileKindName : String,
+                                      videoFileExtension : String,
+                                      voiceNameList : StringList,
+                                      silentVideoFilePath : String,
+                                      tempMp4FilePath : String,
+                                      tempSubtitleFilePath : String,
+                                      targetVideoFilePath : String):
+        """Generates final video from silent video, audio tracks and
+           subtitle files for given <videoTarget>;
+           <videoFileExtension> gives the extension of the video file
+           generated, <voiceNameList> gives the list of affected
+           voices, <silentVideoFilePath> the path of the silent video
+           source, <tempMp4FilePath> the path for a generated
+           temporary MP4 video, <tempSubtitleFilePath> the path of the
+           subtitle file and <targetVideoFilePath> the path for the
+           target files"""
+
+        Logging.trace(">>: videoTarget = %s,"
+                      + " videoFileExtension = '%s',"
+                      + " silentVideoFilePath = '%s',"
+                      + " voiceNameList = %r,"
+                      + " tempMp4FilePath = '%s',"
+                      + " tempSubtitleFilePath = '%s',"
+                      + " targetVideoFilePath = '%s'",
+                      videoTarget, videoFileExtension,
+                      silentVideoFilePath, voiceNameList,
+                      tempMp4FilePath, tempSubtitleFilePath,
+                      targetVideoFilePath)
+
+        if videoFileExtension == "tar":
+            if not OperatingSystem.hasFile(silentVideoFilePath):
+                Logging.trace("cannot copy file %s", silentVideoFilePath)
+                message = ("ERR: cannot find %s" % silentVideoFilePath)
+            else:
+                OperatingSystem.copyFile(silentVideoFilePath,
+                                         targetVideoFilePath)
+                message = ("=== copying final video for %s"
+                           % videoFileKindName)
+
+            OperatingSystem.showMessageOnConsole(message)
+        else:
+            configData = cls._configData
+
+            if not videoTarget.subtitlesAreHardcoded:
+                videoFilePath = silentVideoFilePath
+                effectiveSubtitleFilePath = tempSubtitleFilePath
+            else:
+                videoFilePath = tempMp4FilePath
+                effectiveSubtitleFilePath = ""
+                VideoAudioCombiner.insertHardSubtitles( \
+                                    silentVideoFilePath,
+                                    tempSubtitleFilePath,
+                                    videoFilePath,
+                                    configData.shiftOffset,
+                                    videoTarget.subtitleColor,
+                                    videoTarget.subtitleFontSize,
+                                    videoTarget.ffmpegPresetName)
+
+            trackDataList = \
+               AudioTrackManager \
+               .constructSettingsForAudioTracks(configData)
+
+            VideoAudioCombiner.combine(voiceNameList,
+                                       trackDataList,
+                                       videoFilePath,
+                                       targetVideoFilePath,
+                                       effectiveSubtitleFilePath)
+
+            mediaType = "TV Show"
+            VideoAudioCombiner.tagVideoFile( \
+                                    targetVideoFilePath,
+                                    configData.albumName,
+                                    configData.artistName,
+                                    configData.albumArtFilePath,
+                                    configData.title,
+                                    mediaType,
+                                    configData.songYear)
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
+    def _processSingleSilentVideoFile(cls,
+                                      videoTarget : VideoTarget,
+                                      videoFileKind : VideoFileKind,
+                                      voiceNameList : StringList,
+                                      tempLilypondFilePath : String,
+                                      targetDirectoryPath : String):
+        """Generates silent video from lilypond notation pages for
+           given <videoTarget> and <videoFileKind>; <voiceNameList>
+           gives the list of affected voices, <tempLilypondFilePath>
+           the path for the generated lilypond file and
+           <targetDirectoryPath> the target path for the silent video
+           file"""
+
+        Logging.trace(">>: videoTarget = %s,"
+                      + " videoFileKind = %s,"
+                      + " voiceNameList = %r,"
+                      + " tempLilypondFilePath = '%s',"
+                      + " targetDirectoryPath = '%s'",
+                      videoTarget, videoFileKind, voiceNameList,
+                      tempLilypondFilePath, targetDirectoryPath)
+                                                      
+        configData = cls._configData
+        targetSubtitleFileName = (targetDirectoryPath
+                                  + cls._pathSeparator
+                                  + (_subtitleFileNameTemplate
+                                     % configData.fileNamePrefix))
+        
+        intermediateFilesAreKept = configData.intermediateFilesAreKept
+        intermediateFileDirectoryPath = \
+            configData.intermediateFileDirectoryPath
+        mmPerInch = 25.4
+        factor = mmPerInch / videoTarget.resolution
+        videoWidth  = videoTarget.width  * factor
+        videoHeight = videoTarget.height * factor
+        videoLineWidth = \
+            videoWidth - 2 * videoTarget.leftRightMargin
+
+        lilypondFile = LilypondFile(tempLilypondFilePath)
+        lilypondFile.setVideoParameters(videoTarget.name,
+                                        videoTarget.resolution,
+                                        videoTarget.systemSize,
+                                        videoTarget.topBottomMargin,
+                                        videoWidth, videoHeight,
+                                        videoLineWidth)
+
+        lilypondFile.generate(configData.includeFilePath,
+                      configData.lilypondVersion, "video",
+                      voiceNameList,
+                      configData.title,
+                      configData.songComposerText,
+                      configData.voiceNameToChordsMap,
+                      configData.voiceNameToLyricsMap,
+                      configData.voiceNameToScoreNameMap,
+                      configData.measureToTempoMap,
+                      configData.phaseAndVoiceNameToClefMap,
+                      configData.phaseAndVoiceNameToStaffListMap)
+
+        frameRate = videoTarget.frameRate
+        videoFileExtension = cls._videoFileExtension(frameRate)
+
+        targetVideoFileName = (targetDirectoryPath
+                             + cls._pathSeparator
+                             + (_silentVideoFileNameTemplate
+                                % (configData.fileNamePrefix,
+                                   videoFileKind.fileNameSuffix,
+                                   videoFileExtension)))
+        videoGenerator = \
+            LilypondPngVideoGenerator(tempLilypondFilePath,
+                                      targetVideoFileName,
+                                      targetSubtitleFileName,
+                                      configData.measureToTempoMap,
+                                      configData.countInMeasureCount,
+                                      frameRate,
+                                      videoTarget.scalingFactor,
+                                      videoTarget.ffmpegPresetName,
+                                      intermediateFileDirectoryPath,
+                                      intermediateFilesAreKept)
+
+        videoGenerator.process()
+        videoGenerator.cleanup()
+
+        ##OperatingSystem.moveFile(targetVideoFileName,
+        ##                         configData.targetDirectoryPath)
+        ##OperatingSystem.moveFile(targetSubtitleFileName,
+        ##                         configData.targetDirectoryPath)
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
     def _stringToMidiInstrument(cls,
                                 st : String) -> Tuple:
         """Converts <st> to midi instrument bank plus instrument based on
@@ -463,78 +639,50 @@ class _LilypondProcessor:
 
         for videoFileKindName, videoFileKind \
             in configData.videoFileKindMap.items():
-            videoTargetName = videoFileKind.target
+            # only use the actual voices in song
+            voiceNameList = [ voiceName
+                              for voiceName in videoFileKind.voiceNameList
+                              if voiceName in configData.voiceNameList ]
 
-            if videoTargetName not in configData.videoTargetMap:
-                Logging.traceError("unknown video target %s for file"
-                                   + " kind %s",
-                                   videoTargetName, videoFileKindName)
+            if len(voiceNameList) == 0:
+                Logging.trace("--: no voices found for %s", videoFileKind)
             else:
-                videoTarget = configData.videoTargetMap[videoTargetName]
-                frameRate = videoTarget.frameRate
-                videoFileExtension = cls._videoFileExtension(frameRate)
+                videoTargetName = videoFileKind.target
 
-                silentVideoFilePath = (("%s/" + _silentVideoFileNameTemplate)
-                                       % (configData.targetDirectoryPath,
-                                          configData.fileNamePrefix,
-                                          videoFileKind.fileNameSuffix,
-                                          videoFileExtension))
-                targetDirectoryPath = videoFileKind.directoryPath
-                ValidityChecker.isDirectory(targetDirectoryPath,
-                                            "video target directory")
-                targetVideoFilePath = ("%s/%s%s%s.%s"
-                                       % (targetDirectoryPath,
-                                          configData.targetFileNamePrefix,
-                                          configData.fileNamePrefix,
-                                          videoFileKind.fileNameSuffix,
-                                          videoFileExtension))
-
-                if videoFileExtension == "tar":
-                    if not OperatingSystem.hasFile(silentVideoFilePath):
-                        Logging.trace("cannot copy file %s",
-                                      silentVideoFilePath)
-                        message = ("ERR: cannot find %s"
-                                   % silentVideoFilePath)
-                    else:
-                        OperatingSystem.copyFile(silentVideoFilePath,
-                                                 targetVideoFilePath)
-                        message = ("=== copying final video for %s"
-                                   % videoFileKindName)
-
-                    OperatingSystem.showMessageOnConsole(message)
+                if videoTargetName not in configData.videoTargetMap:
+                    Logging.traceError("unknown video target %s for file"
+                                       + " kind %s",
+                                       videoTargetName, videoFileKindName)
                 else:
-                    if not videoTarget.subtitlesAreHardcoded:
-                        videoFilePath = silentVideoFilePath
-                        effectiveSubtitleFilePath = tempSubtitleFilePath
-                    else:
-                        videoFilePath = tempMp4FilePath
-                        effectiveSubtitleFilePath = ""
-                        VideoAudioCombiner.insertHardSubtitles( \
-                                                silentVideoFilePath,
-                                                tempSubtitleFilePath,
-                                                videoFilePath,
-                                                configData.shiftOffset,
-                                                videoTarget.subtitleColor,
-                                                videoTarget.subtitleFontSize,
-                                                videoTarget.ffmpegPresetName)
+                    videoTarget = configData.videoTargetMap[videoTargetName]
+                    frameRate = videoTarget.frameRate
+                    videoFileExtension = cls._videoFileExtension(frameRate)
 
-                    trackDataList = \
-                       AudioTrackManager \
-                       .constructSettingsForAudioTracks(configData)
+                    silentVideoFilePath = \
+                        (("%s/" + _silentVideoFileNameTemplate)
+                         % (configData.targetDirectoryPath,
+                            configData.fileNamePrefix,
+                            videoFileKind.fileNameSuffix,
+                            videoFileExtension))
+                    targetDirectoryPath = videoFileKind.directoryPath
+                    ValidityChecker.isDirectory(targetDirectoryPath,
+                                                "video target directory")
+                    targetVideoFilePath = \
+                        ("%s/%s%s%s.%s"
+                         % (targetDirectoryPath,
+                            configData.targetFileNamePrefix,
+                            configData.fileNamePrefix,
+                            videoFileKind.fileNameSuffix,
+                            videoFileExtension))
 
-                    VideoAudioCombiner.combine(videoFileKind.voiceNameList,
-                                               trackDataList, videoFilePath,
-                                               targetVideoFilePath,
-                                               effectiveSubtitleFilePath)
-
-                    mediaType = "TV Show"
-                    VideoAudioCombiner.tagVideoFile(targetVideoFilePath,
-                                                    configData.albumName,
-                                                    configData.artistName,
-                                                    configData.albumArtFilePath,
-                                                    configData.title,
-                                                    mediaType,
-                                                    configData.songYear)
+                    cls._processSingleFinalVideoFile(videoTarget,
+                                                     videoFileKindName,
+                                                     videoFileExtension,
+                                                     voiceNameList,
+                                                     silentVideoFilePath,
+                                                     tempMp4FilePath,
+                                                     tempSubtitleFilePath,
+                                                     targetVideoFilePath)
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         OperatingSystem.removeFile(tempSubtitleFilePath,
@@ -705,90 +853,41 @@ class _LilypondProcessor:
 
         Logging.trace(">>")
 
-        mmPerInch = 25.4
         configData = cls._configData
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         intermediateFileDirectoryPath = \
             configData.intermediateFileDirectoryPath
         targetDirectoryPath = configData.targetDirectoryPath
-        targetSubtitleFileName = (targetDirectoryPath
-                                  + cls._pathSeparator
-                                  + (_subtitleFileNameTemplate
-                                     % configData.fileNamePrefix))
         tempLilypondFilePath = cls._adaptTempFileName("silentvideo", [])
 
         for _, videoFileKind in configData.videoFileKindMap.items():
-            message = ("== generating silent video for %s"
-                       % videoFileKind.name)
-            OperatingSystem.showMessageOnConsole(message)
-            videoTargetName = videoFileKind.target
+            # only use the actual voices in song
+            voiceNameList = [ voiceName
+                              for voiceName in videoFileKind.voiceNameList
+                              if voiceName in configData.voiceNameList ]
 
-            if videoTargetName not in configData.videoTargetMap:
-                Logging.traceError("unknown video target %s for"
-                                   + " file kind %s",
-                                   videoTargetName, videoFileKind.name)
+            if len(voiceNameList) == 0:
+                Logging.trace("--: no voices found for %s", videoFileKind)
             else:
-                videoTarget = configData.videoTargetMap[videoTargetName]
-                factor = mmPerInch / videoTarget.resolution
-                videoWidth  = videoTarget.width  * factor
-                videoHeight = videoTarget.height * factor
-                videoLineWidth = videoWidth - 2 * videoTarget.leftRightMargin
-                lilypondFile = LilypondFile(tempLilypondFilePath)
-                lilypondFile.setVideoParameters(videoTarget.name,
-                                                videoTarget.resolution,
-                                                videoTarget.systemSize,
-                                                videoTarget.topBottomMargin,
-                                                videoWidth, videoHeight,
-                                                videoLineWidth)
+                message = ("== generating silent video for %s"
+                           % videoFileKind.name)
+                OperatingSystem.showMessageOnConsole(message)
+                videoTargetName = videoFileKind.target
 
-                # only use the actual voices in song
-                videoFileKind.voiceNameList
-                voiceNameList = [ voiceName
-                                  for voiceName in videoFileKind.voiceNameList
-                                  if voiceName in configData.voiceNameList ]
-                
-                lilypondFile.generate(configData.includeFilePath,
-                                  configData.lilypondVersion, "video",
-                                  voiceNameList,
-                                  configData.title,
-                                  configData.songComposerText,
-                                  configData.voiceNameToChordsMap,
-                                  configData.voiceNameToLyricsMap,
-                                  configData.voiceNameToScoreNameMap,
-                                  configData.measureToTempoMap,
-                                  configData.phaseAndVoiceNameToClefMap,
-                                  configData.phaseAndVoiceNameToStaffListMap)
-                
-                frameRate = videoTarget.frameRate
-                videoFileExtension = cls._videoFileExtension(frameRate)
-
-                targetVideoFileName = (targetDirectoryPath
-                                     + cls._pathSeparator
-                                     + (_silentVideoFileNameTemplate
-                                        % (configData.fileNamePrefix,
-                                           videoFileKind.fileNameSuffix,
-                                           videoFileExtension)))
-                videoGenerator = \
-                    LilypondPngVideoGenerator(tempLilypondFilePath,
-                                              targetVideoFileName,
-                                              targetSubtitleFileName,
-                                              configData.measureToTempoMap,
-                                              configData.countInMeasureCount,
-                                              frameRate,
-                                              videoTarget.scalingFactor,
-                                              videoTarget.ffmpegPresetName,
-                                              intermediateFileDirectoryPath,
-                                              intermediateFilesAreKept)
-                videoGenerator.process()
-                videoGenerator.cleanup()
-
-                ##OperatingSystem.moveFile(targetVideoFileName,
-                ##                         configData.targetDirectoryPath)
-                ##OperatingSystem.moveFile(targetSubtitleFileName,
-                ##                         configData.targetDirectoryPath)
+                if videoTargetName not in configData.videoTargetMap:
+                    Logging.traceError("unknown video target %s for"
+                                       + " file kind %s",
+                                       videoTargetName, videoFileKind.name)
+                else:
+                    videoTarget = configData.videoTargetMap[videoTargetName]
+                    cls._processSingleSilentVideoFile(videoTarget,
+                                                      videoFileKind,
+                                                      voiceNameList,
+                                                      tempLilypondFilePath,
+                                                      targetDirectoryPath)
 
         OperatingSystem.removeFile(tempLilypondFilePath,
-                                   intermediateFilesAreKept)
+                                   configData.intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -893,7 +992,7 @@ def main ():
 
     Logging.initialize()
     Logging.setLevel(Logging_Level.verbose)
-    Logging.setTracingWithTime(True, 2)
+    Logging.setTracingWithTime(True, 3)
     Logging.trace(">>")
 
     isOkay, processingPhaseSet = initialize()

@@ -94,7 +94,8 @@ class ConfigurationFile:
     _hexIntegerRegExp = re.compile(r"^0[xX][0-9A-Fa-f]+$")
     _keyValueRegExp = re.compile(r"^(\w+)\s*=\s*(.*)$")
     _whiteSpaceCharRegExp = re.compile(r"^\s$")
-    _identifierCharRegExp = re.compile(r"[A-Za-z0-9_]")
+    _identifierCharRegExp = re.compile(r"[A-Za-z_0-9]")
+    _identifierFirstCharRegExp = re.compile(r"[A-Za-z_]")
     _identifierLineRegExp = re.compile(r"\s*"
                                        + r"[A-Za-z_][A-Za-z0-9_]*"
                                        + r"\s*=")
@@ -211,7 +212,7 @@ class ConfigurationFile:
                          + "[%s] %s" % (parseStateToString[parseState], ch))
 
             if parseState == ParseState_inLimbo:
-                if cls._identifierCharRegExp.search(ch):
+                if cls._identifierFirstCharRegExp.search(ch):
                     identifier = ch
                     parseState = ParseState_inIdentifier
                 else:

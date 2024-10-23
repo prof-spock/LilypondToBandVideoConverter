@@ -6,7 +6,7 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # version and root directories for installation and sources
-installationVersion = "1.1"
+installationVersion = "1.1.1.post1"
 installationRootDirectory = "Lib/site-packages/lilypondToBVC"
 sourceRootDirectory = "lilypondtobvc/src"
 

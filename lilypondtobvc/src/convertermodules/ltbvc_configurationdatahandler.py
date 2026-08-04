@@ -30,7 +30,7 @@ from basemodules.ttbase import iif, isInRange
 from basemodules.validitychecker import ValidityChecker
 
 from .ltbvc_businesstypes import AudioTrack, VideoFileKind, \
-                                 VideoTarget, VoiceDescriptor, \
+                                 VideoDestination, VoiceDescriptor, \
                                  panPositionStringToReal
 
 # renamings
@@ -44,7 +44,7 @@ generateObjectMapFromString = DataTypeSupport.generateObjectMapFromString
 #--------------------------------------
 
 # the path of the directory where media files should be stored
-_defaultMediaTargetDirectoryPath = "./mediafiles"
+_defaultMediaDestinationDirectoryPath = "./mediafiles"
 
 # set of voices with chord symbols
 _melodicVoiceNameSet : StringSet = set(("bass", "keyboard", "guitar"))
@@ -148,17 +148,19 @@ class _DefaultValueHandler:
     # clefs used for the different voice names
     _phaseAndVoiceNameToClefMapDefaultString = \
         ("{"
-         + ", ".join([targetKind + " : " +
+         + ", ".join([destinationKind + " : " +
                       _voiceNameToClefMapString
-                      for targetKind in ["extract", "midi", "score", "video"]])
+                      for destinationKind in ["extract", "midi",
+                                              "score", "video"]])
          + "}")
 
     # default value for mapping from output kinds to staff mappings
     # used
     _phaseAndVoiceNameToStaffListMapDefaultString : String = \
         ("{ "
-         + ", ".join([targetKind + " : " + _voiceNameToStaffListMapString
-                      for targetKind in ["extract", "midi", "score", "video"]])
+         + ", ".join([destinationKind + " : " + _voiceNameToStaffListMapString
+                      for destinationKind in ["extract", "midi",
+                                              "score", "video"]])
          + " }")
 
     # default value for mapping from voice names to chords shown in
@@ -170,20 +172,20 @@ class _DefaultValueHandler:
                       for voiceName in _melodicVoiceNameSet])
          + " }")
 
-    # default value for the mapping from file kind to video target for
-    # a single target with the all voices
+    # default value for the mapping from file kind to video
+    # destination for a single destination with the all voices
     _videoFileKindMapDefaultString = \
         ("{ " \
          "tabletVocGtr: { target:         tablet,"
          +              " fileNameSuffix: '-tblt',"
          +             (" directoryPath:  '%s' ,"
-                        % _defaultMediaTargetDirectoryPath)
+                        % _defaultMediaDestinationDirectoryPath)
          +              " voiceNameList:  '' }"
          + " }")
 
-    # default value for the mapping of the video target: a single
-    # target with a 640x480 resolution
-    _videoTargetMapDefaultString : String = \
+    # default value for the mapping of the video destination: a single
+    # destination with a 640x480 resolution
+    _videoDestinationMapDefaultString : String = \
         ("{ "
          + "tablet: { resolution: 64,"
          +          " height: 480,"
@@ -251,6 +253,7 @@ class _DefaultValueHandler:
 
         # midi generation
         "humanizedVoiceNameSet"             : "",
+        "largeBankNumbersAreSupported"      : True,
         "measureToHumanizationStyleNameMap" : "{}",
         "midiChannelList"                   : "",
         "midiInstrumentList"                : "",
@@ -261,8 +264,8 @@ class _DefaultValueHandler:
 
         # audio file generation
         "audioGroupToVoicesMap"             : "{}",
-        "audioTargetDirectoryPath"          : \
-            _defaultMediaTargetDirectoryPath,
+        "audioDestinationDirectoryPath"          : \
+            _defaultMediaDestinationDirectoryPath,
         "audioTrackList"                    : "{}",
         "audioVoiceNameSet"                 : "",
         "parallelTrack"                     : ",0,0",
@@ -272,7 +275,7 @@ class _DefaultValueHandler:
         "voiceNameToOverrideFileNameMap"    : "{}",
 
         # video file generation
-        "videoTargetMap"                    : _videoTargetMapDefaultString,
+        "videoDestinationMap"                    : _videoDestinationMapDefaultString,
         "videoFileKindMap"                  : _videoFileKindMapDefaultString
     }
     
@@ -398,7 +401,7 @@ class _LocalValidator:
         # file paths
         cls._setMap("intermediateFileDirectoryPath", "WDIRECTORY")
         cls._setMap("loggingFilePath", "WFILE")
-        cls._setMap("targetDirectoryPath", "WDIRECTORY")
+        cls._setMap("destinationDirectoryPath", "WDIRECTORY")
         cls._setMap("tempLilypondFilePath", "WFILE")
 
         # song group properties
@@ -460,6 +463,7 @@ class _LocalValidator:
         cls._setMap("midiVolumeList", "REGEXP", integerListRegExp)
         cls._setMap("panPositionList", "REGEXP",
                     makeRegExp(makeListPat(r"C|\d+(\.\d+)[RL]", False)))
+        cls._setMap("largeBankNumbersAreSupported", "BOOLEAN")
         cls._setMap("voiceNameToVariationFactorMap", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           floatPattern + "/" + floatPattern)))
@@ -469,7 +473,7 @@ class _LocalValidator:
                     makeRegExp(makeMapPat(identifierPattern,
                                           makeCompactListPat(identifierPattern),
                                           False)))
-        cls._setMap("audioTargetDirectoryPath", "WDIRECTORY")
+        cls._setMap("audioDestinationDirectoryPath", "WDIRECTORY")
         cls._setMap("audioTrackList", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           AudioTrack.regexpPattern(),
@@ -486,9 +490,9 @@ class _LocalValidator:
                     makeRegExp(idToTextMapPattern))
 
         # video file generation
-        cls._setMap("videoTargetMap", "REGEXP",
+        cls._setMap("videoDestinationMap", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
-                                          VideoTarget.regexpPattern())))
+                                          VideoDestination.regexpPattern())))
         cls._setMap("videoFileKindMap", "REGEXP",
                     makeRegExp(makeMapPat(identifierPattern,
                                           VideoFileKind.regexpPattern())))
@@ -606,11 +610,13 @@ class _ConfigDataGlobal (AbstractDataType):
     _audioProcessorMapAliasName : ClassVar = "audioProcessor"
 
     _attributeNameList : ClassVar = \
-        [ "aacCommandLine", "ffmpegCommand", "intermediateFileDirectoryPath",
-          "lilypondCommand", "lilypondVersion", "loggingFilePath",
+        [ "aacCommandLine", "destinationDirectoryPath",
+          "ffmpegCommand", "intermediateFileDirectoryPath",
+          "largeBankNumbersAreSupported", "lilypondCommand",
+          "lilypondVersion", "loggingFilePath",
           "midiToWavRenderingCommandLine", "mp4boxCommand",
-          "targetDirectoryPath", "tempAudioDirectoryPath",
-          "tempLilypondFilePath", "videoTargetMap", "videoFileKindMap" ]
+          "tempAudioDirectoryPath", "tempLilypondFilePath",
+          "videoDestinationMap", "videoFileKindMap" ]
 
     _derivedAttributeNameList : ClassVar = [ "audioProcessorMap" ]
 
@@ -651,8 +657,10 @@ class _ConfigDataGlobal (AbstractDataType):
         specialField(None,
                      lambda st: _ConfigDataGlobal._makeAudioProcessorMap(st),
                      _audioProcessorMapAliasName)
+    destinationDirectoryPath      : String    = "."
     ffmpegCommand                 : String    = "ffmpeg"
     intermediateFileDirectoryPath : String    = "."
+    largeBankNumbersAreSupported  : Boolean   = True
     lilypondCommand               : String    = "lilypond"
     lilypondVersion               : String    = "2.18"
     loggingFilePath               : String    = \
@@ -661,14 +669,13 @@ class _ConfigDataGlobal (AbstractDataType):
     midiToWavRenderingCommandLine : String    = "fluidsynth"
     mp4boxCommand                 : String    = ""
     soundStyleNameToTextMap       : StringMap = ""
-    targetDirectoryPath           : String    = "."
     tempAudioDirectoryPath        : String    = "/tmp"
     tempLilypondFilePath          : String    = "./temp.ly"
-    videoTargetMap                : StringMap = \
+    videoDestinationMap           : StringMap = \
         specialField(None,
                      (lambda st :
                       generateObjectMapFromString(st,
-                                                  VideoTarget())))
+                                                  VideoDestination())))
     videoFileKindMap              : StringMap = \
         specialField(None,
                      (lambda st :
@@ -1125,19 +1132,19 @@ class _ConfigDataSong (AbstractDataType):
     #--------------------
 
     @classmethod
-    def _convertTargetMapping (cls,
+    def _convertDestinationMapping (cls,
                                mapAsString : String,
                                isLyricsMap : Boolean) -> StringMap:
         """Prepares a map from voice name to lyrics or chord data
            (depending on <isLyricsMap>) based on data in
            <mapAsString>; voice names for lyrics map to a mapping from
-           target to lyrics line count, voice names for chords map to
-           sets of targets"""
+           destination to lyrics line count, voice names for chords map to
+           sets of destinations"""
 
         Logging.trace(">>: map = %r, isLyrics = %r",
                       mapAsString, isLyricsMap)
 
-        targetAbbrevToNameMap = { "e": "extract", "m": "midi",
+        destinationAbbrevToNameMap = { "e": "extract", "m": "midi",
                                   "s": "score",   "v": "video" }
         currentMap = deserializeToMap(mapAsString)
 
@@ -1148,27 +1155,29 @@ class _ConfigDataSong (AbstractDataType):
 
             for voiceName, value in currentMap.items():
                 entry = iif(isLyricsMap, {}, set())
-                targetList = value.split("/")
-                Logging.trace("--: targetList(%r) = %r",
-                              voiceName, targetList)
+                destinationList = value.split("/")
+                Logging.trace("--: destinationList(%r) = %r",
+                              voiceName, destinationList)
 
-                for targetSpec in targetList:
-                    targetSpec = targetSpec.strip()
+                for destinationSpec in destinationList:
+                    destinationSpec = destinationSpec.strip()
 
-                    if len(targetSpec) > 0:
-                        target, rest = targetSpec[0], targetSpec[1:]
-                        Logging.trace("--: target = %r", target)
+                    if len(destinationSpec) > 0:
+                        destination, rest = \
+                            destinationSpec[0], destinationSpec[1:]
+                        Logging.trace("--: destination = %r", destination)
 
-                        if target in "emsv":
-                            target = targetAbbrevToNameMap[target]
+                        if destination in "emsv":
+                            destination = \
+                                destinationAbbrevToNameMap[destination]
 
                             if not isLyricsMap:
-                                entry.update([ target ])
+                                entry.update([ destination ])
                             else:
                                 if rest == "":
                                     rest = "1"
 
-                                entry[target] = int(rest)
+                                entry[destination] = int(rest)
 
                 result[voiceName] = entry
 
@@ -1291,11 +1300,11 @@ class _ConfigDataSong (AbstractDataType):
         specialField((), deserializeToList)
     voiceNameToChordsMap              : StringMap = \
         specialField(None,
-                     lambda st: _ConfigDataSong._convertTargetMapping(st,
+                     lambda st: _ConfigDataSong._convertDestinationMapping(st,
                                                                       False))
     voiceNameToLyricsMap              : StringMap = \
         specialField(None,
-                     lambda st: _ConfigDataSong._convertTargetMapping(st,
+                     lambda st: _ConfigDataSong._convertDestinationMapping(st,
                                                                       True))
     voiceNameToOverrideFileNameMap    : StringMap = \
         specialField(None, deserializeToMap)
@@ -1442,8 +1451,8 @@ class _ConfigDataSongGroup (AbstractDataType):
 
     _attributeNameList : ClassVar = [
         "albumArtFilePath", "albumName", "artistName",
-        "audioTargetDirectoryPath",
-        "targetFileNamePrefix"
+        "audioDestinationDirectoryPath",
+        "destinationFileNamePrefix"
     ]
 
     _derivedAttributeNameList : ClassVar = [
@@ -1469,13 +1478,13 @@ class _ConfigDataSongGroup (AbstractDataType):
                         for audioGroupName, voiceNames
                         in deserializeToMap(st).items() }),
                      "audioGroupToVoicesMap")
-    audioTargetDirectoryPath        : String = "."
+    audioDestinationDirectoryPath   : String = "."
     audioTrackNameToDataMap         : Map = \
         specialField((),
                      lambda st: generateObjectMapFromString(st,
                                                             AudioTrack()),
                      "audioTrackList")
-    targetFileNamePrefix            : String = ""
+    destinationFileNamePrefix       : String = ""
 
     #--------------------
     #--------------------
@@ -1589,7 +1598,7 @@ class LTBVC_ConfigurationData (_ConfigDataGlobal,
             "audioGroupNameToVoiceNameSetMap", "audioProcessorMap",
             "measureToHumanizationStyleNameMap", "measureToTempoMap",
             "phaseAndVoiceNameToClefMap", "phaseAndVoiceNameToStaffListMap",
-            "videoFileKindMap", "videoTargetMap", "voiceNameToChordsMap",
+            "videoDestinationMap", "videoFileKindMap", "voiceNameToChordsMap",
             "voiceNameToLyricsMap", "voiceNameToOverrideFileNameMap",
             "voiceNameToScoreNameMap", "voiceNameToVariationFactorMap" ]
 

@@ -4,7 +4,14 @@
 
 #====================
 
-import typing
+import sys
+
+isMicroPython = (sys.implementation.name == "micropython")
+
+if isMicroPython:
+    import basemodules.typing as typing
+else:
+    import typing
 
 #====================
 
@@ -26,26 +33,45 @@ String    = str
 
 # list types
 List        = typing.Sequence
-BitList     = List[Bit]
-ByteList    = List[Byte]
-IntegerList = List[Integer]
-NaturalList = List[Natural]
 ObjectList  = List
-RealList    = List[Real]
-StringList  = List[String]
 Tuple       = typing.Tuple
 Pair        = Tuple
-TupleList   = List[Tuple]
+
+if isMicroPython:
+    BitList     = List #List[Bit]
+    ByteList    = List #List[Byte]
+    IntegerList = List #List[Integer]
+    NaturalList = List #List[Natural]
+    RealList    = List #List[Real]
+    StringList  = List #List[String]
+    TupleList   = List #List[Tuple]
+else:
+    BitList     = List[Bit]
+    ByteList    = bytearray
+    IntegerList = List[Integer]
+    NaturalList = List[Natural]
+    RealList    = List[Real]
+    StringList  = List[String]
+    TupleList   = List[Tuple]
 
 # set types
 Set         = typing.Set
 ObjectSet   = Set
-StringSet   = Set[String]
+
+if isMicroPython:
+    StringSet   = Set #Set[String]
+else:
+    StringSet   = Set[String]
 
 # mapping types
 Map        = typing.Mapping
-Dictionary = Map[String, String]
-StringMap  = Map[String, Object]
+
+if isMicroPython:
+    Dictionary = Map #Map[String, String]
+    StringMap  = Map #Map[String, Object]
+else:
+    Dictionary = Map[String, String]
+    StringMap  = Map[String, Object]
 
 # function types
 Callable = typing.Callable

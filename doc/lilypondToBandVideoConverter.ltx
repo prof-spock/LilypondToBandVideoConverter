@@ -144,7 +144,7 @@
   \newcommand{\hyperlink}[1]{\textsf{\small \color{blue}#1}}
   \newcommand{\ltbvc}{\textsl{Lilypond\-To\-Band\-Video\-Converter}}
   \newcommand{\ltbvcCommand}{lilypondToBVC}
-  \newcommand{\ltbvcVersion}{1.1.1}
+  \newcommand{\ltbvcVersion}{1.2.1}
   \newcommand{\macro}[1]{\textbackslash #1}
   \newcommand{\mandatory}{\textbf{MANDATORY}}
   \newcommand{\meta}[1]{\guillemotleft #1\guillemotright}
@@ -362,7 +362,7 @@
   the refinement effects (\placeholder{effects})
 }
 
-\newcommand{\DESCaudioTargetDirectoryPath}{%
+\newcommand{\DESCaudioDestinationDirectoryPath}{%
   path for the final AAC audio files with subsets of rendered and
   refined audio tracks
 }
@@ -379,13 +379,13 @@
 }
 
 \newcommand{\DESCaudioTrackAudioFileTemplate}{%
-  template string defining how the audio file name of the target audio
-  file for given list of voices is constructed from the plain audio
+  template string defining how the file name of the audio file
+  for a given list of voices is constructed from the plain audio
   file name (indicated by a dollar-sign)
 }
 
 \newcommand{\DESCaudioTrackDescription}{%
-  description for audio track within target video (typically
+  description for audio track within destination video (typically
   unsupported by video players)
 }
 
@@ -395,7 +395,7 @@
 }
 
 \newcommand{\DESCaudioTrackLanguageCode}{%
-  ISO language code for audio track within target video (typically
+  ISO language code for audio track within destination video (typically
   supported by video players)
 }
 
@@ -477,6 +477,12 @@
 \newcommand{\DESChumanizedVoiceNameSet}{%
   set of voice names to be humanized by random variations of timing
   and velocity
+}
+
+\newcommand{\DESClargeBankNumbersAreSupported}{%
+  boolean telling whether large bank numbers can be processed by the
+  MIDI to audio renderer; if set, a bank number may be between 0 and
+  16383, otherwise the bank number must be less than 128
 }
 
 \newcommand{\DESClilypondCommand}{%
@@ -580,7 +586,7 @@
   refinement
 }
 
-\newcommand{\DESCtargetDirectoryPath}{%
+\newcommand{\DESCdestinationDirectoryPath}{%
   path of directory where all generated files go (except for audio and
   video files)
 }
@@ -595,7 +601,7 @@
 }
 
 \newcommand{\DESCtitle}{%
-  human visible title of song used as tag in the target audio file and
+  human visible title of song used as tag in the audio files and
   as header line in the notation files
 }
 
@@ -610,7 +616,7 @@
 
 \newcommand{\DESCvoiceNameToLyricsMap}{%
   mapping from voice name to a count of parallel lyrics lines directly
-  following the target letter (``e'' for the extract, ``s'' for the
+  following the phase kind letter (``e'' for the extract, ``s'' for the
   score and ``v'' for the video)
 }
 
@@ -623,17 +629,80 @@
   year of arrangement
 }
 
+\newcommand{\DESCvideoDestinationFFMpegPresetName}{%
+  a specific ffmpeg preset for the current video destination device
+  (a string; a missing value defaults to a baseline level 3 profile)
+}
+
+\newcommand{\DESCvideoDestinationFrameRate}{%
+  the frame rate of the video (in frames per second)
+}
+
+\newcommand{\DESCvideoDestinationMediaType}{%
+  the Quicktime media type of the video (for example "TV Show")
+}
+
+\newcommand{\DESCvideoDestinationHeight}{%
+  height of device and video (in dots)
+}
+
+\newcommand{\DESCvideoDestinationLeftRightMargin}{%
+  margin for video on left and right side (in millimeters)
+}
+
+\newcommand{\DESCvideoDestinationResolution}{%
+  resolution of the device (in dpi)
+}
+
+\newcommand{\DESCvideoDestinationScalingFactor}{%
+  the factor (an integer) by which width and height are multiplied for
+  lilypond image rendering to be later downscaled for a better edge
+  smoothing via antialiasing
+}
+
+\newcommand{\DESCvideoDestinationSubtitleColor}{%
+  color of overlayed subtitle in final video for measure display (as
+  integer for 16bit alpha/red/green/blue)
+}
+
+\newcommand{\DESCvideoDestinationSubtitlesAreHardcoded}{%
+  flag to tell whether subtitles are burnt into the video or are
+  available as a separate subtitle track
+}
+
+\newcommand{\DESCvideoDestinationSubtitleFontSize}{%
+  height of subtitle (in pixels)
+}
+
+\newcommand{\DESCvideoDestinationSystemSize}{%
+  size of lilypond system (in lilypond units, cf. lilypond system
+  size)
+}
+
+\newcommand{\DESCvideoDestinationTopBottomMargin}{%
+  margin for video on top and bottom (in millimeters)
+}
+
+\newcommand{\DESCvideoDestinationWidth}{%
+  width of device and video (in dots)
+}
+
+\newcommand{\DESCvideoDestinationMap}{%
+  mapping from video destination name to video destination descriptor
+  with several parameters for specific video file generation
+}
+
 \newcommand{\DESCvideoFileKindDirectoryPath}{%
-  directory where final videos for that target go
+  directory where final videos for that file kind go
 }
 
 \newcommand{\DESCvideoFileKindFileNameSuffix}{%
-  suffix to be used for the video file names for that target
+  suffix to be used for the video file names for that file kind
 }
 
-\newcommand{\DESCvideoFileKindTarget}{%
-  name of associated video target that is used when rendering video
-  files of that kind
+\newcommand{\DESCvideoFileKindDestination}{%
+  name of associated video destination that is used when rendering video
+  files of that phase
 }
 
 \newcommand{\DESCvideoFileKindVoiceNameList}{%
@@ -644,76 +713,13 @@
 \newcommand{\DESCvideoFileKindMap}{%
   mapping from video file kind name to video file kind descriptor with
   several parameters for specific video file generation referencing
-  a video target that gives overall video parameters
-}
-
-\newcommand{\DESCvideoTargetFFMpegPresetName}{%
-  a specific ffmpeg preset for the current video target device (a string,
-  a missing value defaults to a baseline level 3 profile)
-}
-
-\newcommand{\DESCvideoTargetFrameRate}{%
-  the frame rate of the video (in frames per second)
-}
-
-\newcommand{\DESCvideoTargetMediaType}{%
-  the Quicktime media type of the video (for example "TV Show")
-}
-
-\newcommand{\DESCvideoTargetHeight}{%
-  height of device and video (in dots)
-}
-
-\newcommand{\DESCvideoTargetLeftRightMargin}{%
-  margin for video on left and right side (in millimeters)
-}
-
-\newcommand{\DESCvideoTargetResolution}{%
-  resolution of the device (in dpi)
-}
-
-\newcommand{\DESCvideoTargetScalingFactor}{%
-  the factor (an integer) by which width and height are multiplied for
-  lilypond image rendering to be later downscaled for a better edge
-  smoothing via antialiasing
-}
-
-\newcommand{\DESCvideoTargetSubtitleColor}{%
-  color of overlayed subtitle in final video for measure display (as
-  integer for 16bit alpha/red/green/blue)
-}
-
-\newcommand{\DESCvideoTargetSubtitlesAreHardcoded}{%
-  flag to tell whether subtitles are burnt into the video or are
-  available as a separate subtitle track
-}
-
-\newcommand{\DESCvideoTargetSubtitleFontSize}{%
-  height of subtitle (in pixels)
-}
-
-\newcommand{\DESCvideoTargetSystemSize}{%
-  size of lilypond system (in lilypond units, cf. lilypond system
-  size)
-}
-
-\newcommand{\DESCvideoTargetTopBottomMargin}{%
-  margin for video on top and bottom (in millimeters)
-}
-
-\newcommand{\DESCvideoTargetWidth}{%
-  width of device and video (in dots)
-}
-
-\newcommand{\DESCvideoTargetMap}{%
-  mapping from video target name to video target descriptor with
-  several parameters for specific video file generation
+  a video destination that gives overall video parameters
 }
 
 \newcommand{\DESCvoiceNameToOverrideFileNameMap}{%
   map from voice name to name of file overriding that voice in the
   processed audio files and in the final mixdown audio files and in
-  the target videos
+  the destination videos
 }
 
 \newcommand{\DESCvoiceNameToVariationFactorMap}{%
@@ -758,9 +764,9 @@ music piece (a song) written in the lilypond notation to
         applied to achieve some humanization),
   \item audio mix files with several subsets of voices (specified
         by configuration), and
-  \item video files for several output targets visualizing the score
-        notation pages and having the mixes as mutually selectable
-        audio tracks as backing tracks.
+  \item video files for several output destinations visualizing the
+        score notation pages and having the mixes as mutually
+        selectable audio tracks as backing tracks.
 \end{itemize}
 
 The central aim is to finally have a video file with several audio
@@ -782,7 +788,7 @@ For processing a song one must have
         specific lilypond identifiers, and
 
   \item a configuration file giving details like the voices occuring
-        in the song, their associated midi instrument, target audio
+        in the song, their associated midi instrument, the audio
         volume, list of mutable voices for the audio tracks
         etc.
 
@@ -790,7 +796,7 @@ For processing a song one must have
 
 Based on those files the python script --~together with some
 open-source command-line software like ffmpeg~-- produces all the
-target files. This is done either incrementally or altogether
+destination files. This is done either incrementally or altogether
 depending on command-line settings for the script.
 
 In principle, all this could also be done with standard lilypond files
@@ -895,7 +901,7 @@ Additionally the following software must be available:
         \cite{reference:fluidSoundfontMuseScore}), and
 
   \item [sox:] for instrument-specific postprocessing of audio files
-        for the target mix files as well as the mixdown
+        for the audio mix files as well as the mixdown
         \cite{reference:soxDocumentation}
 \end{ttDescription}
 
@@ -1271,8 +1277,8 @@ lilypond file:
         for each voice given in the configuration file containing the
         musical expression to be used in an extract, in a score, in
         the midi file or in the video; here ``XXX'' depends on the
-        target, so you might have different macros for a voice for the
-        different targets it occurs in (extract, score, midi, video).
+        phase, so you might have different macros for a voice for the
+        different phases it occurs in (extract, score, midi, video).
 
 \end{ttDescription}
 
@@ -1352,8 +1358,8 @@ variable, the corresponding lilypond macro(s) and a short description.
 The dependency is not strict, because some default settings are
 applied, but in general the logic described in the figure is a good
 orientation.  Video voice names are not specified in a single
-variable, but via video target and video file kind definitions (see
-section~\ref{section:videoGeneration}).
+variable, but via video destination and video file kind definitions
+(see section~\ref{section:videoGeneration}).
 
 For example, assume we have three voices in the song called
 ``vocals'', ``drums'' and ``guitar''. We also assume that we shall
@@ -1408,15 +1414,15 @@ can be omitted.
 
 Because the software is used in a band context, chord symbols may also
 be used.  Chords may depend on voice and very often depend on the
-processing target, because the voice formatting may be different per
-target.
+processing phase, because the voice formatting may be different per
+phase.
 
 The configuration file variable responsible for chords is
 \embeddedCode{voiceNameToChordsMap} and tells where chords are shown
 and for which voices.
 
 All voices with chords are mentioned as keys and mapped onto a slash
-separated list of single character abbreviations for the targets.  We
+separated list of single character abbreviations for the phases.  We
 have ``e'' for the extract, ``s'' for the score and ``v'' for the
 video.  There are no chords for the midi file.
 
@@ -1460,7 +1466,7 @@ leading padding).
 
 The syntax is similar to chords, hence we have a
 \embeddedCode{voiceNameToLyricsMap}, but it also contains a count of
-parallel lyrics lines directly following the target letter (``e'' for
+parallel lyrics lines directly following the phase letter (``e'' for
 the extract, ``s'' for the score and ``v'' for the video).
 
 So for the configuration file line
@@ -1489,10 +1495,11 @@ following definitions in \embeddedCode{\macro{lyricmode}}:
 \end{lilypondFileCode}
 
 Again there is a default: when some lyrics macro is missing, the macro
-for the voice without the target (but with the appropriate suffix) is
-used.  So for example, for a missing \embeddedCode{vocalsLyricsScoreB}
-an existing \embeddedCode{vocalsLyricsB} is used.  Additionally for
-the first line the suffix may be totally omitted, so
+for the voice without the phase indication (but with the appropriate
+suffix) is used.  So for example, for a missing
+\embeddedCode{vocalsLyricsScoreB} an existing
+\embeddedCode{vocalsLyricsB} is used.  Additionally for the first line
+the suffix may be totally omitted, so
 \embeddedCode{vocalsLyricsScoreA} can be replaced by
 \embeddedCode{vocalsLyricsScore} or even \embeddedCode{vocalsLyrics}.
 
@@ -1609,6 +1616,10 @@ Two entries are special: \embeddedCode{aacCommandLine} and
                {\DESCffmpegCommand}
                {"/pathto/ffmpeg"}
 
+    \varDescriptionLong{largeBankNumbersAreSupported}
+               {\DESClargeBankNumbersAreSupported}
+               {true}
+
     \varDescriptionLong{lilypondCommand}
                {\DESClilypondCommand}
                {"/pathto/lilypond"}
@@ -1722,8 +1733,8 @@ prevent that, see chapter~\ref{section:debugging}).
                {\DESCloggingFilePath}
                {"/pathto/ltbvc.log"}
 
-    \varDescriptionLong{targetDirectoryPath}
-               {\DESCtargetDirectoryPath}
+    \varDescriptionLong{destinationDirectoryPath}
+               {\DESCdestinationDirectoryPath}
                {"generated"}
 
     \varDescriptionLong{tempAudioDirectoryPath}
@@ -1746,7 +1757,7 @@ configuration variables could look like that:
 \begin{configurationFileCode}
   intermediateFileDirectoryPath = "temp"
   loggingFilePath = "/var/logs/ltbvc.log"
-  targetDirectoryPath = "generated"
+  destinationDirectoryPath = "generated"
   tempAudioDirectoryPath = "~/ltbvc_audiofilesdir"
   tempLilypondFilePath = "temp\_\placeholder{phase}\_\placeholder{voiceName}.ly"
 \end{configurationFileCode}
@@ -1964,11 +1975,11 @@ auxiliary variable.
 The default is ``drums'' and ``percussion'' as ``DrumStaff'' in
 Lilypond, the rest uses ``Staff''.
 
-It is also allowed to have more than one staff as the target of a
-voice.  In that case the staff names are slash-separated and are
-filled from several voice macros in the lilypond fragment file.  For
-two systems the macros are \meta{voice}Top and \meta{voice}Bottom with
-the phase target name appended, for three systems we have
+It is also allowed to have more than one staff for a single voice.  In
+that case those staff names are slash-separated and have to be filled
+from several voice macros in the lilypond fragment file.  For two
+systems the macros are \meta{voice}Top and \meta{voice}Bottom with the
+phase destination name appended, for three systems we have
 \meta{voice}Top, \meta{voice}Middle and \meta{voice}Bottom.  For
 example, a keyboard with a piano staff in a score references the
 macros \embeddedCode{keyboardTopScore} and
@@ -2072,7 +2083,7 @@ generates an extract for each voice given in
 voices is undefined.
 
 As a result of this phase for each voice an extract pdf file is put
-into the directory given by \embeddedCode{targetDirectoryPath} with
+into the directory given by \embeddedCode{destinationDirectoryPath} with
 name \embeddedCode{fileNamePrefix}, a dash, the voice name and the
 extension ``.pdf''.
 
@@ -2116,7 +2127,7 @@ voices given in \embeddedCode{scoreVoiceNameList} in the order given
 by this variable and with default layout parameters.
 
 The score pdf file is put into the directory given by
-\embeddedCode{targetDirectoryPath} with name
+\embeddedCode{destinationDirectoryPath} with name
 \embeddedCode{fileNamePrefix} followed by ``\_score'' and the
 extension ``.pdf''.
 
@@ -2205,7 +2216,7 @@ The ``midi'' processing phase unfolds all repeats in the given voices
 and generates corresponding midi streams.  Those streams are generated
 only for those voices specified in the configuration variable
 \embeddedCode{midiVoiceNameList} and stored in a single file in the
-directory given by \embeddedCode{targetDirectoryPath} with name
+directory given by \embeddedCode{destinationDirectoryPath} with name
 \embeddedCode{fileNamePrefix} plus ``-std'' and extension ``.mid''.
 
 \begin{centeredFigure}
@@ -2494,91 +2505,91 @@ rendered images from lilypond in an intelligent fashion.
 with the rendered audio tracks.
 
 For the video rendering we need the characteristics of the video
-target, for example, the size and resolution of the device used.
+destination, for example, the size and resolution of the device used.
 Additionally there is data as the rendering directory or the suffix
 used for the video files.
 
 Because it might happen that several video renderings have similar
-video target properties, the information is split: a video rendering
-relies on a specific video target and gives details such as the
-directory where the video file goes or the names of the displayed
-voices.
+video destination properties, the information is split: a video
+rendering relies on a specific video destination and gives details
+such as the directory where the video file goes or the names of the
+displayed voices.
 
 \begin{centeredFigure}
   \begin{variableDescriptionTableShort}
 
     \varDescriptionShort{height}
-                        {\DESCvideoTargetHeight}
+                        {\DESCvideoDestinationHeight}
 
     \varDescriptionShort{width}
-                        {\DESCvideoTargetWidth}
+                        {\DESCvideoDestinationWidth}
 
     \varDescriptionShort{resolution}
-                        {\DESCvideoTargetResolution}
+                        {\DESCvideoDestinationResolution}
 
     \varDescriptionShort{topBottomMargin}
-                        {\DESCvideoTargetTopBottomMargin}
+                        {\DESCvideoDestinationTopBottomMargin}
 
     \varDescriptionShort{leftRightMargin}
-                        {\DESCvideoTargetLeftRightMargin}
+                        {\DESCvideoDestinationLeftRightMargin}
 
     \varDescriptionShort{systemSize}
-                        {\DESCvideoTargetSystemSize}
+                        {\DESCvideoDestinationSystemSize}
 
     \varDescriptionShort{scalingFactor}
-                        {\DESCvideoTargetScalingFactor}
+                        {\DESCvideoDestinationScalingFactor}
 
     \varDescriptionShort{frameRate}
-                        {\DESCvideoTargetFrameRate}
+                        {\DESCvideoDestinationFrameRate}
 
     \varDescriptionShort{ffmpegPresetName}
-                        {\DESCvideoTargetFFMpegPresetName}
+                        {\DESCvideoDestinationFFMpegPresetName}
 
     \varDescriptionShort{mediaType}
-                        {\DESCvideoTargetMediaType}
+                        {\DESCvideoDestinationMediaType}
 
     \varDescriptionShort{subtitleColor}
-                        {\DESCvideoTargetSubtitleColor}
+                        {\DESCvideoDestinationSubtitleColor}
 
     \varDescriptionShort{subtitleFontSize}
-                        {\DESCvideoTargetSubtitleFontSize}
+                        {\DESCvideoDestinationSubtitleFontSize}
 
     \varDescriptionShort{subtitlesAreHardcoded}
-                        {\DESCvideoTargetSubtitlesAreHardcoded}
+                        {\DESCvideoDestinationSubtitlesAreHardcoded}
   \end{variableDescriptionTableShort}
 
-  \caption{Parameters for Video Target in
-          \embeddedCode{videoTargetMap} Variable}
-  \label{figure:configFileVideoTargetVariables}
+  \caption{Parameters for Video Destination in
+          \embeddedCode{videoDestinationMap} Variable}
+  \label{figure:configFileVideoDestinationVariables}
 \end{centeredFigure}
 
 \begin{centeredFigure}
-  \centeredExternalPicture{1.5}{videoTargetDimensions.mps}
-  \caption{Target Parameters for Video Generation}
-  \label{figure:targetVideoVariables}
+  \centeredExternalPicture{1.5}{videoDestinationDimensions.mps}
+  \caption{Destination Parameters for Video Generation}
+  \label{figure:destinationVideoVariables}
 \end{centeredFigure}
 
 So we have two configuration file variables:
 \begin{itemize}
 
-  \item \embeddedCode{videoTargetMap} provides video device dependent
-        properties of notation videos, but also some device
+  \item \embeddedCode{videoDestinationMap} provides video device
+        dependent properties of notation videos, but also some device
         independent parameters (like, for example, the subtitle font
         size).
 
-        This variable is a map from ``target name'' to a target
-        descriptor.  A target descriptor is itself a map with the
-        several fields as shown in
-        figure~\ref{figure:configFileVideoTargetVariables}.  Some of
-        the variables like \embeddedCode{resolution},
+        This variable is a map from ``destination name'' to a
+        destination descriptor.  A destination descriptor is itself a
+        map with the several fields as shown in
+        figure~\ref{figure:configFileVideoDestinationVariables}.  Some
+        of the variables like \embeddedCode{resolution},
         \embeddedCode{height} or \embeddedCode{width} describe
         ``hardware'' parameters (because normally the video should
         have the appropriate size), others like
         \embeddedCode{topBottomMargin} the layout of the video.
 
-        Figure~\ref{figure:targetVideoVariables} shows how some of the
-        parameters for video generation are connected to the physical
-        output device and the video target in general.
+        Figure~\ref{figure:destinationVideoVariables} shows how some
+        of the parameters for video generation are connected to the
+        physical output device and the video destination in general.
 
   \item \embeddedCode{videoFileKindMap} provides further details on
         the rendering (like, for example, the list of voices to be
@@ -2588,7 +2599,7 @@ So we have two configuration file variables:
         video file kind descriptor.  A video file kind descriptor is
         itself a map with the several fields as shown in
         figure~\ref{figure:configFileVideoFileKindVariables}.  There
-        is information about the target file given by
+        is information about the destination file given by
         \embeddedCode{videoDirectoryPath} and
         \embeddedCode{fileNameSuffix} and the list of the voices in
         those video files.
@@ -2596,8 +2607,8 @@ So we have two configuration file variables:
         \begin{centeredFigure}
           \begin{variableDescriptionTableShort}
 
-            \varDescriptionShort{target}
-                                {\DESCvideoFileKindTarget}
+            \varDescriptionShort{destination}
+                                {\DESCvideoFileKindDestination}
 
             \varDescriptionShort{directoryPath}
                                 {\DESCvideoFileKindDirectoryPath}
@@ -2616,14 +2627,14 @@ So we have two configuration file variables:
         \end{centeredFigure}
 \end{itemize}
 
-So a video target definition for a single midrange tablet
+So a video destination definition for a single midrange tablet
 could look like this:
 \begin{configurationFileCode}
-  videoTargetMap =
+  videoDestinationMap =
     "{"
       " tablet:"
         " { fileNameSuffix:           '-i-v',"
-          " targetVideoDirectoryPath: '/pathto/tablet',"
+          " destinationVideoDirectoryPath: '/pathto/tablet',"
           " resolution:               132,"
           " height:                   1024,"
           " width:                    768,"
@@ -2640,7 +2651,7 @@ could look like this:
     "}"
 \end{configurationFileCode}
 
-The above defines a target called ``tablet'' having a video with
+The above defines a destination called ``tablet'' having a video with
 1024x768~pixels, a resolution of 132dpi, a margin of 5mm at top and
 bottom, a margin of 10mm left and right, slightly enlarged systems
 (lilypond standard system size is 20), a yellow semi-transparent
@@ -2653,20 +2664,20 @@ by the video renderer for better video image quality.  The quicktime
 media type is ``TV Show'' and subtitles in the final video are on a
 separate track.
 
-Based on the video target definition given above a video file kind
+Based on the video destination definition given above a video file kind
 definition could look like this:
 \begin{configurationFileCode}
   videoFileKindMap =
     "{"
       " tabletVocGtr:"
-        " { target:          tablet,"
+        " { destination:          tablet,"
           " fileNameSuffix:  '-i-v',"
           " directoryPath:   '/pathto/xyz',"
           " voiceNameList:   'vocals, guitar' }"
     "}"
 \end{configurationFileCode}
 
-The above defines a single file kind for output.  The target
+The above defines a single file kind for output.  The destination
 characteristics are those of a ``tablet'', those videos contain a
 score with vocals plus guitar and all the files have suffix '-i-v'
 (followed by '.mp4', of course).
@@ -2682,38 +2693,38 @@ name \embeddedCode{fileNamePrefix} plus "\_noaudio" and the
 specification and extension ``.mp4''.
 
 Additionally a subtitle file with all measure numbers is generated in
-the directory given by \embeddedCode{targetDirectoryPath} with name
-\embeddedCode{fileNamePrefix} plus "\_subtitle" and extension
+the directory given by \embeddedCode{destinationDirectoryPath} with
+name \embeddedCode{fileNamePrefix} plus "\_subtitle" and extension
 ``.srt''.
 
 This means that a song with file name prefix ``wonderful\_song'' and a
-target file name suffix ``-tablet'' leads to a silent video file of
-``wonderful\_song\_no\-audio-tablet.mp4'' and a subtitle file of
+destination file name suffix ``-tablet'' leads to a silent video file
+of ``wonderful\_song\_no\-audio-tablet.mp4'' and a subtitle file of
 ``wonderful\_song\_subtitle.srt''.  Note that the subtitle file is
-independent of the video target, because it only gives the time
+independent of the video destination, because it only gives the time
 intervals of each measure and those do not depend on the video.
 
 If you \emph{really} want to fiddle with the video generation, the
-video target name is provided as the lilypond macro
-\embeddedCode{ltbvcVideoTargetName} and has the values specified as
-keys in the list \embeddedCode{videoTargetMap}.  You can use this for
-conditional processing, video layout changes etc., because the file
-inclusion into the boilerplate file is done at a very late position.
-Be warned that the whole video generation might fail, because the
-generator assumes that it has to handle a simple-structured lilypond
-include file.
+video destination name is provided as the lilypond macro
+\embeddedCode{ltbvcVideoDestinationName} and has the values specified
+as keys in the list \embeddedCode{videoDestinationMap}.  You can use
+this for conditional processing, video layout changes etc., because
+the file inclusion into the boilerplate file is done at a very late
+position.  Be warned that the whole video generation might fail,
+because the generator assumes that it has to handle a
+simple-structured lilypond include file.
 
 There is only a single configuration file variable for video as shown
 in figure~\ref{figure:configFileVideoVariables} that defines all video
-targets that are used in the generation.
+destinations that are used in the generation.
 
 \begin{centeredFigure}
   \begin{variableDescriptionTableLong}
 
     \varDescriptionHeaderLong
 
-    \varDescriptionLong{videoTargetMap}
-                       {\DESCvideoTargetMap}
+    \varDescriptionLong{videoDestinationMap}
+                       {\DESCvideoDestinationMap}
                        {see text}
 
     \varDescriptionLong{videoFileKindMap}
@@ -2741,12 +2752,12 @@ still notation image pages, the subtitle data containing the measure
 timings and information at which measure some image is shown.  This is
 a non-standard video kind: it is simply a tar file with still images,
 subtitle file and file with mapping from measures to image names.  Its
-target must have a \embeddedCode{frameRate} of zero, because this
+destination must have a \embeddedCode{frameRate} of zero, because this
 should not occur for real videos.
 
-So the video target definition for such files might be
+So the video destination definition for such files might be
 \begin{configurationFileCode}
-  videoTargetMap = "{"
+  videoDestinationMap = "{"
       ...
       "other: { resolution: 120,"
               " height: 720,"
@@ -2763,11 +2774,11 @@ And the video file kind map might have entries like
 \begin{configurationFileCode}
   videoFileKindMap = "{"
     ...
-    "tarVocGtr: { target: other,"
+    "tarVocGtr: { destination: other,"
                 " directoryPath:  '/temp/vocalsGuitar',"
                 " fileNameSuffix: '-vocGtr',"
                 " voiceNameList:  'vocals, guitar' },"
-    "tarBass:   { target: other,"
+    "tarBass:   { destination: other,"
                 " directoryPath:  '/temp/bass',"
                 " fileNameSuffix: '-bs',"
                 " voiceNameList:  'bass' },"
@@ -2941,8 +2952,8 @@ There are four things to note:
   \item The special effect ``tee'' is not part of sox.  When debugging
         is active, this ``effect'' writes out the audio data available
         at that position in the chain into a temporary file in the
-        target audio directory called ``\meta{voice}X.wav'' where X
-        stands for a hex number.  Multiple ``tee'' occurrences are
+        destination audio directory called ``\meta{voice}X.wav'' where
+        X stands for a hex number.  Multiple ``tee'' occurrences are
         possible, so you can do an audio debugging of your chain.
 
   \item Normally processing is purely sequential with a single signal
@@ -3010,7 +3021,7 @@ set of variant names that apply to all voices, for example, ``STD''
 (for an ultra-hard sound) etc.
 
 So finally each audio voice has its processed wav version in
-\embeddedCode{targetDirectoryPath} called
+\embeddedCode{destinationDirectoryPath} called
 ``\meta{voice}-processed.wav'' for later mixdown.
 
 %............................
@@ -3026,24 +3037,24 @@ emulated by \ltbvc.  They can be specified as follows:
         can be redefined by setting the variable
         \embeddedCode{audioProcessor.chainSeparator}).
 
-  \item For each chain its (single) source and target are each given
-        by an identifier that is immediately preceeded or followed by
-        ``->'' (which can be redefined by setting
-        \embeddedCode{audioProcessor.redirector}).  So a chain target
-        might be specified as ``->xxx'', a chain source might be
-        specified as ``yyy->''.  When no identifier is given for a
-        source, the raw audio file is used.
+  \item For each chain its (single) source and destination are each
+        given by an identifier that is immediately preceeded or
+        followed by ``->'' (which can be redefined by setting
+        \embeddedCode{audioProcessor.redirector}).  So a chain
+        destination might be specified as ``->xxx'', a chain source
+        might be specified as ``yyy->''.  When no identifier is given
+        for a source, the raw audio file is used.
 
         Note that, of course, the name of a chain source must occur
-        as a chain target somewhere before.
+        as a chain destination somewhere before.
 
         Each chain has ``->'' (the raw audio file) as its implicit
         chain source, the last chain has the refined audio file as its
-        implicit target.
+        implicit destination.
 
   \item A chain may consist of a special ``mix'' effect that does a
-        decibel-weighted mix of several sources into a single target.
-        E.g. the chain
+        decibel-weighted mix of several sources into a single
+        destination.  E.g. the chain
         \begin{configurationFileCode}
           mix 0 -> -3 A-> -6 B-> ->C
         \end{configurationFileCode}
@@ -3051,10 +3062,10 @@ emulated by \ltbvc.  They can be specified as follows:
         mixes the raw audio file with 0dB attenuation (unchanged), the
         result of chain A with -3dB attenuation (about 71\% volume)
         and the result of chain B with -6dB attenuation (about 50\%
-        volume) into chain target C.
+        volume) into chain destination C.
 
         Very often, the last chain is a mix of several sources into
-        the refined audio file as the target.
+        the refined audio file as the destination.
 
         A ``mix'' effect must not have an embedded ``tee''.
 \end{itemize}
@@ -3217,9 +3228,9 @@ affects the left and right channel of a stereo signal.
   \label{figure:panGraph}
 \end{centeredFigure}
 
-After panning and mixing the target file is stored in the
-\embeddedCode{audioTargetDirectoryPath} with its name constructed as
-the concatenation of \embeddedCode{targetFileNamePrefix},
+After panning and mixing the destination file is stored in the
+\embeddedCode{audioDestinationDirectoryPath} with its name constructed as
+the concatenation of \embeddedCode{destinationFileNamePrefix},
 \embeddedCode{fileNamePrefix} and suffix ``-ALL.m4a''.
 
 But: you do not want a backing track with all voices of your
@@ -3393,10 +3404,10 @@ Both of them are used in the audio track list definition.
 \end{configurationFileCode}
 
 So any number of audio tracks is possible.  In the example above we
-have two (if you ignore the ellipsis!).  If we assume that the target
-file name prefix is ``test-'' and that the song has file name prefix
-``wonderful\_song'' and is called ``Wonderful Song'', the files have
-the following properties:
+have two (if you ignore the ellipsis!).  If we assume that the
+destination file name prefix is ``test-'' and that the song has file
+name prefix ``wonderful\_song'' and is called ``Wonderful Song'', the
+files have the following properties:
 \begin{enumerate}
 
   \item The first track contains all voices, it is stored in
@@ -3424,8 +3435,8 @@ introduced in this section in summary.
                        {\DESCaudioGroupToVoicesMap}
                        {see text}
 
-    \varDescriptionLong{audioTargetDirectoryPath}
-                       {\DESCaudioTargetDirectoryPath}
+    \varDescriptionLong{audioDestinationDirectoryPath}
+                       {\DESCaudioDestinationDirectoryPath}
                        {"/pathto/XXX"}
 
     \varDescriptionLong{audioTrackList}
@@ -3455,32 +3466,33 @@ following parts:
 
   \item the file-kind-specific still video (without sound) with the
         appropriate extension \embeddedCode{fileNameSuffix} for the
-        given target name finally located in
-        \embeddedCode{targetDirectoryPath},
+        given destination name finally located in
+        \embeddedCode{destinationDirectoryPath},
 
   \item the subtitle file located in
-        \embeddedCode{targetDirectoryPath}, and
+        \embeddedCode{destinationDirectoryPath}, and
 
   \item the compressed audio files generated by the ``mix'' phase
-        and located in \embeddedCode{audioTargetDirectoryPath}
+        and located in \embeddedCode{audioDestinationDirectoryPath}
 \end{itemize}
 
-If \embeddedCode{subtitlesAreHardcoded} is set for the target, the
+If \embeddedCode{subtitlesAreHardcoded} is set for the destination, the
 subtitle is burnt into the video with specified
 \embeddedCode{subtitleFontSize} and \embeddedCode{subtitleColor}.
-Otherwise the subtitle is put into the target video as a subtitle
+Otherwise the subtitle is put into the destination video as a subtitle
 track (to be switched on or off).  In the latter case, the rendering
- of the subtitle is done by the video player.
+of the subtitle is done by the video player.
 
 The name of the combined video is constructed from several variables
-as follows: the \embeddedCode{targetFileNamePrefix} is concatenated
-with \embeddedCode{fileNamePrefix} for the song, a minus character,
-the video file kind name suffix and ``.mp4'' extension.  It is stored
-in the directory given by \embeddedCode{videoFileKind.directoryPath}.
+as follows: the \embeddedCode{destinationFileNamePrefix} is
+concatenated with \embeddedCode{fileNamePrefix} for the song, a minus
+character, the video file kind name suffix and ``.mp4'' extension.  It
+is stored in the directory given by
+\embeddedCode{videoFileKind.directoryPath}.
 
 For example, by those conventions the ``Wonderful Song'' for the
 ``tablet'' has name ``test-wonderful\_song-tablet.mp4'' and is stored
-in the directory given in the target definition.
+in the directory given in the destination definition.
 
 %----------------
 \section{Summary}
@@ -3495,9 +3507,9 @@ fragment file with song voices and a song configuration file:
   \item a MIDI file with selected voices slightly humanized,
   \item several single voice audio files,
   \item audio file mixes combining voices into groups, and
-  \item video files for different target devices containing selectable
-        audio tracks and possibly a selectable subtitle with measure
-        indication
+  \item video files for different destination devices containing
+        selectable audio tracks and possibly a selectable subtitle with
+        measure indication
 \end{itemize}
 
 %======================
@@ -3773,7 +3785,7 @@ existence before doing something.
 \begin{configurationFileCode}
   tempLilypondFilePath = "./temp/temp_${phase}_${voiceName}.ly"
   intermediateFileDirectoryPath = "./temp"
-  targetDirectoryPath = "./generated"
+  destinationDirectoryPath = "./generated"
   tempAudioDirectoryPath = "./mediafiles"
 \end{configurationFileCode}
 
@@ -3811,7 +3823,7 @@ timing and velocity.
     "  SLACK:0.1, RASTER: 0.03125 }"
 \end{configurationFileCode}
 
-The video generation uses the default single video target called
+The video generation uses the default single video destination called
 ``tablet'' with a landscape orientation of 640x480 and yellow
 subtitles, hence there is nothing to be specified in the configuration
 file.
@@ -3848,7 +3860,7 @@ name.  So, for example, the audio file for ``Wonderful Song'' with all
 voices has path ``./mediaFiles/test-wonderful\_song.m4a''.
 
 \begin{configurationFileCode}
-  targetFileNamePrefix = "test-"
+  destinationFileNamePrefix = "test-"
   albumArtFilePath = "./mediaFiles/demo.jpg"
 
   audioGroupToVoicesMap = "{"
@@ -3892,7 +3904,7 @@ values for non-drums.
 
 The audio levels and pan positions are given in a separate mapping,
 which is used in the audio track list.  We use a single mapping for
-all targets, that means the relative levels and pan positions are
+all destinations, that means the relative levels and pan positions are
 identical in all mixes.
 
 \begin{configurationFileCode}
@@ -3991,7 +4003,7 @@ Assuming that the configuration is in file
   lilypondToBVC --phases all wonderful_song-config.txt
 \end{commandLine}
 
-and it produces the following target files
+and it produces the following destination files
 \begin{itemize}
   \item in directory ``generated'' the extracts
         ``wonderful\_song-bass.pdf'',
@@ -4011,9 +4023,9 @@ and it produces the following target files
         ``~/videos/test-wonderful\_song-tblt.mp4''
 \end{itemize}
 
-Figure~\ref{figure:exampleTargetImages} shows an extract page (a), one
-image of the target video (b) and the first score page (c) as an
-illustration.
+Figure~\ref{figure:exampleDestinationImages} shows an extract page
+(a), one image of the destination video (b) and the first score page
+(c) as an illustration.
 
 \begin{centeredFigure}
   \begin{center}
@@ -4025,8 +4037,8 @@ illustration.
     c) \externalPicture{0.14}{demo-score.png}
   \end{center}
 
-  \caption{Examples for Target File Images}
-  \label{figure:exampleTargetImages}
+  \caption{Examples for Destination File Images}
+  \label{figure:exampleDestinationImages}
 \end{centeredFigure}
 
 %========================
@@ -4094,9 +4106,10 @@ For the postprocessing phases all intermediate files are kept as follows:
         specified by \embeddedCode{tempAudioDirectoryPath} as
         ``\meta{voice}-processed.wav'',
 
-  \item [mix and finalvideo:] both phases only have target files
-        in \embeddedCode{audioTargetDirectoryPath} and the target
-        specific path in \embeddedCode{targetVideoDirectory}.
+  \item [mix and finalvideo:] both phases only have destination files
+        in \embeddedCode{audioDestinationDirectoryPath} and the
+        destination specific path in
+        \embeddedCode{destinationVideoDirectory}.
 
 \end{ttDescription}
 
@@ -4282,8 +4295,8 @@ been mentioned first in the current document.
                               \placeholder{effects}"}
                         {AudioProcessor}
 
-    \varDescriptionFinal{audioTargetDirectory\-Path}
-                        {\DESCaudioTargetDirectoryPath}
+    \varDescriptionFinal{audioDestinationDirectory\-Path}
+                        {\DESCaudioDestinationDirectoryPath}
                         {"./mediafiles"}
                         {Mix}
 
@@ -4388,6 +4401,11 @@ been mentioned first in the current document.
                         {current directory}
                         {Path}
 
+    \varDescriptionFinal{largeBankNumbers\-AreSupported}
+                        {\DESClargeBankNumbersAreSupported}
+                        {true}
+                        {Program}
+
     \varDescriptionFinal{lilypondCommand}
                         {\DESClilypondCommand}
                         {lilypond on system's path otherwise \mandatory}
@@ -4485,8 +4503,8 @@ been mentioned first in the current document.
                         {"COPY" for each of the voices}
                         {Audio}
 
-    \varDescriptionFinal{targetDirectoryPath}
-                        {\DESCtargetDirectoryPath}
+    \varDescriptionFinal{destinationDirectoryPath}
+                        {\DESCdestinationDirectoryPath}
                         {current directory}
                         {Path}
 
@@ -4512,6 +4530,76 @@ been mentioned first in the current document.
                         {0}
                         {SongRelated}
 
+    \varDescriptionFinal{videoDestination\bdot ffmpegPresetName}
+                        {\DESCvideoDestinationFFMpegPresetName}
+                        {``''}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot frameRate}
+                        {\DESCvideoDestinationFrameRate}
+                        {10}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot height}
+                        {\DESCvideoDestinationHeight}
+                        {\mandatory}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot leftRightMargin}
+                        {\DESCvideoDestinationLeftRightMargin}
+                        {\mandatory}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot mediaType}
+                        {\DESCvideoDestinationMediaType}
+                        {"TV Show"}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot resolution}
+                        {\DESCvideoDestinationResolution}
+                        {\mandatory}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot scalingFactor}
+                        {\DESCvideoDestinationScalingFactor}
+                        {1}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot subtitleColor}
+                        {\DESCvideoDestinationSubtitleColor}
+                        {(yellow)}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot subtitleFontSize}
+                        {\DESCvideoDestinationSubtitleFontSize}
+                        {10}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot subtitlesAreHardcoded}
+                        {\DESCvideoDestinationSubtitlesAreHardcoded}
+                        {false}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot systemSize}
+                        {\DESCvideoDestinationSystemSize}
+                        {20 (default of lilypond)}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot topBottomMargin}
+                        {\DESCvideoDestinationTopBottomMargin}
+                        {\mandatory}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestination\bdot width}
+                        {\DESCvideoDestinationWidth}
+                        {\mandatory}
+                        {VideoDestination}
+
+    \varDescriptionFinal{videoDestinationMap}
+                        {\DESCvideoDestinationMap}
+                        {\mandatory}
+                        {Video}
+
     \varDescriptionFinal{videoFileKind\bdot directoryPath}
                         {\DESCvideoFileKindDirectoryPath}
                         {current directory}
@@ -4522,8 +4610,8 @@ been mentioned first in the current document.
                         {\mandatory}
                         {VideoFileKind}
 
-    \varDescriptionFinal{videoFileKind\bdot target}
-                        {\DESCvideoFileKindTarget}
+    \varDescriptionFinal{videoFileKind\bdot destination}
+                        {\DESCvideoFileKindDestination}
                         {\mandatory}
                         {VideoFileKind}
 
@@ -4531,77 +4619,6 @@ been mentioned first in the current document.
                         {\DESCvideoFileKindVoiceNameList}
                         {voiceNameList}
                         {VideoFileKind}
-
-
-    \varDescriptionFinal{videoTarget\bdot ffmpegPresetName}
-                        {\DESCvideoTargetFFMpegPresetName}
-                        {``''}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot frameRate}
-                        {\DESCvideoTargetFrameRate}
-                        {10}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot height}
-                        {\DESCvideoTargetHeight}
-                        {\mandatory}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot leftRightMargin}
-                        {\DESCvideoTargetLeftRightMargin}
-                        {\mandatory}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot mediaType}
-                        {\DESCvideoTargetMediaType}
-                        {"TV Show"}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot resolution}
-                        {\DESCvideoTargetResolution}
-                        {\mandatory}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot scalingFactor}
-                        {\DESCvideoTargetScalingFactor}
-                        {1}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot subtitleColor}
-                        {\DESCvideoTargetSubtitleColor}
-                        {(yellow)}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot subtitleFontSize}
-                        {\DESCvideoTargetSubtitleFontSize}
-                        {10}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot subtitlesAreHardcoded}
-                        {\DESCvideoTargetSubtitlesAreHardcoded}
-                        {false}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot systemSize}
-                        {\DESCvideoTargetSystemSize}
-                        {20 (default of lilypond)}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot topBottomMargin}
-                        {\DESCvideoTargetTopBottomMargin}
-                        {\mandatory}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTarget\bdot width}
-                        {\DESCvideoTargetWidth}
-                        {\mandatory}
-                        {VideoTarget}
-
-    \varDescriptionFinal{videoTargetMap}
-                        {\DESCvideoTargetMap}
-                        {\mandatory}
-                        {Video}
 
     \varDescriptionFinal{voiceNameToChordsMap}
                         {\DESCvoiceNameToChordsMap}
@@ -4651,8 +4668,8 @@ been mentioned first in the current document.
 
     \item [audio group]
         a group of \glossaryLink{voice} \glossaryLink{audio track}s to
-        be mixed into a target audio file or into a single audio track
-        in the target video files
+        be mixed into a destination audio file or into a single audio
+        track in the destination video files
 
     \item [audio track]
         the audio rendering of a subset of all song voices (typically
@@ -4806,9 +4823,10 @@ been mentioned first in the current document.
     \item [silentvideo (phase)]
         a \glossaryLink{processing phase} to generate (intermediate)
         silent videos containing the score pages for several output
-        \glossaryLink{video target}s (with configurable resolution and
-        size) using \glossaryLink{ffmpeg} as the video generator from
-        notation pages produced by \glossaryLink{lilypond}
+        \glossaryLink{video destination}s (with configurable
+        resolution and size) using \glossaryLink{ffmpeg} as the video
+        generator from notation pages produced by
+        \glossaryLink{lilypond}
 
     \item [song]
         a collection of several parallel \glossaryLink{voice}s forming
@@ -4837,21 +4855,21 @@ been mentioned first in the current document.
         distortions or reverbs) used in the
         \glossaryLink{refinedaudio} and \glossaryLink{mix} phases
 
-    \item [video file kind]
-        the configuration information used in the
-        \glossaryLink{silentvideo} and \glossaryLink{finalvideo} phases
-        giving video rendering properties of notation videos extending
-        characteristics of a \glossaryLink{video target} by data
-        (like, for example, the list of voices to be shown or the video
-        files target directory)
-
-    \item [video target]
+    \item [video destination]
         the configuration information used in the
         \glossaryLink{silentvideo} and \glossaryLink{finalvideo}
         phases giving video device dependent properties of notation
         videos (like, for example, device resolution or pixel width
         and height), but also some device independent parameters
         (like, for example, the subtitle font size)
+
+    \item [video file kind]
+        the configuration information used in the
+        \glossaryLink{silentvideo} and \glossaryLink{finalvideo} phases
+        giving video rendering properties of notation videos extending
+        characteristics of a \glossaryLink{video destination} by data
+        (like, for example, the list of voices to be shown or the video
+        files destination directory)
 
     \item [voice]
         a polyphonic part of a composition belonging to a single

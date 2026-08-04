@@ -14,6 +14,7 @@ import struct
 import wave
 
 from basemodules.operatingsystem import OperatingSystem
+from basemodules.progressmessage import ProgressMessage
 from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Boolean, Integer, IntegerList, List, \
                                     Natural, Object, Real, RealList, \
@@ -200,16 +201,17 @@ class _WavFile:
              sourceFilePathList : StringList,
              mixSettingList : TupleList,
              amplificationLevel : Real,
-             targetFilePath : String):
-        """Mixes WAV audio files given in <sourceFilePathList> to target WAV
-           file with <targetFilePath> with volumes and pan positions
-           given by <mixSettingList> with loudness amplification given
-           by <amplificationLevel> via Python modules only"""
+             destinationFilePath : String):
+        """Mixes WAV audio files given in <sourceFilePathList> to
+           destination WAV file with <destinationFilePath> with
+           volumes and pan positions given by <mixSettingList> with
+           loudness amplification given by <amplificationLevel> via
+           Python modules only"""
 
         Logging.trace(">>: sourceFiles = %r, mixSettings = %r,"
-                      + " level = %4.3f, targetFile = %r",
+                      + " level = %4.3f, destinationFile = %r",
                       sourceFilePathList, mixSettingList,
-                      amplificationLevel, targetFilePath)
+                      amplificationLevel, destinationFilePath)
 
         OperatingSystem.showMessageOnConsole("  MIX", False)
         sourceFileList = [cls(name, "r") for name in sourceFilePathList]
@@ -238,12 +240,12 @@ class _WavFile:
         for file in sourceFileList:
             file.close()
 
-        targetFile = cls(targetFilePath, "w")
-        targetFrameCount = len(resultSampleList) // channelCount
-        targetFile.setParameters(channelCount, sampleSize,
-                                 frameRate, targetFrameCount)
-        targetFile.writeSamples(resultSampleList)
-        targetFile.close()
+        destinationFile = cls(destinationFilePath, "w")
+        destinationFrameCount = len(resultSampleList) // channelCount
+        destinationFile.setParameters(channelCount, sampleSize,
+                                 frameRate, destinationFrameCount)
+        destinationFile.writeSamples(resultSampleList)
+        destinationFile.close()
 
         Logging.trace("<<")
 
@@ -341,25 +343,25 @@ class _WavFile:
                       audioFilePath, shiftedFilePath, shiftOffset)
 
         sourceFile = cls.open(audioFilePath, "r")
-        targetFile = cls.open(shiftedFilePath, "w")
+        destinationFile = cls.open(shiftedFilePath, "w")
 
         channelCount, sampleSize, frameRate, frameCount = \
             sourceFile.getParameters()
         silenceFrameCount = round(frameRate * shiftOffset)
-        targetFile.setParameters(channelCount, sampleSize, frameRate,
-                                 frameCount + silenceFrameCount)
+        destinationFile.setParameters(channelCount, sampleSize, frameRate,
+                                      frameCount + silenceFrameCount)
 
         # insert padding with silence
         rawSampleList = (silenceFrameCount * channelCount) * [ 0 ]
-        targetFile.writeSamplesRaw(rawSampleList)
+        destinationFile.writeSamplesRaw(rawSampleList)
 
         # copy samples over
         rawSampleList = sourceFile.readAllSamplesRaw()
-        targetFile.writeSamplesRaw(rawSampleList)
+        destinationFile.writeSamplesRaw(rawSampleList)
 
         # close files
         sourceFile.close()
-        targetFile.close()
+        destinationFile.close()
 
         Logging.trace("<<")
 
@@ -439,18 +441,18 @@ class AudioTrackManager:
     def _compressAudio (self,
                         audioFilePath : String,
                         songTitle : String,
-                        targetFilePath : String):
+                        destinationFilePath : String):
         """Compresses audio file with <songTitle> in path with
-          <audioFilePath> to AAC file at <targetFilePath>"""
+          <audioFilePath> to AAC file at <destinationFilePath>"""
 
         Logging.trace(">>: audioFile = %r, title = %r,"
-                      + " targetFile = %r",
-                      audioFilePath, songTitle, targetFilePath)
+                      + " destinationFile = %r",
+                      audioFilePath, songTitle, destinationFilePath)
 
         cls = self.__class__
 
-        OperatingSystem.showMessageOnConsole("== convert to AAC: "
-                                             + songTitle)
+        ProgressMessage.reportProcessingStart("convert to AAC: "
+                                              + songTitle)
 
         commandLine = iif(cls._aacCommandLine != "", cls._aacCommandLine,
                           ("%s -loglevel %s -i ${infile}"
@@ -458,11 +460,12 @@ class AudioTrackManager:
                            + " -y ${outfile}")
                            % (cls._ffmpegCommand, _ffmpegLogLevel))
         variableMap = { "infile"  : audioFilePath,
-                        "outfile" : targetFilePath }
+                        "outfile" : destinationFilePath }
         command = cls._replaceVariablesByValues(tokenize(commandLine),
                                                 variableMap)
 
         OperatingSystem.executeCommand(command, True)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -471,30 +474,33 @@ class AudioTrackManager:
     def _convertMidiToAudio (self,
                              songName : String,
                              voiceMidiFilePath : String,
-                             targetFilePath : String):
+                             destinationFilePath : String):
         """Converts voice data in midi file with <voiceMidiFilePath>
            for song named <songName> to raw audio file with
-           <targetFilePath>"""
+           <destinationFilePath>"""
 
-        Logging.trace(">>: songName = %r, midiFile = %r, targetFile = %r",
-                      songName, voiceMidiFilePath, targetFilePath)
+        Logging.trace(">>: songName = %r, midiFile = %r,"
+                      + " destinationFile = %r",
+                      songName, voiceMidiFilePath, destinationFilePath)
 
         cls = self.__class__
 
         # processing midi file via given command
-        template = "== convertMidiToWav for %r into %s"
-        targetFileBaseName = OperatingSystem.basename(targetFilePath)
-        OperatingSystem.showMessageOnConsole(template
-                                             % (songName,
-                                                targetFileBaseName))
+        template = "convertMidiToWav for %r into %s"
+        destinationFileBaseName = \
+            OperatingSystem.basename(destinationFilePath)
+        ProgressMessage.reportProcessingStart(template
+                                              % (songName,
+                                                 destinationFileBaseName))
 
         variableMap = { "infile"  : voiceMidiFilePath,
-                        "outfile" : targetFilePath }
+                        "outfile" : destinationFilePath }
         command = \
             cls._replaceVariablesByValues( \
                                 cls._midiToWavRenderingCommandList,
                                 variableMap)
         OperatingSystem.executeCommand(command, True)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -508,7 +514,7 @@ class AudioTrackManager:
              debugFileCount : Natural,
              effectTokenList : StringList) -> Tuple:
         """Returns information about the success of operation, list of
-           sources and single target from audio refinement effect
+           sources and single destination from audio refinement effect
            chain <effectTokenList>; adapts <effectTokenList>
            accordingly by deleting those tokens; <voiceName> gives
            name of current voice; <chainPosition> tells whether this
@@ -533,16 +539,16 @@ class AudioTrackManager:
 
         sourceFilePath = \
             "%s/%s.wav" % (self._audioDirectoryPath, voiceName)
-        targetFilePath = (_processedAudioFileTemplate %
-                          (self._audioDirectoryPath, voiceName))
+        destinationFilePath = (_processedAudioFileTemplate %
+                               (self._audioDirectoryPath, voiceName))
         teeFilePathProc = \
             (lambda i: tempFilePathProc("%02X" % i))
         chainFilePathProc = tempFilePathProc
 
-        # collect sources and targets and delete them from token list
+        # collect sources and destinations and delete them from token list
         redirector = re.escape(cls._audioProcessorMap["redirector"])
         indicatorRegExp = re.compile(redirector + r"([A-Za-z]+)")
-        targetList = \
+        destinationList = \
             cls._extractMatchingElementsFromList(effectTokenList,
                                                  indicatorRegExp)
         indicatorRegExp = re.compile(r"([A-Za-z]*)" + redirector)
@@ -556,19 +562,19 @@ class AudioTrackManager:
              isOkay = False
 
         isOkay = True
-        validationProc(len(targetList) == 1,
-                       "only one target is allowed in chain fragment")
-        validationProc(chainPosition != "LAST" or len(targetList) == 0,
-                       "last chain may not have an explicit target")
+        validationProc(len(destinationList) == 1,
+                       "only one destination is allowed in chain fragment")
+        validationProc(chainPosition != "LAST" or len(destinationList) == 0,
+                       "last chain may not have an explicit destination")
         validationProc(partPosition in ["SINGLE", "LAST"]
-                       or len(targetList) == 0,
-                       "only last fragment in chain may have a target")
+                       or len(destinationList) == 0,
+                       "only last fragment in chain may have a destination")
         validationProc(partPosition in ["SINGLE", "FIRST"]
                        or len(sourceList) == 0,
                        "only first fragment in chain may have a source")
             
         if isOkay:
-            # fine, calculate the effective sources and targets
+            # fine, calculate the effective sources and destinations
             if len(sourceList) > 0:
                 tempList = sourceList
                 sourceList = []
@@ -582,20 +588,20 @@ class AudioTrackManager:
             else:
                 sourceList = teeFilePathProc(debugFileCount)
 
-            if len(targetList) > 0:
-                target = chainFilePathProc(targetList[0])
+            if len(destinationList) > 0:
+                destination = chainFilePathProc(destinationList[0])
             elif chainPosition in ["FIRST", "OTHER"]:
                 # output goes to tee file
                 debugFileCount += 1
-                target = teeFilePathProc(debugFileCount)
+                destination = teeFilePathProc(debugFileCount)
             else:
-                target = targetFilePath
+                destination = destinationFilePath
 
         Logging.trace("<<: isOkay = %s, effects = %r, sources = %r,"
-                      " target = %r, debugFileCount = %d",
+                      " destination = %r, debugFileCount = %d",
                       isOkay, effectTokenList, sourceList,
-                      target, debugFileCount)
-        return (isOkay, sourceList, target, debugFileCount)
+                      destination, debugFileCount)
+        return (isOkay, sourceList, destination, debugFileCount)
 
     #--------------------
 
@@ -634,7 +640,8 @@ class AudioTrackManager:
            to voice with <voiceName> and writes them to
            <voiceMidiFilePath>"""
 
-        Logging.trace(">>: voice = %s, midiFile = %r, targetFile = %r",
+        Logging.trace(">>: voice = %s, midiFile = %r,"
+                      + " destinationFile = %r",
                       voiceName, midiFilePath, voiceMidiFilePath)
 
         cls = self.__class__
@@ -653,21 +660,21 @@ class AudioTrackManager:
                        mixSettingList : TupleList,
                        masteringEffectList : StringList,
                        amplificationLevel : Real,
-                       targetFilePath : String):
-        """Mixes WAV audio files given in <sourceFilePathList> to target WAV
-           file with <targetFilePath> with volumes and pan positions
-           given by <mixSettingList> with loudness amplification given
-           by <amplificationLevel> either externally or with slow
-           internal algorithm; <masteringEffectList> gives the
-           refinement effects for this track (if any) to be applied
-           after the mix"""
+                       destinationFilePath : String):
+        """Mixes WAV audio files given in <sourceFilePathList> to
+           destination WAV file with <destinationFilePath> with
+           volumes and pan positions given by <mixSettingList> with
+           loudness amplification given by <amplificationLevel> either
+           externally or with slow internal algorithm;
+           <masteringEffectList> gives the refinement effects for this
+           track (if any) to be applied after the mix"""
 
         Logging.trace(">>: sourceFiles = %r, mixSettings = %r,"
                       + " masteringEffects = %r, amplification = %4.3f,"
-                      + " targetFile = %r",
+                      + " destinationFile = %r",
                       sourceFilePathList, mixSettingList,
                       masteringEffectList, amplificationLevel,
-                      targetFilePath)
+                      destinationFilePath)
 
         cls = self.__class__
 
@@ -676,7 +683,7 @@ class AudioTrackManager:
                                          mixSettingList,
                                          masteringEffectList,
                                          amplificationLevel,
-                                         targetFilePath)
+                                         destinationFilePath)
         else:
             if len(masteringEffectList) > 0:
                 Logging.trace("--: WARNING - no mastering available"
@@ -685,7 +692,7 @@ class AudioTrackManager:
                               masteringEffectList)
 
             _WavFile.mix(sourceFilePathList, mixSettingList,
-                         amplificationLevel, targetFilePath)
+                         amplificationLevel, destinationFilePath)
 
         Logging.trace("<<")
 
@@ -695,20 +702,21 @@ class AudioTrackManager:
                                  sourceFilePathList : StringList,
                                  mixSettingList : TupleList,
                                  masteringEffectList : StringList,
-                                 amplificationLevel, targetFilePath):
-        """Mixes WAV audio files given in <sourceFilePathList> to target WAV
-           file with <targetFilePath> with volumes and pan positions
-           given by <mixSettingList> with loudness amplification given
-           by <amplificationLevel> using external command;
-           <masteringEffectList> gives the refinement effects for this
-           track (if any) to be applied after mixing"""
+                                 amplificationLevel, destinationFilePath):
+        """Mixes WAV audio files given in <sourceFilePathList> to
+           destination WAV file with <destinationFilePath> with
+           volumes and pan positions given by <mixSettingList> with
+           loudness amplification given by <amplificationLevel> using
+           external command; <masteringEffectList> gives the
+           refinement effects for this track (if any) to be applied
+           after mixing"""
 
         Logging.trace(">>: sourceFiles = %r, mixSettings = %r,"
                       + " masteringEffects = %r, level = %4.3f,"
-                      + " targetFile = %r",
+                      + " destinationFile = %r",
                       sourceFilePathList, mixSettingList,
                       masteringEffectList, amplificationLevel,
-                      targetFilePath)
+                      destinationFilePath)
 
         cls = self.__class__
 
@@ -720,8 +728,9 @@ class AudioTrackManager:
         masteringPassIsRequired = (amplificationLevel != 0
                                    or len(masteringEffectList) > 0)
         intermediateFilePath = self._audioDirectoryPath + "/result-mix.wav"
-        intermediateFilePath = iif(masteringPassIsRequired,
-                                   intermediateFilePath, targetFilePath)
+        intermediateFilePath = \
+            iif(masteringPassIsRequired,
+                intermediateFilePath, destinationFilePath)
 
         Logging.trace("--: masteringPass = %r, intermediateFile = %r",
                       masteringPassIsRequired, intermediateFilePath)
@@ -780,7 +789,7 @@ class AudioTrackManager:
             refinementCommandLine = audioProcMap["refinementCommandLine"]
             refinementCommandList = tokenize(refinementCommandLine)
             variableMap = { "infile"  : intermediateFilePath,
-                            "outfile" : targetFilePath,
+                            "outfile" : destinationFilePath,
                             "effects" : effectList }
             command = replaceVariables(refinementCommandList, variableMap)
             OperatingSystem.executeCommand(command, True)
@@ -797,11 +806,11 @@ class AudioTrackManager:
                              parallelTrackFilePath : String,
                              masteringEffectList : StringList,
                              amplificationLevel : Real,
-                             targetFilePath : String):
-        """Constructs and executes a command for audio mixing to target file
-           with <targetFilePath> from given <voiceNameList>, the
-           mapping to volumes and pan positions in
-           <voiceNameToMixSettingMap> with loudness amplification
+                             destinationFilePath : String):
+        """Constructs and executes a command for audio mixing to
+           destination file with <destinationFilePath> from given
+           <voiceNameList>, the mapping to volumes and pan positions
+           in <voiceNameToMixSettingMap> with loudness amplification
            given by <amplificationLevel>; <masteringEffectList> gives
            the refinement effects for this track (if any) to be
            applied after mixing; if <parallelTrackPath> is not empty,
@@ -809,10 +818,10 @@ class AudioTrackManager:
 
         Logging.trace(">>: voiceNames = %r, audioLevels = %r"
                       + " parallelTrack = %r, masteringEffects = %r"
-                      + " amplification = %5.3f, target = %r",
+                      + " amplification = %5.3f, destination = %r",
                       voiceNameList, voiceNameToMixSettingMap,
                       parallelTrackFilePath, masteringEffectList,
-                      amplificationLevel, targetFilePath)
+                      amplificationLevel, destinationFilePath)
 
         sourceFilePathList = []
         mixSettingList   = []
@@ -836,7 +845,7 @@ class AudioTrackManager:
 
         self._mixToWavFile(sourceFilePathList, mixSettingList,
                            masteringEffectList, amplificationLevel,
-                           targetFilePath)
+                           destinationFilePath)
         Logging.trace("<<")
 
     #--------------------
@@ -995,7 +1004,7 @@ class AudioTrackManager:
                                     i == fragmentCount - 1, "LAST",
                                     "OTHER")
 
-            isOkay, sourceList, currentTarget, debugFileCount = \
+            isOkay, sourceList, currentDestination, debugFileCount = \
                 self._extractEffectListSrcAndTgt(voiceName,
                                                  chainPosition,
                                                  fragmentPosition,
@@ -1009,14 +1018,14 @@ class AudioTrackManager:
                   or effectsTokenList[0] != "mix"):
                 currentSource = sourceList[0]
                 variableMap = { "infile"   : currentSource,
-                                "outfile"  : currentTarget,
+                                "outfile"  : currentDestination,
                                 "effects"  : effectsTokenList }
                 command = \
                     cls._replaceVariablesByValues(refCmdTokenList,
                                                   variableMap)
                 OperatingSystem.executeCommand(command, True)
             else:
-                # a mix command, all sources and targets have been
+                # a mix command, all sources and destinations have been
                 # removed, so only the volumes (in decibels) remain
                 volumeList = effectsTokenList[1:]
 
@@ -1033,7 +1042,7 @@ class AudioTrackManager:
                         mixSettingList.append((float(volume), 0))
                         
                     self._mixToWavFile(sourceList, mixSettingList,
-                                       "", 0.0, currentTarget)
+                                       "", 0.0, currentDestination)
 
         result = (isOkay, debugFileCount)
         Logging.trace("<<: %s", result)
@@ -1088,10 +1097,10 @@ class AudioTrackManager:
                       songName, audioFilePath, shiftedFilePath, shiftOffset)
 
         shiftedFileBaseName = OperatingSystem.basename(shiftedFilePath)
-        template = "== shifting %r for %r by %7.3fs"
-        OperatingSystem.showMessageOnConsole(template
-                                             % (shiftedFileBaseName,
-                                                songName, shiftOffset))
+        template = "shifting %r for %r by %7.3fs"
+        ProgressMessage.reportProcessingStart(template
+                                              % (shiftedFileBaseName,
+                                                 songName, shiftOffset))
 
         if "paddingCommandLine" not in cls._audioProcessorMap:
             _WavFile.shiftAudio(audioFilePath, shiftedFilePath, shiftOffset)
@@ -1100,6 +1109,8 @@ class AudioTrackManager:
             cls._shiftAudioFileExternally(commandLine,
                                           audioFilePath, shiftedFilePath,
                                           shiftOffset)
+
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -1157,8 +1168,9 @@ class AudioTrackManager:
         tagToValueMap["track"]       = configData.trackNumber
         tagToValueMap["year"]        = configData.songYear
 
-        OperatingSystem.showMessageOnConsole("== tagging AAC: " + songTitle)
+        ProgressMessage.reportProcessingStart("tagging AAC: " + songTitle)
         MP4TagManager.tagFile(audioFilePath, tagToValueMap)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -1230,7 +1242,7 @@ class AudioTrackManager:
 
     def __init__ (self,
                   audioDirectoryPath : String):
-        """Initializes generator with target directory of all audio
+        """Initializes generator with destination directory of all audio
            files to be stored in <audioDirectoryPath>"""
 
         Logging.trace(">>: audioDirectoryPath = %r", audioDirectoryPath)
@@ -1245,12 +1257,12 @@ class AudioTrackManager:
     def constructSettingsForAudioTracks \
             (cls,
              configData : LTBVC_ConfigurationData) -> List:
-        """Constructs a list of tuples each representing a target audio file
-           from mapping <audioGroupNameToVoiceNameListMap> and
-           <audioTrackNameToDataMap> and given <voiceNameList> in
+        """Constructs a list of tuples each representing a destination
+           audio file from mapping <audioGroupNameToVoiceNameListMap>
+           and <audioTrackNameToDataMap> and given <voiceNameList> in
            <configData>; each tuple contains the set of voice names
-           used, its album name, its song title and its target file
-           path"""
+           used, its album name, its song title and its destination
+           file path"""
 
         Logging.trace(">>")
 
@@ -1280,11 +1292,12 @@ class AudioTrackManager:
             songTitle = st.replace("$", configData.title)
             st = audioTrack.audioFileTemplate
             st = st.replace("$", configData.fileNamePrefix)
-            targetFilePath = \
-                ("%s/%s.m4a" % (configData.audioTargetDirectoryPath, st))
+            destinationFilePath = \
+                ("%s/%s.m4a" % (configData.audioDestinationDirectoryPath,
+                                st))
 
             newEntry = (voiceNameSubset, albumName, songTitle,
-                        targetFilePath, audioTrack.description,
+                        destinationFilePath, audioTrack.description,
                         audioTrack.languageCode,
                         audioTrack.voiceNameToMixSettingMap,
                         audioTrack.masteringEffectList,
@@ -1311,13 +1324,15 @@ class AudioTrackManager:
                       songName, voiceName, filePath, shiftOffset)
 
         cls = self.__class__
-        message = ("== overriding %r in %r from file"
+        message = ("overriding %r in %r from file"
                    % (voiceName, songName))
-        OperatingSystem.showMessageOnConsole(message)
+        ProgressMessage.reportProcessingStart(message)
 
-        targetFilePath = (_processedAudioFileTemplate
+        destinationFilePath = (_processedAudioFileTemplate
                           % (self._audioDirectoryPath, voiceName))
-        cls._shiftAudioFile(songName, filePath, targetFilePath, shiftOffset)
+        cls._shiftAudioFile(songName, filePath,
+                            destinationFilePath, shiftOffset)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -1329,12 +1344,12 @@ class AudioTrackManager:
                           voiceName : String,
                           shiftOffset : Real):
         """Generates audio wave file for <voiceName> in song named
-           <songName> from midi file with <midiFilePath> in target
-           directory; if several midi tracks match voice name, the
-           resulting audio files are mixed; output is dry (no chorus,
-           reverb and delay) and contains leading and trailing silent
-           passages; if <shiftOffset> is greater that zero, the target
-           file is shifted by that amount"""
+           <songName> from midi file with <midiFilePath> in
+           destination directory; if several midi tracks match voice
+           name, the resulting audio files are mixed; output is dry
+           (no chorus, reverb and delay) and contains leading and
+           trailing silent passages; if <shiftOffset> is greater that
+           zero, the destination file is shifted by that amount"""
 
         Logging.trace(">>: songName = %r, voice = %s, midiFile = %r,"
                       + " shiftOffset = %7.3f",
@@ -1353,10 +1368,10 @@ class AudioTrackManager:
         self._convertMidiToAudio(songName, tempMidiFilePath, audioFilePath)
 
         if isShifted:
-            targetFilePath = defaultTemplate % (self._audioDirectoryPath,
-                                                voiceName)
-            cls._shiftAudioFile(songName, audioFilePath, targetFilePath,
-                                shiftOffset)
+            destinationFilePath = defaultTemplate % (self._audioDirectoryPath,
+                                                     voiceName)
+            cls._shiftAudioFile(songName, audioFilePath,
+                                destinationFilePath, shiftOffset)
             OperatingSystem.removeFile(audioFilePath,
                                        cls._intermediateFilesAreKept)
 
@@ -1373,10 +1388,10 @@ class AudioTrackManager:
                               soundVariant : String,
                               reverbLevel : Real):
         """Generates refined audio wave file for <voiceName> in song
-           named <songName> from raw audio file in target directory;
-           <soundVariant> gives the kind of postprocessing ('COPY',
-           'STD', 'EXTREME', ...) and <reverbLevel> the percentage of
-           reverb to be used for that voice"""
+           named <songName> from raw audio file in destination
+           directory; <soundVariant> gives the kind of postprocessing
+           ('COPY', 'STD', 'EXTREME', ...) and <reverbLevel> the
+           percentage of reverb to be used for that voice"""
 
         Logging.trace(">>: song = %r, voice = %s, variant = %s,"
                       + " reverb = %4.3f",
@@ -1398,9 +1413,9 @@ class AudioTrackManager:
                 "soundStyle%s%s" % (capitalizedVoiceName,
                                     extendedSoundVariant)
 
-        message = ("== processing %s (%s) in %r"
+        message = ("processing %s (%s) in %r"
                    % (voiceName, soundVariant, songName))
-        OperatingSystem.showMessageOnConsole(message)
+        ProgressMessage.reportProcessingStart(message)
 
         # prepare list of audio processing commands
         if isCopyVariant:
@@ -1431,6 +1446,7 @@ class AudioTrackManager:
             audioProcessingEffects += reverbEffect
 
         self._processAudioRefinement(voiceName, audioProcessingEffects)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -1454,13 +1470,14 @@ class AudioTrackManager:
 
         for v in voiceProcessingList:
             currentVoiceNameList, albumName, songTitle, \
-              targetFilePath, _, languageCode, voiceNameToMixSettingMap, \
-              masteringEffectList, amplificationLevel = v
+                destinationFilePath, _, languageCode, \
+                voiceNameToMixSettingMap, masteringEffectList, \
+                amplificationLevel = v
             waveIntermediateFilePath = ("%s/result_%s.wav"
                                         % (self._audioDirectoryPath,
                                            languageCode))
-            OperatingSystem.showMessageOnConsole("== make mix file: %s"
-                                                 % songTitle)
+            ProgressMessage.reportProcessingStart("make mix file: %s"
+                                                  % songTitle)
 
             if configData.parallelTrackFilePath != "":
                 parallelTrackVolume = configData.parallelTrackVolume
@@ -1474,10 +1491,12 @@ class AudioTrackManager:
                                      amplificationLevel,
                                      waveIntermediateFilePath)
             self._compressAudio(waveIntermediateFilePath, songTitle,
-                                targetFilePath)
-            cls._tagAudio(targetFilePath, configData, songTitle, albumName)
+                                destinationFilePath)
+            cls._tagAudio(destinationFilePath, configData,
+                          songTitle, albumName)
 
             #OperatingSystem.removeFile(waveIntermediateFilePath,
             #                           cls._intermediateFilesAreKept)
+            ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")

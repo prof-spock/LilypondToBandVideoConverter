@@ -10,6 +10,7 @@
 import re
 
 from basemodules.operatingsystem import OperatingSystem
+from basemodules.progressmessage import ProgressMessage
 from basemodules.simplelogging import Logging
 from basemodules.simpletypes import Natural, ObjectList, Real, String, \
                                     StringList
@@ -121,19 +122,19 @@ class VideoAudioCombiner:
                             sourceVideoFilePath : String,
                             audioTrackDataList : ObjectList,
                             subtitleFilePath : String,
-                            targetVideoFilePath : String):
+                            destinationVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
-           <targetVideoFilePath>; if <subtitleFilePath> is not empty,
+           <destinationVideoFilePath>; if <subtitleFilePath> is not empty,
            a subtile is added"""
 
         # TODO: this ffmpeg rendering does not produce quicktime
         # compliant videos
 
-        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+        Logging.trace(">>: sourceVideo = %r, destinationVideo = %r,"
                       + " audioTracks = %r, subtitleFile = %r",
-                      sourceVideoFilePath, audioTrackDataList,
-                      subtitleFilePath, targetVideoFilePath)
+                      sourceVideoFilePath, destinationVideoFilePath,
+                      audioTrackDataList, subtitleFilePath)
 
         trackFilePathList    = []
         mapDefinitionList    = []
@@ -159,7 +160,8 @@ class VideoAudioCombiner:
                    + [ "-map", "v:0" ] + mapDefinitionList
                    + metadataSettingsList
                    + ["-vcodec", "copy", "-acodec", "copy",
-                      "-scodec", "mov_text", "-y", targetVideoFilePath ])
+                      "-scodec", "mov_text",
+                      "-y", destinationVideoFilePath ])
 
         Logging.trace("<<: %r", command)
         return command
@@ -171,16 +173,16 @@ class VideoAudioCombiner:
                             sourceVideoFilePath : String,
                             audioTrackDataList : ObjectList,
                             subtitleFilePath : String,
-                            targetVideoFilePath : String):
+                            destinationVideoFilePath : String):
         """Combines video in <sourceVideoFilePath> and audio tracks
            specified by <audioTrackDataList> to new file in
-           <targetVideoFilePath>; if <subtitleFilePath> is not empty,
+           <destinationVideoFilePath>; if <subtitleFilePath> is not empty,
            a subtile is added"""
 
-        Logging.trace(">>: sourceVideo = %r, targetVideo = %r,"
+        Logging.trace(">>: sourceVideo = %r, destinationVideo = %r,"
                       + " audioTracks = %r, subtitleFile = %r",
-                      sourceVideoFilePath, audioTrackDataList,
-                      subtitleFilePath, targetVideoFilePath)
+                      sourceVideoFilePath, destinationVideoFilePath,
+                      audioTrackDataList, subtitleFilePath)
 
         command = [ cls._mp4boxCommand,
                     "-noprog", "-isma", "-ipod", "-strict-error",
@@ -194,7 +196,7 @@ class VideoAudioCombiner:
         if subtitleFilePath > "":
             command.extend([ "-add", subtitleFilePath + "#handler=sbtl" ])
 
-        command.extend([ "-out", targetVideoFilePath ])
+        command.extend([ "-out", destinationVideoFilePath ])
 
         Logging.trace("<<: %r", command)
         return command
@@ -225,26 +227,26 @@ class VideoAudioCombiner:
                  voiceNameList : StringList,
                  trackDataList : ObjectList,
                  sourceVideoFilePath : String,
-                 targetVideoFilePath : String,
+                 destinationVideoFilePath : String,
                  subtitleFilePath : String):
         """Combines all final audio files (characterized by
            <trackDataList>) and the video given by
-           <sourceVideoFilePath> into video in <targetVideoFilePath>;
+           <sourceVideoFilePath> into video in <destinationVideoFilePath>;
            if <subtitleFilePath> is not empty, the given subtitle file
            is added as an additional track; <voiceNameList> gives the
            list of all voices"""
 
         Logging.trace(">>: voiceNameList = %r, trackDataList = %r,"
-                      + " sourceVideo = %r, targetVideo = %r,"
+                      + " sourceVideo = %r, destinationVideo = %r,"
                       + " subtitleFilePath = %r",
                       voiceNameList, trackDataList, sourceVideoFilePath,
-                      targetVideoFilePath, subtitleFilePath)
+                      destinationVideoFilePath, subtitleFilePath)
 
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
 
-        st = "== combining audio and video for " + targetVideoFilePath
-        OperatingSystem.showMessageOnConsole(st)
+        st = "combining audio and video for " + destinationVideoFilePath
+        ProgressMessage.reportProcessingStart(st)
 
         audioTrackDataList = []
 
@@ -258,14 +260,16 @@ class VideoAudioCombiner:
             command = cls._combineWithMp4box(sourceVideoFilePath,
                                              audioTrackDataList,
                                              subtitleFilePath,
-                                             targetVideoFilePath)
+                                             destinationVideoFilePath)
         else:
             command = cls._combineWithFfmpeg(sourceVideoFilePath,
                                              audioTrackDataList,
                                              subtitleFilePath,
-                                             targetVideoFilePath)
+                                             destinationVideoFilePath)
 
         OperatingSystem.executeCommand(command, True)
+        ProgressMessage.reportProcessingEnd()
+
         Logging.trace("<<")
 
     #--------------------
@@ -274,7 +278,7 @@ class VideoAudioCombiner:
     def insertHardSubtitles (cls,
                              sourceVideoFilePath : String,
                              subtitleFilePath : String,
-                             targetVideoFilePath : String,
+                             destinationVideoFilePath : String,
                              shiftOffset : Real,
                              subtitleColor : Natural,
                              subtitleFontSize : Natural,
@@ -282,24 +286,24 @@ class VideoAudioCombiner:
         """Inserts hard subtitles specified by an SRT file with
            <subtitleFilePath> into video given by
            <sourceVideoFilePath> resulting in video with
-           <targetVideoFilePath>; <shiftOffset> tells the amount of
+           <destinationVideoFilePath>; <shiftOffset> tells the amount of
            empty time to be inserted before the video, <ffmpegPresetName>
            tells the ffmpeg preset used for the newly generated video,
            <subtitleColor> the RGB color of the subtitle,
            <subtitleFontSize> the size in pixels"""
 
         Logging.trace(">>: sourceVideo = %r, subtitleFile = %r,"
-                      + " targetVideo = %r, subtitleFontSize = %d,"
+                      + " destinationVideo = %r, subtitleFontSize = %d,"
                       + " subtitleColor = %d, ffmpegPreset = %r",
                       sourceVideoFilePath, subtitleFilePath,
-                      targetVideoFilePath, subtitleFontSize,
+                      destinationVideoFilePath, subtitleFontSize,
                       subtitleColor, ffmpegPresetName)
 
         ValidityChecker.isReadableFile(sourceVideoFilePath,
                                        "source video file")
 
-        st = "== hardcoding subtitles for %r" % sourceVideoFilePath
-        OperatingSystem.showMessageOnConsole(st)
+        st = "hardcoding subtitles for %r" % sourceVideoFilePath
+        ProgressMessage.reportProcessingStart(st)
 
         subtitleOption = (("subtitles=%s:force_style='PrimaryColour=%d,"
                            + "FontSize=%d'")
@@ -316,9 +320,11 @@ class VideoAudioCombiner:
                          ("-pix_fmt", "yuv420p",
                           "-profile:v", "baseline",
                           "-level", cls._defaultMp4BaselineLevel))
-                   + ("-y", targetVideoFilePath))
+                   + ("-y", destinationVideoFilePath))
 
         OperatingSystem.executeCommand(command, True)
+        ProgressMessage.reportProcessingEnd()
+
         Logging.trace("<<")
 
     #--------------------
@@ -326,14 +332,15 @@ class VideoAudioCombiner:
     @classmethod
     def shiftSubtitleFile (cls,
                            subtitleFilePath : String,
-                           targetSubtitleFilePath : String,
+                           destinationSubtitleFilePath : String,
                            shiftOffset : Real):
-        """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and stores
-           result in file with <targetSubtitleFilePath>"""
+        """Shifts SRT file in <subtitleFilePath> by <shiftOffset> and
+           stores result in file with <destinationSubtitleFilePath>"""
 
         Logging.trace(">>: subtitleFilePath = %r, shiftOffset = %7.3f,"
-                      + " targetSubtitleFilePath =%r",
-                      subtitleFilePath, shiftOffset, targetSubtitleFilePath)
+                      + " destinationSubtitleFilePath =%r",
+                      subtitleFilePath, shiftOffset,
+                      destinationSubtitleFilePath)
 
         ValidityChecker.isReadableFile(subtitleFilePath, "subtitle file")
 
@@ -343,9 +350,10 @@ class VideoAudioCombiner:
 
         lineList = _SubtitleShifter.applyShift(lineList, shiftOffset)
 
-        targetSubtitleFile = UTF8File(targetSubtitleFilePath, "wt")
-        targetSubtitleFile.write("\n".join(lineList))
-        targetSubtitleFile.close()
+        destinationSubtitleFile = UTF8File(destinationSubtitleFilePath,
+                                           "wt")
+        destinationSubtitleFile.write("\n".join(lineList))
+        destinationSubtitleFile.close()
 
         Logging.trace("<<")
 
@@ -367,8 +375,8 @@ class VideoAudioCombiner:
 
         ValidityChecker.isReadableFile(videoFilePath, "source video file")
 
-        st = "== tagging %r" % videoFilePath
-        OperatingSystem.showMessageOnConsole(st)
+        st = "tagging %r" % videoFilePath
+        ProgressMessage.reportProcessingStart(st)
 
         tagToValueMap = {}
         tagToValueMap["album"]           = albumName
@@ -381,5 +389,6 @@ class VideoAudioCombiner:
         tagToValueMap["year"]            = year
 
         MP4TagManager.tagFile(videoFilePath, tagToValueMap)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")

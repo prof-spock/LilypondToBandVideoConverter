@@ -1046,67 +1046,67 @@ endfig;
 beginfig(4);
     pair lineOffset, lineVector;
     pair marginOffset, markerLengthVector, markerPosition;
-    pair videoTargetSize;
+    pair videoDestinationSize;
     numeric markerLength, arrowLength;
     numeric labelScaleFactor;
 
-    videoTargetSize    := (50mm, 28mm);
+    videoDestinationSize    := (50mm, 28mm);
     marginOffset       := (5mm, 4mm);
     markerLengthVector := (10mm, 5mm);
     labelScaleFactor   := 0.75;
 
-    Box_make(videoTarget, "B", "");
-    Box_setSizeAndColor(videoTarget, videoTargetSize, white);
-    drawboxed(videoTarget);
-    drawLabel(1/2[videoTarget.c, videoTarget.s], "center", 1.25,
-              true, "VIDEO TARGET");
+    Box_make(videoDestination, "B", "");
+    Box_setSizeAndColor(videoDestination, videoDestinationSize, white);
+    drawboxed(videoDestination);
+    drawLabel(1/2[videoDestination.c, videoDestination.s], "center", 1.25,
+              true, "VIDEO DESTINATION");
 
     lineOffset := (xpart marginOffset, 0);
-    lineVector := (0, ypart videoTargetSize);
-    drawDottedLine(videoTarget.sw + lineOffset, lineVector);
-    drawDottedLine(videoTarget.se - lineOffset, lineVector);
+    lineVector := (0, ypart videoDestinationSize);
+    drawDottedLine(videoDestination.sw + lineOffset, lineVector);
+    drawDottedLine(videoDestination.se - lineOffset, lineVector);
     lineOffset := (0, ypart marginOffset);
-    lineVector := (xpart videoTargetSize, 0);
-    drawDottedLine(videoTarget.sw + lineOffset, lineVector);
-    drawDottedLine(videoTarget.nw - lineOffset, lineVector);
+    lineVector := (xpart videoDestinationSize, 0);
+    drawDottedLine(videoDestination.sw + lineOffset, lineVector);
+    drawDottedLine(videoDestination.nw - lineOffset, lineVector);
 
-    arrowLength := xpart videoTargetSize / 4;
+    arrowLength := xpart videoDestinationSize / 4;
     markerLength := -ypart markerLengthVector;
-    drawMarkerPair(videoTarget.sw, videoTargetSize, markerLength,
+    drawMarkerPair(videoDestination.sw, videoDestinationSize, markerLength,
                    arrowLength, "H");
-    drawLabel(videoTarget.s + (0, markerLength)/2, "center",
+    drawLabel(videoDestination.s + (0, markerLength)/2, "center",
               labelScaleFactor, true, "width");
 
     markerLength := ypart markerLengthVector;
     arrowLength  := xpart marginOffset / 2;
-    markerPosition := videoTarget.nw + (xpart marginOffset, 0);
+    markerPosition := videoDestination.nw + (xpart marginOffset, 0);
     drawMarkerPair(markerPosition, -marginOffset,
                    markerLength, arrowLength, "H");
-    drawMarkerPair(videoTarget.ne, -marginOffset,
+    drawMarkerPair(videoDestination.ne, -marginOffset,
                    markerLength, arrowLength, "H");
-    drawLabel(videoTarget.n + (0, markerLength)/2, "center",
+    drawLabel(videoDestination.n + (0, markerLength)/2, "center",
               labelScaleFactor, true, "leftRightMargin");
 
-    arrowLength := ypart videoTargetSize / 4;
+    arrowLength := ypart videoDestinationSize / 4;
     markerLength := xpart markerLengthVector;
-    drawMarkerPair(videoTarget.se, videoTargetSize, markerLength,
+    drawMarkerPair(videoDestination.se, videoDestinationSize, markerLength,
                    arrowLength,  "V");
-    drawLabel(videoTarget.e + (markerLength, 0)/2, "center",
+    drawLabel(videoDestination.e + (markerLength, 0)/2, "center",
               labelScaleFactor, true, "height");
 
     markerLength := -xpart markerLengthVector;
     arrowLength  := ypart marginOffset / 2;
-    markerPosition := videoTarget.sw + (0, ypart marginOffset);
+    markerPosition := videoDestination.sw + (0, ypart marginOffset);
     drawMarkerPair(markerPosition, -marginOffset,
                    markerLength, arrowLength, "V");
-    drawMarkerPair(videoTarget.nw, -marginOffset,
+    drawMarkerPair(videoDestination.nw, -marginOffset,
                    markerLength, arrowLength, "V");
-    drawLabel(videoTarget.w, "left", labelScaleFactor,
+    drawLabel(videoDestination.w, "left", labelScaleFactor,
               true, "topBottomMargin");
 
     markerLength := 1mm;
     arrowLength  := 2mm;
-    markerPosition := 1/2[videoTarget.c, videoTarget.n];
+    markerPosition := 1/2[videoDestination.c, videoDestination.n];
     drawMarkerPair(markerPosition, -(1mm, 0),
                    markerLength, arrowLength, "H");
     drawLabel(markerPosition - (0, 2markerLength), "center",

@@ -1,0 +1,58 @@
+# pyproject.toml for LilypondToBandVideoConverter
+
+[build-system]
+requires = [ "setuptools" ]
+build-backend = "setuptools.build_meta"
+
+#--------------------
+
+[project]
+name = "LilypondToBandVideoConverter"
+version = "1.2.1"
+description = "Generator for Notation Videos from Lilypond Text"
+readme = "README.md"
+authors = [ { name = "Dr. Thomas Tensi", email = "t.tensi@gmx.de" } ]
+keywords = [ "audio", "conversion", "ffmpeg", "lilypond", "midi", "sox" ]
+dependencies = [ "mutagen" ]
+requires-python = ">=3.7"
+license = "MIT"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Topic :: Multimedia :: Video :: Conversion",
+]
+
+#--------------------
+
+[project.urls]
+homepage = "https://github.com/prof-spock/LilypondToBandVideoConverter"
+repository = "https://github.com/prof-spock/LilypondToBandVideoConverter"
+
+#--------------------
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-dir]
+"lilypondtobvc.config"               = "config"
+"lilypondtobvc.demo"                 = "demo"
+"lilypondtobvc.src"                  = "lilypondtobvc/src"
+"lilypondtobvc.src.basemodules"      = "lilypondtobvc/src/basemodules"
+"lilypondtobvc.src.convertermodules" = "lilypondtobvc/src/convertermodules"
+
+#--------------------
+
+[tool.setuptools.package-data]
+"lilypondtobvc.config" = [ "*.cfg" ]
+"lilypondtobvc.demo"   = [ "*.txt", "*.jpg", "*.ly" ]
+"lilypondtobvc.doc"    = [ "../*.pdf" ]
+
+#--------------------
+
+[project.scripts]
+lilypondtobvc = "lilypondtobvc.src.main:main"

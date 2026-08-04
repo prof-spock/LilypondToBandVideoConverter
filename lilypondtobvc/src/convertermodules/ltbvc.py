@@ -1,9 +1,9 @@
-# ltbvc -- script that produces lilypond files and target files
+# ltbvc -- script that produces lilypond files and destination files
 #          for single voices, a complete score, a midi file, audio and
 #          video files based on a configuration file from a lilypond
 #          music fragment file
 #
-# author: Dr. Thomas Tensi, 2006 - 2018
+# author: Dr. Thomas Tensi, 2006 - 2026
 
 #====================
 # IMPORTS
@@ -11,13 +11,15 @@
 
 import argparse
 import re
+import time
 
 from basemodules.datatypesupport import SETATTR
 from basemodules.operatingsystem import OperatingSystem
+from basemodules.progressmessage import ProgressMessage
 from basemodules.simplelogging import Logging, Logging_Level
-from basemodules.simpletypes import Boolean, Callable, List, Map, \
-                                    Natural, Real, String, StringList, \
-                                    StringMap, StringSet, Tuple
+from basemodules.simpletypes import \
+    Boolean, Callable, List, Map, Natural, Real, String, \
+    StringList, StringMap, StringSet, Tuple
 from basemodules.stringutil import deserializeToList
 from basemodules.ttbase import iif
 from basemodules.validitychecker import ValidityChecker
@@ -25,14 +27,15 @@ from basemodules.validitychecker import ValidityChecker
 from .audiotrackmanager import AudioTrackManager
 from .lilypondfilegenerator import LilypondFile
 from .lilypondpngvideogenerator import LilypondPngVideoGenerator
-from .ltbvc_businesstypes import MidiTrackSettings, VideoFileKind, \
-                                 VideoTarget
+from .ltbvc_businesstypes import \
+    MidiTrackSettings, VideoDestination, VideoFileKind
 from .ltbvc_configurationdatahandler import LTBVC_ConfigurationData
 from .miditransformer import MidiTransformer
 from .videoaudiocombiner import VideoAudioCombiner
 
 #====================
 
+_programName = "lilypondToBandVideoConverter"
 _subtitleFileNameTemplate = "%s_subtitle.srt"
 _silentVideoFileNameTemplate = "%s_noaudio%s.%s"
 
@@ -112,17 +115,19 @@ class _CommandLineOptions:
 
         Logging.trace(">>")
 
-        programDescription = ("Generates lilypond files and target files"
-                              + " for single voices, a complete score,"
-                              + " a midi file and videos based on a"
-                              + " configuration file")
-        p = argparse.ArgumentParser(description=programDescription)
+        programDescription = ("Generates lilypond files and destination"
+                              + " files for single voices, a complete"
+                              + " score, a midi file and videos based"
+                              + " on a configuration file")
+        p = argparse.ArgumentParser(prog = _programName,
+                                    description = programDescription)
 
         p.add_argument("-k", action="store_true", dest="keepFiles",
                        help="tells to keep intermediate files")
         p.add_argument("configurationFilePath",
                        help="name of configuration file for song")
-        p.add_argument("-l", "--loggingFilePath")
+        p.add_argument("-l", "--loggingFilePath",
+                       help="name of logging file (for debugging)")
         p.add_argument("--phases",
                        required=True,
                        help=("slash-separated list of phase names to be"
@@ -306,16 +311,17 @@ class _LilypondProcessor:
     @classmethod
     def _makePdf (cls,
                   processingPhase : String,
-                  targetFileNamePrefix : String,
+                  destinationFileNamePrefix : String,
                   voiceNameList : StringList):
         """Processes lilypond file and generates extract or score PDF
            file."""
 
-        Logging.trace(">>: targetFilePrefix = %r, voiceNameList=%r",
-                      targetFileNamePrefix, voiceNameList)
+        Logging.trace(">>: destinationFilePrefix = %r,"
+                      + " voiceNameList=%r",
+                      destinationFileNamePrefix, voiceNameList)
 
-        tempLilypondFilePath = cls._adaptTempFileName(processingPhase,
-                                                      voiceNameList)
+        tempLilypondFilePath = \
+            cls._adaptTempFileName(processingPhase, voiceNameList)
         configData = cls._configData
         lilypondFile = LilypondFile(tempLilypondFilePath)
         lilypondFile.generate(configData.includeFilePath,
@@ -329,9 +335,10 @@ class _LilypondProcessor:
                               configData.measureToTempoMap,
                               configData.phaseAndVoiceNameToClefMap,
                               configData.phaseAndVoiceNameToStaffListMap)
-        cls._processLilypond(tempLilypondFilePath, targetFileNamePrefix)
-        OperatingSystem.moveFile(targetFileNamePrefix + ".pdf",
-                                 configData.targetDirectoryPath)
+        cls._processLilypond(tempLilypondFilePath,
+                             destinationFileNamePrefix)
+        OperatingSystem.moveFile(destinationFileNamePrefix + ".pdf",
+                                 configData.destinationDirectoryPath)
         OperatingSystem.removeFile(tempLilypondFilePath,
                                    configData.intermediateFilesAreKept)
 
@@ -340,21 +347,58 @@ class _LilypondProcessor:
     #--------------------
 
     @classmethod
+    def _postprocessMidiFile (cls, midiFileName):
+        """Postprocesses previously generated MIDI file named
+           <midiFileName> adding some humanization"""
+
+        Logging.trace(">>")
+
+        configData = cls._configData
+        destinationMidiFileName = (cls._midiFileNameTemplate
+                                   % configData.fileNamePrefix)
+
+        ProgressMessage.reportProcessingStart("adapting MIDI into "
+                                              + destinationMidiFileName)
+
+        trackToSettingsMap = cls._calculateTrackToSettingsMap()
+
+        midiTransformer = \
+            MidiTransformer(midiFileName,
+                            configData.intermediateFilesAreKept,
+                            configData.largeBankNumbersAreSupported)
+        midiTransformer.addMissingTrackNames()
+        midiTransformer.humanizeTracks(configData.countInMeasureCount,
+                        configData.measureToHumanizationStyleNameMap)
+        midiTransformer.positionInstruments(trackToSettingsMap)
+        midiTransformer.addProcessingDateToTracks(trackToSettingsMap.keys())
+        midiTransformer.save(destinationMidiFileName)
+
+        OperatingSystem.moveFile(destinationMidiFileName,
+                                 configData.destinationDirectoryPath)
+
+        ProgressMessage.reportProcessingEnd()
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
     def _processLilypond (cls,
                           lilypondFilePath : String,
-                          targetFileNamePrefix : String):
+                          destinationFileNamePrefix : String):
         """Processes <lilypondFilePath> and stores result in file with
-           <targetFileNamePrefix>."""
+           <destinationFileNamePrefix>."""
 
-        Logging.trace(">>: lilyFile = %r, targetFileNamePrefix=%r",
-                      lilypondFilePath, targetFileNamePrefix)
+        Logging.trace(">>: lilyFile = %r, destinationFileNamePrefix=%r",
+                      lilypondFilePath, destinationFileNamePrefix)
 
-        OperatingSystem.showMessageOnConsole("== processing %s with lilypond"
-                                             % targetFileNamePrefix)
+        ProgressMessage.reportProcessingStart("processing %s with lilypond"
+                                              % destinationFileNamePrefix)
         command = (cls._lilypondCommand,
-                   "--output", targetFileNamePrefix,
+                   "--output", destinationFileNamePrefix,
                    lilypondFilePath)
         OperatingSystem.executeCommand(command, True)
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -362,51 +406,54 @@ class _LilypondProcessor:
 
     @classmethod
     def _processSingleFinalVideoFile (cls,
-                                      videoTarget : VideoTarget,
+                                      videoDestination : VideoDestination,
                                       videoFileKindName : String,
                                       videoFileExtension : String,
                                       voiceNameList : StringList,
                                       silentVideoFilePath : String,
                                       tempMp4FilePath : String,
                                       tempSubtitleFilePath : String,
-                                      targetVideoFilePath : String):
+                                      destinationVideoFilePath : String):
         """Generates final video from silent video, audio tracks and
-           subtitle files for given <videoTarget>;
+           subtitle files for given <videoDestination>;
            <videoFileExtension> gives the extension of the video file
            generated, <voiceNameList> gives the list of affected
            voices, <silentVideoFilePath> the path of the silent video
            source, <tempMp4FilePath> the path for a generated
            temporary MP4 video, <tempSubtitleFilePath> the path of the
-           subtitle file and <targetVideoFilePath> the path for the
-           target files"""
+           subtitle file and <destinationVideoFilePath> the path for the
+           destination files"""
 
-        Logging.trace(">>: videoTarget = %s,"
+        Logging.trace(">>: videoDestination = %s,"
                       + " videoFileExtension = '%s',"
                       + " silentVideoFilePath = '%s',"
                       + " voiceNameList = %r,"
                       + " tempMp4FilePath = '%s',"
                       + " tempSubtitleFilePath = '%s',"
-                      + " targetVideoFilePath = '%s'",
-                      videoTarget, videoFileExtension,
+                      + " destinationVideoFilePath = '%s'",
+                      videoDestination, videoFileExtension,
                       silentVideoFilePath, voiceNameList,
                       tempMp4FilePath, tempSubtitleFilePath,
-                      targetVideoFilePath)
+                      destinationVideoFilePath)
 
-        if videoFileExtension == "tar":
+        isTarFile = (videoFileExtension == "tar")
+        messageTemplate = (iif(isTarFile, "copying",  "generating")
+                           + " final video for %s")
+        message = (messageTemplate % videoFileKindName)
+        ProgressMessage.reportProcessingStart(message)
+
+        if isTarFile:
             if not OperatingSystem.hasFile(silentVideoFilePath):
                 Logging.trace("cannot copy file %s", silentVideoFilePath)
                 message = ("ERR: cannot find %s" % silentVideoFilePath)
+                OperatingSystem.showMessageOnConsole(message)
             else:
                 OperatingSystem.copyFile(silentVideoFilePath,
-                                         targetVideoFilePath)
-                message = ("=== copying final video for %s"
-                           % videoFileKindName)
-
-            OperatingSystem.showMessageOnConsole(message)
+                                         destinationVideoFilePath)
         else:
             configData = cls._configData
 
-            if not videoTarget.subtitlesAreHardcoded:
+            if not videoDestination.subtitlesAreHardcoded:
                 videoFilePath = silentVideoFilePath
                 effectiveSubtitleFilePath = tempSubtitleFilePath
             else:
@@ -417,9 +464,9 @@ class _LilypondProcessor:
                                     tempSubtitleFilePath,
                                     videoFilePath,
                                     configData.shiftOffset,
-                                    videoTarget.subtitleColor,
-                                    videoTarget.subtitleFontSize,
-                                    videoTarget.ffmpegPresetName)
+                                    videoDestination.subtitleColor,
+                                    videoDestination.subtitleFontSize,
+                                    videoDestination.ffmpegPresetName)
 
             trackDataList = \
                AudioTrackManager \
@@ -428,18 +475,19 @@ class _LilypondProcessor:
             VideoAudioCombiner.combine(voiceNameList,
                                        trackDataList,
                                        videoFilePath,
-                                       targetVideoFilePath,
+                                       destinationVideoFilePath,
                                        effectiveSubtitleFilePath)
 
-            mediaType = "TV Show"
             VideoAudioCombiner.tagVideoFile( \
-                                    targetVideoFilePath,
+                                    destinationVideoFilePath,
                                     configData.albumName,
                                     configData.artistName,
                                     configData.albumArtFilePath,
                                     configData.title,
-                                    mediaType,
+                                    videoDestination.mediaType,
                                     configData.songYear)
+
+        ProgressMessage.reportProcessingEnd()
 
         Logging.trace("<<")
 
@@ -447,28 +495,28 @@ class _LilypondProcessor:
 
     @classmethod
     def _processSingleSilentVideoFile(cls,
-                                      videoTarget : VideoTarget,
+                                      videoDestination : VideoDestination,
                                       videoFileKind : VideoFileKind,
                                       voiceNameList : StringList,
                                       tempLilypondFilePath : String,
-                                      targetDirectoryPath : String):
+                                      destinationDirectoryPath : String):
         """Generates silent video from lilypond notation pages for
-           given <videoTarget> and <videoFileKind>; <voiceNameList>
+           given <videoDestination> and <videoFileKind>; <voiceNameList>
            gives the list of affected voices, <tempLilypondFilePath>
            the path for the generated lilypond file and
-           <targetDirectoryPath> the target path for the silent video
+           <destinationDirectoryPath> the destination path for the silent video
            file"""
 
-        Logging.trace(">>: videoTarget = %s,"
+        Logging.trace(">>: videoDestination = %s,"
                       + " videoFileKind = %s,"
                       + " voiceNameList = %r,"
                       + " tempLilypondFilePath = '%s',"
-                      + " targetDirectoryPath = '%s'",
-                      videoTarget, videoFileKind, voiceNameList,
-                      tempLilypondFilePath, targetDirectoryPath)
+                      + " destinationDirectoryPath = '%s'",
+                      videoDestination, videoFileKind, voiceNameList,
+                      tempLilypondFilePath, destinationDirectoryPath)
                                                       
         configData = cls._configData
-        targetSubtitleFileName = (targetDirectoryPath
+        destinationSubtitleFileName = (destinationDirectoryPath
                                   + cls._pathSeparator
                                   + (_subtitleFileNameTemplate
                                      % configData.fileNamePrefix))
@@ -477,17 +525,17 @@ class _LilypondProcessor:
         intermediateFileDirectoryPath = \
             configData.intermediateFileDirectoryPath
         mmPerInch = 25.4
-        factor = mmPerInch / videoTarget.resolution
-        videoWidth  = videoTarget.width  * factor
-        videoHeight = videoTarget.height * factor
+        factor = mmPerInch / videoDestination.resolution
+        videoWidth  = videoDestination.width  * factor
+        videoHeight = videoDestination.height * factor
         videoLineWidth = \
-            videoWidth - 2 * videoTarget.leftRightMargin
+            videoWidth - 2 * videoDestination.leftRightMargin
 
         lilypondFile = LilypondFile(tempLilypondFilePath)
-        lilypondFile.setVideoParameters(videoTarget.name,
-                                        videoTarget.resolution,
-                                        videoTarget.systemSize,
-                                        videoTarget.topBottomMargin,
+        lilypondFile.setVideoParameters(videoDestination.name,
+                                        videoDestination.resolution,
+                                        videoDestination.systemSize,
+                                        videoDestination.topBottomMargin,
                                         videoWidth, videoHeight,
                                         videoLineWidth)
 
@@ -503,10 +551,10 @@ class _LilypondProcessor:
                       configData.phaseAndVoiceNameToClefMap,
                       configData.phaseAndVoiceNameToStaffListMap)
 
-        frameRate = videoTarget.frameRate
+        frameRate = videoDestination.frameRate
         videoFileExtension = cls._videoFileExtension(frameRate)
 
-        targetVideoFileName = (targetDirectoryPath
+        destinationVideoFileName = (destinationDirectoryPath
                              + cls._pathSeparator
                              + (_silentVideoFileNameTemplate
                                 % (configData.fileNamePrefix,
@@ -514,23 +562,23 @@ class _LilypondProcessor:
                                    videoFileExtension)))
         videoGenerator = \
             LilypondPngVideoGenerator(tempLilypondFilePath,
-                                      targetVideoFileName,
-                                      targetSubtitleFileName,
+                                      destinationVideoFileName,
+                                      destinationSubtitleFileName,
                                       configData.measureToTempoMap,
                                       configData.countInMeasureCount,
                                       frameRate,
-                                      videoTarget.scalingFactor,
-                                      videoTarget.ffmpegPresetName,
+                                      videoDestination.scalingFactor,
+                                      videoDestination.ffmpegPresetName,
                                       intermediateFileDirectoryPath,
                                       intermediateFilesAreKept)
 
         videoGenerator.process()
         videoGenerator.cleanup()
 
-        ##OperatingSystem.moveFile(targetVideoFileName,
-        ##                         configData.targetDirectoryPath)
-        ##OperatingSystem.moveFile(targetSubtitleFileName,
-        ##                         configData.targetDirectoryPath)
+        ##OperatingSystem.moveFile(destinationVideoFileName,
+        ##                         configData.destinationDirectoryPath)
+        ##OperatingSystem.moveFile(destinationSubtitleFileName,
+        ##                         configData.destinationDirectoryPath)
         Logging.trace("<<")
 
     #--------------------
@@ -550,7 +598,7 @@ class _LilypondProcessor:
             midiInstrumentBank = int(midiInstrumentBank)
             midiInstrument     = int(midiInstrument)
 
-        result = midiInstrumentBank, midiInstrument
+        result = (midiInstrumentBank, midiInstrument)
         Logging.trace("<<: %r", result)
         return result
 
@@ -595,7 +643,7 @@ class _LilypondProcessor:
     @classmethod
     def processExtract (cls):
         """Generates voice extracts as PDF and move them to local
-           target directory."""
+           destination directory."""
 
         Logging.trace(">>")
 
@@ -605,10 +653,11 @@ class _LilypondProcessor:
         for voiceName in relevantVoiceNameSet:
             Logging.trace("--: processing %s", voiceName)
             singleVoiceNameList = [ voiceName ]
-            targetFileNamePrefix = ("%s-%s"
-                                    % (cls._configData.fileNamePrefix,
-                                       voiceName))
-            cls._makePdf("extract", targetFileNamePrefix, singleVoiceNameList)
+            destinationFileNamePrefix = \
+                ("%s-%s" % (cls._configData.fileNamePrefix,
+                            voiceName))
+            cls._makePdf("extract",
+                         destinationFileNamePrefix, singleVoiceNameList)
 
         Logging.trace("<<")
 
@@ -630,7 +679,7 @@ class _LilypondProcessor:
                            + "/tempVideoWithSubtitles.mp4")
 
         # --- shift subtitles ---
-        subtitleFilePath = "%s/%s" % (configData.targetDirectoryPath,
+        subtitleFilePath = "%s/%s" % (configData.destinationDirectoryPath,
                                       (_subtitleFileNameTemplate
                                        % configData.fileNamePrefix))
         VideoAudioCombiner.shiftSubtitleFile(subtitleFilePath,
@@ -647,42 +696,43 @@ class _LilypondProcessor:
             if len(voiceNameList) == 0:
                 Logging.trace("--: no voices found for %s", videoFileKind)
             else:
-                videoTargetName = videoFileKind.target
+                videoDestinationName = videoFileKind.destination
 
-                if videoTargetName not in configData.videoTargetMap:
-                    Logging.traceError("unknown video target %s for file"
+                if videoDestinationName not in configData.videoDestinationMap:
+                    Logging.traceError("unknown video destination %s for file"
                                        + " kind %s",
-                                       videoTargetName, videoFileKindName)
+                                       videoDestinationName, videoFileKindName)
                 else:
-                    videoTarget = configData.videoTargetMap[videoTargetName]
-                    frameRate = videoTarget.frameRate
+                    videoDestination = \
+                        configData.videoDestinationMap[videoDestinationName]
+                    frameRate = videoDestination.frameRate
                     videoFileExtension = cls._videoFileExtension(frameRate)
 
                     silentVideoFilePath = \
                         (("%s/" + _silentVideoFileNameTemplate)
-                         % (configData.targetDirectoryPath,
+                         % (configData.destinationDirectoryPath,
                             configData.fileNamePrefix,
                             videoFileKind.fileNameSuffix,
                             videoFileExtension))
-                    targetDirectoryPath = videoFileKind.directoryPath
-                    ValidityChecker.isDirectory(targetDirectoryPath,
-                                                "video target directory")
-                    targetVideoFilePath = \
+                    destinationDirectoryPath = videoFileKind.directoryPath
+                    ValidityChecker.isDirectory(destinationDirectoryPath,
+                                                "video destination directory")
+                    destinationVideoFilePath = \
                         ("%s/%s%s%s.%s"
-                         % (targetDirectoryPath,
-                            configData.targetFileNamePrefix,
+                         % (destinationDirectoryPath,
+                            configData.destinationFileNamePrefix,
                             configData.fileNamePrefix,
                             videoFileKind.fileNameSuffix,
                             videoFileExtension))
 
-                    cls._processSingleFinalVideoFile(videoTarget,
+                    cls._processSingleFinalVideoFile(videoDestination,
                                                      videoFileKindName,
                                                      videoFileExtension,
                                                      voiceNameList,
                                                      silentVideoFilePath,
                                                      tempMp4FilePath,
                                                      tempSubtitleFilePath,
-                                                     targetVideoFilePath)
+                                                     destinationVideoFilePath)
 
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         OperatingSystem.removeFile(tempSubtitleFilePath,
@@ -701,9 +751,12 @@ class _LilypondProcessor:
         Logging.trace(">>")
 
         configData = cls._configData
-        intermediateFilesAreKept = configData.intermediateFilesAreKept
         tempLilypondFilePath = cls._adaptTempFileName("midi", [])
         lilypondFile = LilypondFile(tempLilypondFilePath)
+        tempMidiFileNamePrefix = (configData.intermediateFileDirectoryPath
+                                  + cls._pathSeparator
+                                  + configData.fileNamePrefix + "-temp")
+        tempMidiFileName = tempMidiFileNamePrefix + ".mid"
 
         voiceNameToMidiInstrumentMap, \
         voiceNameToMidiVolumeMap, \
@@ -723,36 +776,13 @@ class _LilypondProcessor:
                               configData.measureToTempoMap,
                               configData.phaseAndVoiceNameToClefMap,
                               configData.phaseAndVoiceNameToStaffListMap)
-
-        tempMidiFileNamePrefix = (configData.intermediateFileDirectoryPath
-                                  + cls._pathSeparator
-                                  + configData.fileNamePrefix + "-temp")
-        tempMidiFileName = tempMidiFileNamePrefix + ".mid"
-        targetMidiFileName = (cls._midiFileNameTemplate
-                              % configData.fileNamePrefix)
-
         cls._processLilypond(tempLilypondFilePath, tempMidiFileNamePrefix)
+        cls._postprocessMidiFile(tempMidiFileName)
 
-        # postprocess MIDI file
-        OperatingSystem.showMessageOnConsole("== adapting MIDI into "
-                                             + targetMidiFileName)
-        trackToSettingsMap = cls._calculateTrackToSettingsMap()
-
-        midiTransformer = MidiTransformer(tempMidiFileName,
-                                          intermediateFilesAreKept)
-        midiTransformer.addMissingTrackNames()
-        midiTransformer.humanizeTracks(configData.countInMeasureCount,
-                        configData.measureToHumanizationStyleNameMap)
-        midiTransformer.positionInstruments(trackToSettingsMap)
-        midiTransformer.addProcessingDateToTracks(trackToSettingsMap.keys())
-        midiTransformer.save(targetMidiFileName)
-
-        OperatingSystem.moveFile(targetMidiFileName,
-                                 configData.targetDirectoryPath)
-        OperatingSystem.removeFile(tempMidiFileName,
-                                   intermediateFilesAreKept)
         OperatingSystem.removeFile(tempLilypondFilePath,
-                                   intermediateFilesAreKept)
+                                   configData.intermediateFilesAreKept)
+        OperatingSystem.removeFile(tempMidiFileName,
+                                   configData.intermediateFilesAreKept)
 
         Logging.trace("<<")
 
@@ -780,7 +810,7 @@ class _LilypondProcessor:
 
         configData = cls._configData
         songName = configData.title
-        midiFilePath = (configData.targetDirectoryPath + "/"
+        midiFilePath = (configData.destinationDirectoryPath + "/"
                         + (cls._midiFileNameTemplate
                            % configData.fileNamePrefix))
 
@@ -834,7 +864,7 @@ class _LilypondProcessor:
 
     @classmethod
     def processScore (cls):
-        """Generates score as PDF and moves them to local target
+        """Generates score as PDF and moves them to local destination
            directory."""
 
         Logging.trace(">>")
@@ -857,7 +887,7 @@ class _LilypondProcessor:
         intermediateFilesAreKept = configData.intermediateFilesAreKept
         intermediateFileDirectoryPath = \
             configData.intermediateFileDirectoryPath
-        targetDirectoryPath = configData.targetDirectoryPath
+        destinationDirectoryPath = configData.destinationDirectoryPath
         tempLilypondFilePath = cls._adaptTempFileName("silentvideo", [])
 
         for _, videoFileKind in configData.videoFileKindMap.items():
@@ -869,22 +899,25 @@ class _LilypondProcessor:
             if len(voiceNameList) == 0:
                 Logging.trace("--: no voices found for %s", videoFileKind)
             else:
-                message = ("== generating silent video for %s"
+                message = ("generating silent video for %s"
                            % videoFileKind.name)
-                OperatingSystem.showMessageOnConsole(message)
-                videoTargetName = videoFileKind.target
+                ProgressMessage.reportProcessingStart(message)
+                videoDestinationName = videoFileKind.destination
 
-                if videoTargetName not in configData.videoTargetMap:
-                    Logging.traceError("unknown video target %s for"
+                if videoDestinationName not in configData.videoDestinationMap:
+                    Logging.traceError("unknown video destination %s for"
                                        + " file kind %s",
-                                       videoTargetName, videoFileKind.name)
+                                       videoDestinationName, videoFileKind.name)
                 else:
-                    videoTarget = configData.videoTargetMap[videoTargetName]
-                    cls._processSingleSilentVideoFile(videoTarget,
+                    videoDestination = \
+                        configData.videoDestinationMap[videoDestinationName]
+                    cls._processSingleSilentVideoFile(videoDestination,
                                                       videoFileKind,
                                                       voiceNameList,
                                                       tempLilypondFilePath,
-                                                      targetDirectoryPath)
+                                                      destinationDirectoryPath)
+
+                ProgressMessage.reportProcessingEnd()
 
         OperatingSystem.removeFile(tempLilypondFilePath,
                                    configData.intermediateFilesAreKept)
@@ -911,7 +944,9 @@ def conditionalExecuteHandlerProc (processingPhase : String,
                             iif(isPreprocessing, "preprocess", "postprocess")])
 
     if len(allowedPhaseSet.intersection(processingPhaseSet)) > 0:
+        ProgressMessage.reportProcessingStart("phase '%s'" % processingPhase)
         handlerProc()
+        ProgressMessage.reportProcessingEnd()
 
     Logging.trace("<<")
 
@@ -1015,8 +1050,3 @@ def main ():
                                           isPreprocessing, handlerProc)
 
     Logging.trace("<<")
-
-#--------------------
-
-if __name__ == "__main__":
-    main()

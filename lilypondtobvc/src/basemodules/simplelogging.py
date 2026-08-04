@@ -15,6 +15,7 @@ from basemodules.typesupport import toUnicodeString
 if not isMicroPython:
     import atexit
     import io
+    import threading
 
 #====================
 
@@ -51,9 +52,31 @@ class Logging_Level:
             result = cls.standardAbbreviated
         elif st == "error":
             result = cls.error
+        else:
+            result = cls.noLogging
        
         return result
     
+    #--------------------
+
+    @classmethod
+    def toString (cls,
+                  level : Natural) -> String:
+        """Converts <level> to string"""
+
+        if level == cls.verbose:
+            result = "verbose"
+        elif level == cls.standard:
+            result = "standard"
+        elif level == cls.standardAbbreviated:
+            result = "standardAbbreviated"
+        elif level == cls.error:
+            result = "error"
+        else:
+            result = "noLogging"
+
+        return result
+        
 #====================
 
 class Logging:
@@ -65,13 +88,14 @@ class Logging:
     _fileIsOpen                 = None
     _fileIsKeptOpen             = None
     _file                       = None
-    _isEnabled                  = True
+    _isActive                   = True
     _timeIsLogged               = True
     _timeFactor                 = 1
     _timeFractionalPartTemplate = ""
     _timeFractionalDigitCount   = 0
     _previousTimestamp          = 0
     _timeOfDayString            = ""
+    _threadIDIsLogged           = False
 
     # buffer logs data before log file is opened, otherwise a
     # write-through will be done
@@ -115,28 +139,14 @@ class Logging:
 
             while not found:
                 currentFrame = sys._getframe(callerDepth)
-                functionName = currentFrame.f_code.co_name
+                codeObject = currentFrame.f_code
+                functionName = codeObject.co_name
                 found = (functionName not in cls._ignoredFunctionNameList)
 
                 if not found:
                     callerDepth = callerDepth + 1
                 else:
-                    # check whether this is a method in a class using
-                    # python conventions
-                    localVariableList = currentFrame.f_locals
-                    hasSelfVariable   = ("self" in localVariableList)
-                    hasClsVariable    = ("cls" in localVariableList)
-
-                    if hasSelfVariable:
-                        variable = localVariableList["self"]
-                        className = variable.__class__.__name__
-                    elif hasClsVariable:
-                        className = localVariableList["cls"].__name__
-                    else:
-                        className = ""
-
-                    functionName = (className + iif(className > "", ".", "")
-                                    + functionName)
+                    functionName = codeObject.co_qualname
 
         return functionName
 
@@ -146,6 +156,7 @@ class Logging:
     def _closeFileConditionally (cls):
         if cls._fileIsOpen:
             cls._file.close()
+            cls._fileIsOpen = False
         
     #--------------------
 
@@ -213,7 +224,7 @@ class Logging:
         """Writes <argumentList> formatted by <template> together with
            function name to log file."""
 
-        if cls._isEnabled and level <= cls._referenceLevel:
+        if cls._isActive and level <= cls._referenceLevel:
             functionName = cls._callingFunctionName()
             prefixLength = cls._tracePrefixLength
 
@@ -222,21 +233,29 @@ class Logging:
                             + iif(len(template) > 0, ":", "")
                             + template)
 
+            if cls._threadIDIsLogged:
+                threadID = threading.current_thread().ident
+                threadIDString = " [%d]" % threadID
+            else:
+                threadIDString = ""
+                
             if cls._timeIsLogged:
                 timeString = " (" + cls._currentTimeOfDay() + ")"
             else:
                 timeString = ""
 
-            st = template[0:prefixLength] + functionName + timeString
+            st = (template[0:prefixLength]
+                  + functionName
+                  + timeString
+                  + threadIDString)
             template = template[prefixLength:]
 
-            # workaround for JYTHON
+            # workaround for JYTHON or for mismatch in template and
+            # argument list
             try:
                 st += template % argumentList
             except:
-                st += template + " ###JYTHON CONVERSION ERROR###"
-
-            st = st.replace("\n", "#")
+                st += template + " ###CONVERSION ERROR###"
 
             if (cls._referenceLevel == Logging_Level.standardAbbreviated
                 and st[0:prefixLength] in cls._standardPrefixList):
@@ -256,7 +275,10 @@ class Logging:
         if isMicroPython:
             print(st)
         else:
-            st = st + '\n'
+            for pattern in ("\r\n", "\n", "\r"):
+                st = st.replace(pattern, "<BR/>")
+
+            st += '\n'
 
             if cls._fileName == "":
                 # no output file => put line to buffer
@@ -295,7 +317,7 @@ class Logging:
         cls._referenceLevel = Logging_Level.noLogging
         cls._fileName       = ""
         cls._fileIsOpen     = False
-        cls._isEnabled      = True
+        cls._isActive       = True
         cls._buffer.clear()
 
         header = "START LOGGING -*- coding:utf-8 -*-"
@@ -324,7 +346,7 @@ class Logging:
                     isEnabled : Boolean):
         """Sets logging to active or inactive"""
 
-        cls._isEnabled = isEnabled
+        cls._isActive = isEnabled
 
     #--------------------
 
@@ -368,6 +390,23 @@ class Logging:
     #--------------------
 
     @classmethod
+    def setTracingOfThreadID (cls,
+                              threadIDIsLogged : Boolean):
+        """Sets logging of threads to active or inactive depending on
+           <threadIDIsLogged>"""
+
+        Logging.trace(">>: %s", threadIDIsLogged)
+
+        if isMicroPython:
+            Logging.trace("--: multiprocessing not supported in MicroPython")
+        else:
+            cls._threadIDIsLogged = threadIDIsLogged
+
+        Logging.trace("<<")
+
+    #--------------------
+
+    @classmethod
     def setTracingWithTime (cls,
                             timeIsLogged : Boolean,
                             fractionalDigitCount : Natural = 0):
@@ -392,7 +431,7 @@ class Logging:
         """Writes <st> as a line to log file, when <level> is below or
            equal to the reference level."""
 
-        if cls._referenceLevel >= level and cls._isEnabled:
+        if cls._referenceLevel >= level and cls._isActive:
             # log message is significant 
             cls._writeLine(st)
 

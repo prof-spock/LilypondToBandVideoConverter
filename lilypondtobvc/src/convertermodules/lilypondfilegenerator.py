@@ -164,8 +164,8 @@ class LilypondFile:
 
         Logging.trace(">>: %s", voiceName)
 
-        target = self._phase
-        lyricsMacroNamePrefix = "%sLyrics%s" % (voiceName, target.capitalize())
+        phase = self._phase
+        lyricsMacroNamePrefix = "%sLyrics%s" % (voiceName, phase.capitalize())
         lyricsCount = self._lyricsCount(voiceName)
         suffixList = "ABCDEFGHIJK"
 
@@ -314,11 +314,11 @@ class LilypondFile:
         Logging.trace(">>: %s", voiceName)
 
         result = 0
-        target = self._phase
+        phase = self._phase
 
         if voiceName in self._voiceNameToLyricsMap:
             entry = self._voiceNameToLyricsMap[voiceName]
-            result = entry.get(target, 0)
+            result = entry.get(phase, 0)
 
         Logging.trace("<<: %d", result)
         return result
@@ -468,17 +468,17 @@ class LilypondFile:
         Logging.trace(">>: %s", voiceName)
 
         cls = self.__class__
-        target = self._phase
+        phase = self._phase
 
         if voiceName in self._voiceNameToChordsMap:
-            if target in self._voiceNameToChordsMap[voiceName]:
+            if phase in self._voiceNameToChordsMap[voiceName]:
                 lilypondVoiceName = cls._lilypondVoiceName(voiceName)
                 lilypondVoiceName = (lilypondVoiceName[0].upper()
                                      + lilypondVoiceName[1:])
                 chordsName = "chords" + lilypondVoiceName
-                chordsMacroName = chordsName + target.capitalize()
+                chordsMacroName = chordsName + phase.capitalize()
                 alternativeMacroNameList = [ chordsName,
-                                             "chords" + target.capitalize(),
+                                             "chords" + phase.capitalize(),
                                              "allChords" ]
                 self._ensureMacroAvailability(chordsMacroName,
                                               alternativeMacroNameList)
@@ -511,22 +511,23 @@ class LilypondFile:
             self._printLine(0, "ltbvcVideoDeviceName = \"%s\""
                             % self._videoDeviceName)
 
-        # print initial tempo for all target files
+        # print initial tempo for all destination files
         initialTempo = self._songMeasureToTempoMap[1][0]
         self._printLine(0,
                         ("initialTempo = { %s }"
                          % cls._tempoString(initialTempo)))
 
-        if not self._targetIsPdf:
+        if not self._destinationFileIsPdf:
             self._writeNonPdfHeader()
             self._printEmptyLine()
 
-        if not self._targetIsPdf and self._lilypondArticulationIsUsed:
+        if (not self._destinationFileIsPdf
+            and self._lilypondArticulationIsUsed):
             # add reference to articulation file
             self._printLine(0, "\\include \"articulate.ly\"")
             self._printEmptyLine()
 
-        if self._targetIsPdf:
+        if self._destinationFileIsPdf:
             self._writePdfLayoutHeader()
             self._printEmptyLine()
 
@@ -547,7 +548,7 @@ class LilypondFile:
 
     def _writeNonPdfHeader (self):
         """Writes the header of a lilypond file based on <self>
-           targetting for a MIDI file or a video"""
+           destined for a MIDI file or a video"""
 
         Logging.trace(">>: %r", self)
 
@@ -887,10 +888,10 @@ class LilypondFile:
         self._videoLineWidth       = 8
 
         # derived data
-        self._targetIsPdf                 = False
-        self._isExtractScore              = False
-        self._isMidiScore                 = False
-        self._isVideoScore                = False
+        self._destinationFileIsPdf = False
+        self._isExtractScore       = False
+        self._isMidiScore          = False
+        self._isVideoScore         = False
 
         Logging.trace("<<: %r", self)
 
@@ -985,10 +986,10 @@ class LilypondFile:
         self._isFirstChordedSystem            = True
 
         # derived data
-        self._targetIsPdf    = (phase in ["extract", "score"])
-        self._isExtractScore = (phase == "extract")
-        self._isMidiScore    = (phase == "midi")
-        self._isVideoScore   = (phase == "video")
+        self._destinationFileIsPdf = (phase in ["extract", "score"])
+        self._isExtractScore       = (phase == "extract")
+        self._isMidiScore          = (phase == "midi")
+        self._isVideoScore         = (phase == "video")
 
         self._includeFileMacroNameSet = \
             _LilypondIncludeFile.definedMacroNameSet(includeFileName)

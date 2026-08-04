@@ -38,28 +38,28 @@ class OperatingSystem:
     @classmethod
     def _copyOrMoveFile (cls,
                          sourceFileName : String,
-                         targetName : String,
+                         destinationName : String,
                          isCopyOperation : Boolean,
-                         targetDirectoryCreationIsForced : Boolean = False):
+                         destinationDirectoryCreationIsForced : Boolean = False):
         """Depending on <isCopyOperation> either copies or moves file
-           with <sourceFileName> to either file or directory target
-           with <targetName>; if <targetDirectoryCreationIsForced>,
-           target directory is created when it does not exist"""
+           with <sourceFileName> to either file or directory destination
+           with <destinationName>; if <destinationDirectoryCreationIsForced>,
+           destination directory is created when it does not exist"""
 
         Logging.trace(">>: %s %r -> %r",
                       iif(isCopyOperation, "copy", "move"),
-                      sourceFileName, targetName)
+                      sourceFileName, destinationName)
 
         if isStdPython:
             isOkay = True
 
-            if cls.hasDirectory(targetName):
-                directoryName = targetName
+            if cls.hasDirectory(destinationName):
+                directoryName = destinationName
             else:
-                directoryName = cls.dirname(targetName)
+                directoryName = cls.dirname(destinationName)
 
             if not cls.hasDirectory(directoryName):
-                if targetDirectoryCreationIsForced:
+                if destinationDirectoryCreationIsForced:
                     cls.makeDirectory(directoryName)
                 else:
                     errorMessage = "cannot create directory %s"
@@ -68,7 +68,7 @@ class OperatingSystem:
                     isOkay = False
 
             if isOkay:
-                path = shutil.copy2(sourceFileName, targetName)
+                path = shutil.copy2(sourceFileName, destinationName)
                 isOkay = (path is not None)
 
             if isOkay and not isCopyOperation:
@@ -106,16 +106,16 @@ class OperatingSystem:
     @classmethod
     def copyFile (cls,
                   sourceFileName : String,
-                  targetName : String,
-                  targetDirectoryCreationIsForced : Boolean = False):
+                  destinationName : String,
+                  destinationDirectoryCreationIsForced : Boolean = False):
         """Copies file with <sourceFileName> to either file or
-           directory target with <targetName>; if
-           <targetDirectoryCreationIsForced>, target directory is
+           directory destination with <destinationName>; if
+           <destinationDirectoryCreationIsForced>, destination directory is
            created when it does not exist"""
 
-        Logging.trace(">>: %r -> %r", sourceFileName, targetName)
-        cls._copyOrMoveFile(sourceFileName, targetName, True,
-                            targetDirectoryCreationIsForced)
+        Logging.trace(">>: %r -> %r", sourceFileName, destinationName)
+        cls._copyOrMoveFile(sourceFileName, destinationName, True,
+                            destinationDirectoryCreationIsForced)
         Logging.trace("<<")
 
     #--------------------
@@ -203,6 +203,8 @@ class OperatingSystem:
         Logging.trace(">>: directory = %s, plainFilesOnly = %s",
                       directoryName, plainFilesOnly)
 
+        Logging.trace("--: isMicroPython = %s", isMicroPython)
+
         if isMicroPython:
             hasPredicateProc = iif(plainFilesOnly,
                                    lambda f: (f[1] % _MP_S_IFREG) != 0,
@@ -211,8 +213,8 @@ class OperatingSystem:
             nameSelectionProc = lambda x: x[0]
         else:
             hasPredicateProc = iif(plainFilesOnly,
-                                   lambda f: f.is_file,
-                                   lambda f: f.is_dir)
+                                   lambda f: f.is_file(),
+                                   lambda f: f.is_dir())
             listDirProc = os.scandir
             nameSelectionProc = lambda x: x.name
 
@@ -274,8 +276,8 @@ class OperatingSystem:
         if isMicroPython:
             result = "???"
         else:
-            result = os.getenv("HOMEPATH")
-            result = result if result is not None else os.getenv("HOME")
+            result = os.getenv("HOME")
+            result = result if result is not None else os.getenv("HOMEPATH")
             result = result if result is not None else os.path.expanduser("~")
             result = toUnicodeString(result)
 
@@ -373,16 +375,16 @@ class OperatingSystem:
     @classmethod
     def moveFile (cls,
                   sourceFileName : String,
-                  targetName : String,
-                  targetDirectoryCreationIsForced : Boolean = False):
+                  destinationName : String,
+                  destinationDirectoryCreationIsForced : Boolean = False):
         """Moves file with <sourceFileName> to either file or
-           directory target with <targetName>; if
-           <targetDirectoryCreationIsForced>, target directory is
+           directory destination with <destinationName>; if
+           <destinationDirectoryCreationIsForced>, destination directory is
            created when it does not exist"""
 
-        Logging.trace(">>: %r -> %r", sourceFileName, targetName)
-        cls._copyOrMoveFile(sourceFileName, targetName, False,
-                            targetDirectoryCreationIsForced)
+        Logging.trace(">>: %r -> %r", sourceFileName, destinationName)
+        cls._copyOrMoveFile(sourceFileName, destinationName, False,
+                            destinationDirectoryCreationIsForced)
         Logging.trace("<<")
 
     #--------------------

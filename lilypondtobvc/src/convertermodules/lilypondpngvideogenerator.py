@@ -333,7 +333,7 @@ class _PostscriptFile:
 #============================================================
 
 class _NotationVideo:
-    """Handles the generation of the target notation video file."""
+    """Handles the generation of the resulting notation video file."""
 
     #--------------------
     # LOCAL FEATURES
@@ -424,7 +424,7 @@ class _NotationVideo:
         Logging.trace(">>: %r", pageDurationList)
 
         # for each page an MP4 fragment file is generated and finally
-        # concatenated into the target file
+        # concatenated into the destination file
         concatSpecificationFile = \
                 UTF8File(cls._concatSpecificationFileName, 'wt')
 
@@ -739,8 +739,8 @@ class LilypondPngVideoGenerator:
         _NotationVideo._generatorLogLevel = _ffmpegLogLevel
 
         # file parameters
-        _SubtitleFile.setName(self._targetSubtitleFileName)
-        _NotationVideo.setName(self._targetVideoFileName)
+        _SubtitleFile.setName(self._subtitleFileName)
+        _NotationVideo.setName(self._destinationVideoFileName)
 
         Logging.trace("<<")
 
@@ -793,8 +793,8 @@ class LilypondPngVideoGenerator:
 
     def __init__ (self,
                   lilypondFileName : String,
-                  targetVideoFileName : String,
-                  targetSubtitleFileName : String,
+                  destinationVideoFileName : String,
+                  subtitleFileName : String,
                   measureToTempoMap : Map,
                   countInMeasures : Natural,
                   frameRate : Real,
@@ -805,15 +805,15 @@ class LilypondPngVideoGenerator:
         """Initializes generator"""
 
         Logging.trace(">>: lilypondFileName = %r,"
-                      + " targetVideoFileName = %r,"
-                      + " targetSubtitleFileName = %r,"
+                      + " destinationVideoFileName = %r,"
+                      + " subtitleFileName = %r,"
                       + " measureToTempoMap = %r, countInMeasures = %r,"
                       + " frameRate = %r, scalingFactor = %d,"
                       + " ffmpegPresetName = %r,"
                       + " intermediateFileDirectoryPath = %r,"
                       + " intermediateFilesAreKept = %r",
-                      lilypondFileName, targetVideoFileName,
-                      targetSubtitleFileName, measureToTempoMap,
+                      lilypondFileName, destinationVideoFileName,
+                      subtitleFileName, measureToTempoMap,
                       countInMeasures, frameRate, scalingFactor,
                       ffmpegPresetName, intermediateFileDirectoryPath,
                       intermediateFilesAreKept)
@@ -828,8 +828,8 @@ class LilypondPngVideoGenerator:
         self._pictureFileStem                = self._makePath("temp_frame")
         self._postscriptFileName             = (self._pictureFileStem
                                                 + ".ps")
-        self._targetVideoFileName            = targetVideoFileName
-        self._targetSubtitleFileName         = targetSubtitleFileName
+        self._destinationVideoFileName       = destinationVideoFileName
+        self._subtitleFileName               = subtitleFileName
         self._measureToTempoMap              = measureToTempoMap
 
         # video parameters
@@ -854,8 +854,9 @@ class LilypondPngVideoGenerator:
         className = self.__class__.__name__
         result = (("%s(ffmpegCommand = %r, lilypondCommand = %r,"
                    + " lilypondFileName = %r, pictureFileStem = %r,"
-                   + " postscriptFileName = %r, targetVideoFileName = %r,"
-                   + " targetSubtitleFileName = %r,"
+                   + " postscriptFileName = %r,"
+                   + " destinationVideoFileName = %r,"
+                   + " subtitleFileName = %r,"
                    + " measureToTempoMap = %r, countInMeasures = %r,"
                    + " frameRate = %r, scaleFactor = %r,"
                    + " ffmpegPresetName = %r,"
@@ -863,8 +864,8 @@ class LilypondPngVideoGenerator:
                    + " intermediateFilesAreKept = %r)") %
                   (className, self._ffmpegCommand, self._lilypondCommand,
                    self._lilypondFileName, self._pictureFileStem,
-                   self._postscriptFileName, self._targetVideoFileName,
-                   self._targetSubtitleFileName, self._measureToTempoMap,
+                   self._postscriptFileName, self._destinationVideoFileName,
+                   self._subtitleFileName, self._measureToTempoMap,
                    self._countInMeasures, self._frameRate,
                    self._scalingFactor, self._ffmpegPresetName,
                    self._intermediateFileDirectoryPath,
@@ -916,7 +917,7 @@ class LilypondPngVideoGenerator:
                                    self._countInMeasures,
                                    _SubtitleFile.fileName)
 
-            isTarArchive = self._targetVideoFileName.endswith(".tar")
+            isTarArchive = self._destinationVideoFileName.endswith(".tar")
 
             if isTarArchive:
                 _NotationVideo.makeTARFile(pageToMeasureMap,

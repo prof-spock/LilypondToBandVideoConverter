@@ -16,9 +16,9 @@ midiToWavRenderingCommandLine =
 lilypondVersion = "2.19.82"
 tempLilypondFilePath = "./temp/temp_${phase}_${voiceName}.ly"
 intermediateFileDirectoryPath = "./temp"
-targetDirectoryPath = "./generated"
+destinationDirectoryPath = "./generated"
 tempAudioDirectoryPath = "./mediafiles"
-targetFileNamePrefix = "test-"
+destinationFileNamePrefix = "test-"
 
 --====================
 -- PREPROCESSING
@@ -49,7 +49,7 @@ voiceNameToChordsMap = "{"
 -- VIDEO OUTPUT
 --====================
 
-videoTargetMap = "{"
+videoDestinationMap = "{"
     "tablet: { resolution: 132,"
 	     " height: 1024,"
 	     " width: 768,"
@@ -64,7 +64,7 @@ videoTargetMap = "{"
 	     " subtitlesAreHardcoded: true } }"
 
 videoFileKindMap = "{"
-    "tabletVocGtr: { target:         tablet,"
+    "tabletVocGtr: { destination:         tablet,"
 		   " fileNameSuffix: '-tblt-vg',"
 		   " directoryPath:  './mediaFiles' ,"
 		   " voiceNameList:  'vocals, guitar' } }"

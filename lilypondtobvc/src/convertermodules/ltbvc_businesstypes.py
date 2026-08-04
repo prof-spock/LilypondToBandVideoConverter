@@ -6,7 +6,7 @@
 #                          - MidiTrackSettings
 #                          - TempoTrack
 #                          - VideoFileKind
-#                          - VideoTarget
+#                          - VideoDestination
 #                          - VoiceDescriptor
 #
 # author: Dr. Thomas Tensi, 2006 - 2017
@@ -196,7 +196,7 @@ class MidiTrackSettings (AbstractDataType):
                                                 0, maximumValue)))
 
         rangeAdjustProc("midiChannel", 15)
-        rangeAdjustProc("midiInstrumentBank", 127)
+        rangeAdjustProc("midiInstrumentBank", 128*128 - 1)
         rangeAdjustProc("midiInstrument", 127)
         rangeAdjustProc("midiVolume", 127)
         rangeAdjustProc("midiPanPosition", 127)
@@ -210,7 +210,7 @@ class VideoFileKind (AbstractDataType):
        for video generation."""
 
     name           : String     = ""
-    target         : String     = ""
+    destination    : String     = ""
     fileNameSuffix : String     = ""
     directoryPath  : String     = ""
     voiceNameList  : StringList = specialField((),
@@ -219,8 +219,8 @@ class VideoFileKind (AbstractDataType):
 #====================
 
 @dataclass(frozen=True)
-class VideoTarget (AbstractDataType):
-    """This class encapsulates the settings for a video target used
+class VideoDestination (AbstractDataType):
+    """This class encapsulates the settings for a video destination used
        for video generation."""
 
     name                  : String  = ""

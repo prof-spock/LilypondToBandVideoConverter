@@ -42,6 +42,21 @@ def sign (x) -> Integer:
 
 #--------------------
 
+def signedDivmod (a : Integer,
+                  b : Natural) -> Tuple:
+    """Returns the quotient and remainder of division of <a> by <b>
+       taking sign of <a> into account"""
+
+    if a >=0:
+        quotient, remainder = divmod(a, b)
+    else:
+        quotient, remainder = divmod(-a, b)
+        quotient, remainder = -quotient, -remainder
+
+    return (quotient, remainder)
+
+#--------------------
+
 def _canonicalTrackName (trackName : String) -> String:
     """Returns track name without any suffixes appended for
        multiple MIDI tracks of the same instrument."""
@@ -333,8 +348,8 @@ class _MusicTime:
             # the duration of each measure in list
             midiTicksPerMeasure = \
                 cls._measureToMidiTimeMap[cls._firstMeasure + 1]
-            measure, remainingMidiTime = divmod(remainingMidiTime,
-                                                midiTicksPerMeasure)
+            measure, remainingMidiTime = signedDivmod(remainingMidiTime,
+                                                      midiTicksPerMeasure)
         else:
             measure = cls._measureFromMidiTime(remainingMidiTime)
             remainingMidiTime -= cls._measureToMidiTimeMap[measure]
@@ -343,7 +358,8 @@ class _MusicTime:
         offset = iif(isDuration, 0, 1)
 
         for factor in cls._factorVector:
-            part, remainingMidiTime = divmod(remainingMidiTime, factor)
+            part, remainingMidiTime = signedDivmod(remainingMidiTime,
+                                                   factor)
             part += offset
             partList.append(part)
 
@@ -878,7 +894,8 @@ class _Humanizer:
             if event.kind == "On":
                 midiTime = event.midiTime
                 velocity = \
-                    max(event.velocity, midiTimeToVelocityMap.get(midiTime, 0))
+                    max(event.velocity,
+                        midiTimeToVelocityMap.get(midiTime, 0))
                 midiTimeToVelocityMap[midiTime] = velocity
 
         measureToVelocityMap = {}
@@ -1407,8 +1424,7 @@ class MidiTransformer:
 
     #--------------------
 
-    @classmethod
-    def _processPositionInstrumentsLine (cls,
+    def _processPositionInstrumentsLine (self,
                                          currentLine : String,
                                          parseState : _ParseState,
                                          trackToSettingsMap : Map,
@@ -1421,6 +1437,8 @@ class MidiTransformer:
            settings"""
 
         Logging.trace(">>: [%s]#%s", parseState, currentLine)
+
+        cls = self.__class__
 
         ErrorMsg_programChangeImpossible = \
             "cannot do a program change for undefined settings"
@@ -1452,33 +1470,9 @@ class MidiTransformer:
             # ignore this line
             Logging.trace("--: skipped")
         elif cls._programChangeRegExp.search(currentLine):
-            midiTime = int(currentLine.split(" ", 1)[0])
-
-            if parseState == _ParseState.inOtherTrack:
-                # leave line as is
-                lineBuffer.writeLine(currentLine)
-            elif parseState != _ParseState.inInstrumentTrack:
-                Logging.trace("--: skipped program change")
-            elif activeSettings is None:
-                Logging.traceError(ErrorMsg_programChangeImpossible)
-            else:
-                Logging.trace("--: replace by new settings")
-                prefix = "%d Par ch=%d " % (midiTime,
-                                            activeSettings.midiChannel)
-
-                def lineGeneratorProc (controllerIndex, value):
-                    st = (prefix + "c=%d v=%d") % (controllerIndex, value)
-                    lineBuffer.writeLine(st)
-
-                st = "%d PrCh ch=%d p=%d" % (midiTime,
-                                             activeSettings.midiChannel,
-                                             activeSettings.midiInstrument)
-                lineGeneratorProc( 0, activeSettings.midiInstrumentBank)
-                lineBuffer.writeLine(st)
-                lineGeneratorProc( 7, activeSettings.midiVolume)
-                lineGeneratorProc(10, activeSettings.midiPanPosition)
-                lineGeneratorProc(91, activeSettings.midiReverbLevel)
-                parseState = _ParseState.afterSettings
+            parseState = \
+                self._processProgramChangeLine(currentLine, parseState,
+                                               activeSettings, lineBuffer)
         else:
             if (cls._channelReferenceRegExp.search(currentLine)
                 and parseState != _ParseState.inOtherTrack):
@@ -1495,6 +1489,66 @@ class MidiTransformer:
 
         Logging.trace("<<: %s", parseState)
         return parseState, activeSettings
+
+    #--------------------
+
+    def _processProgramChangeLine (self,
+                                   currentLine : String,
+                                   parseState : _ParseState,
+                                   activeSettings : Map,
+                                   lineBuffer : StringList) -> _ParseState:
+        """Process a single program change line <currentLine> in
+           parser state <parseState> with given <activeSettings> map
+           while positioning instruments and updates <lineBuffer>
+           accordingly; finally returns updated parse state"""
+
+        Logging.trace(">>: [%s]#%s", parseState, currentLine)
+
+        ErrorMsg_programChangeImpossible = \
+            "cannot do a program change for undefined settings"
+
+        midiTime = int(currentLine.split(" ", 1)[0])
+
+        if parseState == _ParseState.inOtherTrack:
+            # leave line as is
+            lineBuffer.writeLine(currentLine)
+        elif parseState != _ParseState.inInstrumentTrack:
+            Logging.trace("--: skipped program change")
+        elif activeSettings is None:
+            Logging.traceError(ErrorMsg_programChangeImpossible)
+        else:
+            Logging.trace("--: replace by new settings from %s",
+                          activeSettings)
+            prefix = "%d Par ch=%d " % (midiTime,
+                                        activeSettings.midiChannel)
+
+            def lineGeneratorProc (controllerIndex, value):
+                st = (prefix + "c=%d v=%d") % (controllerIndex, value)
+                Logging.trace("--: add line '%s'", st)
+                lineBuffer.writeLine(st)
+
+            bankMSB, bankLSB = \
+                divmod(activeSettings.midiInstrumentBank, 128)
+
+            if self._largeBankNumbersAreSupported:
+                lineGeneratorProc( 0, bankMSB)
+                lineGeneratorProc(32, bankLSB)
+            else:
+                lineGeneratorProc( 0, bankLSB)
+
+            st = "%d PrCh ch=%d p=%d" % (midiTime,
+                                         activeSettings.midiChannel,
+                                         activeSettings.midiInstrument)
+            lineBuffer.writeLine(st)
+
+            lineGeneratorProc( 7, activeSettings.midiVolume)
+            lineGeneratorProc(10, activeSettings.midiPanPosition)
+            lineGeneratorProc(91, activeSettings.midiReverbLevel)
+
+            parseState = _ParseState.afterSettings
+
+        Logging.trace("<<: %s", parseState)
+        return parseState
 
     #--------------------
     # EXPORTED FEATURES
@@ -1526,13 +1580,15 @@ class MidiTransformer:
 
     def __init__ (self,
                   midiFileName : String,
-                  intermediateFilesAreKept : Boolean = False):
+                  intermediateFilesAreKept : Boolean = False,
+                  largeBankNumbersAreSupported : Boolean = True):
         """Reads data from <midiFileName> and stores it internally in
            a text representation."""
 
         Logging.trace(">>: %r", midiFileName)
 
-        self._intermediateFilesAreKept = intermediateFilesAreKept
+        self._intermediateFilesAreKept     = intermediateFilesAreKept
+        self._largeBankNumbersAreSupported = largeBankNumbersAreSupported
 
         midiFile = MidiFileHandler()
         self._lineList = midiFile.readFile(midiFileName)
@@ -1542,13 +1598,14 @@ class MidiTransformer:
     #--------------------
 
     def save (self,
-              targetMidiFileName : String):
-        """Writes internal data to MIDI file with <targetMidiFileName>."""
+              destinationMidiFileName : String):
+        """Writes internal data to MIDI file with
+           <destinationMidiFileName>."""
 
-        Logging.trace(">>: %r", targetMidiFileName)
+        Logging.trace(">>: %r", destinationMidiFileName)
 
         midiFile = MidiFileHandler()
-        midiFile.writeFile(targetMidiFileName, self._lineList)
+        midiFile.writeFile(destinationMidiFileName, self._lineList)
 
         Logging.trace("<<")
 
@@ -1831,8 +1888,6 @@ class MidiTransformer:
 
         Logging.trace(">>: %r", trackToSettingsMap)
 
-        cls = self.__class__
-
         lineList = []
         lineBuffer = _LineBuffer(lineList)
         parseState = _ParseState.inLimbo
@@ -1840,9 +1895,9 @@ class MidiTransformer:
 
         for currentLine in self._lineList:
             parseState, activeSettings = \
-                cls._processPositionInstrumentsLine(currentLine, parseState,
-                                                    trackToSettingsMap,
-                                                    activeSettings, lineBuffer)
+                self._processPositionInstrumentsLine(currentLine, parseState,
+                                                     trackToSettingsMap,
+                                                     activeSettings, lineBuffer)
 
         lineBuffer.flush()
         self._lineList = lineList
